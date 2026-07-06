@@ -16,6 +16,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    if (db && !db.users) {
+        db.users = [
+            { username: 'admin', passwordHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', role: 'admin', employeeId: 'EMP-001', name: 'Dr. Elena Rostova' }, // admin123
+            { username: 'hr', passwordHash: '070a3b5e8d4bd5c46acccb91c9c54614c0cd649e78c4c4719e3a64270bae5ddf', role: 'hr', employeeId: 'EMP-008', name: 'Clara Oswald' }, // hr123
+            { username: 'clara', passwordHash: 'c7b418ece9991f8e5182e257e8e609c8d2a7a49d3d3f140692a52ab75b197030', role: 'dept_head', employeeId: 'EMP-003', name: 'Nurse Clara de Leon' }, // clara123
+            { username: 'sarah', passwordHash: 'dd7f6bfb6e0d8bcd754e97cae4975c07996f00508f8346d649c5814e19c3f9b9', role: 'supervisor', employeeId: 'EMP-007', name: 'Dr. Sarah Tiongson' }, // sarah123
+            { username: 'maria', passwordHash: '626e3c805e77eeb472c42c6be607be2af7ac5c08fd7050f278e0330fe81abf57', role: 'employee', employeeId: 'EMP-002', name: 'Nurse Maria Santos' }, // maria123
+            { username: 'carlos', passwordHash: 'ac9c2c34c9f7ad52528c3422af40a66e2e24aaf2a727831255413c9470158984', role: 'employee', employeeId: 'EMP-006', name: 'Nurse Carlos Diaz' } // carlos123
+        ];
+        localStorage.setItem('hims_database', JSON.stringify(db));
+    }
+
     if (!db) {
         db = {
             employees: [
