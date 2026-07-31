@@ -49,4 +49,96 @@ class CompetencyController extends Controller
 
         return view('competency.index', compact('stats','departments','gap_matrix','credential_alerts','domains'));
     }
+
+    public function createAssessment()
+    {
+        return view('competency.assessments.create', [
+            'employees'    => DB::table('employees')->orderBy('first_name')->get(),
+            'competencies' => DB::table('competencies')->orderBy('competency_name')->get(),
+        ]);
+    }
+
+    public function storeAssessment(\Illuminate\Http\Request $request)
+    {
+        $request->validate(['employee_id'=>'required','competency_id'=>'required','current_proficiency'=>'required|numeric|min:1|max:5']);
+        $required = DB::table('competencies')->where('competency_id',$request->competency_id)->value('required_proficiency') ?? 3;
+        DB::table('competency_assessments')->insert([
+            'assessment_id'      => \Illuminate\Support\Str::uuid(),
+            'employee_id'        => $request->employee_id,
+            'competency_id'      => $request->competency_id,
+            'current_proficiency'=> $request->current_proficiency,
+            'required_proficiency'=> $required,
+            'gap'                => round($request->current_proficiency - $required, 2),
+            'assessment_method'  => $request->assessment_method ?? 'self_assessment',
+            'assessment_date'    => $request->assessment_date ?? now()->toDateString(),
+            'assessor_notes'     => $request->assessor_notes,
+            'assessed_by'        => auth()->user()->employee_id ?? null,
+            'created_at'         => now(), 'updated_at' => now(),
+        ]);
+        return redirect()->route('competency.index')->with('success','Assessment recorded.');
+    }
+
+    public function credentialsIndex()
+    {
+        $credentials = DB::table('employee_credentials as ec')
+            ->join('employees as e','ec.employee_id','=','e.employee_id')
+            ->select('ec.*', DB::raw("CONCAT(e.first_name,' ',e.last_name) as employee_name"))
+            ->orderBy('ec.expiry_date')->paginate(20);
+        $stats = [
+            'total'   => DB::table('employee_credentials')->count(),
+            'valid'   => DB::table('employee_credentials')->whereDate('expiry_date','>=',now())->count(),
+            'expiring'=> DB::table('employee_credentials')->whereBetween('expiry_date',[now(),now()->addDays(30)])->count(),
+            'expired' => DB::table('employee_credentials')->whereDate('expiry_date','<',now())->count(),
+        ];
+        return view('competency.credentials.index', compact('credentials','stats'));
+    }
+
+    public function createCredential()
+    {
+        return view('competency.credentials.create', [
+            'employees' => DB::table('employees')->orderBy('first_name')->get(),
+        ]);
+    }
+
+    public function storeCredential(\Illuminate\Http\Request $request)
+    {
+        $request->validate(['employee_id'=>'required','credential_type'=>'required|string']);
+        DB::table('employee_credentials')->insert([
+            'credential_id'     => \Illuminate\Support\Str::uuid(),
+            'employee_id'       => $request->employee_id,
+            'credential_type'   => $request->credential_type,
+            'credential_number' => $request->credential_number,
+            'issuing_body'      => $request->issuing_body,
+            'issue_date'        => $request->issue_date ?: null,
+            'expiry_date'       => $request->expiry_date ?: null,
+            'verification_status'=> 'pending',
+            'created_at'        => now(), 'updated_at' => now(),
+        ]);
+        return redirect()->route('competency.credentials.index')->with('success','Credential added.');
+    }
+
+    public function createDomain()
+    {
+        return view('competency.domains.create');
+    }
+
+    public function storeDomain(\Illuminate\Http\Request $request)
+    {
+        $request->validate(['domain_name'=>'required|string|max:150']);
+        DB::table('competency_domains')->insert([
+            'domain_id'   => \Illuminate\Support\Str::uuid(),
+            'domain_name' => $request->domain_name,
+            'description' => $request->description,
+            'created_at'  => now(), 'updated_at' => now(),
+        ]);
+        return redirect()->route('competency.index')->with('success','Domain created.');
+    }
+
+    public function showDomain($id)
+    {
+        $domain = DB::table('competency_domains')->where('domain_id',$id)->first();
+        abort_if(!$domain, 404);
+        $categories = DB::table('competency_categories')->where('domain_id',$id)->get();
+        return view('competency.domains.show', compact('domain','categories'));
+    }
 }

@@ -76,4 +76,21 @@ class EmployeeController extends Controller
 
         return view('employees.show', compact('employee','reviews','credentials','enrollments','recognitions'));
     }
+
+    public function destroy($id)
+    {
+        $employee = DB::table('employees')->where('employee_id', $id)->first();
+        abort_if(!$employee, 404);
+
+        $name = $employee->first_name . ' ' . $employee->last_name;
+
+        // Soft-delete approach: set employment_status to 'terminated' to keep data integrity
+        DB::table('employees')->where('employee_id', $id)->update([
+            'employment_status' => 'terminated',
+            'updated_at'        => now(),
+        ]);
+
+        return redirect()->route('employees.index')
+            ->with('success', "Employee \"{$name}\" has been deactivated.");
+    }
 }

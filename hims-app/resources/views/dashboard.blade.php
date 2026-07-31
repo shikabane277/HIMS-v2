@@ -73,26 +73,14 @@
         </div>
     </div>
     <div class="col-lg-4">
-        <div class="hims-card animate-in mb-3" style="animation-delay:.3s">
+        <div class="hims-card animate-in" style="animation-delay:.3s">
             <div class="card-header"><h5>🚀 Quick Actions</h5></div>
             <div class="card-body d-flex flex-column gap-2">
                 <a href="{{ route('performance.cycles.create') }}" class="btn-hims btn-hims-primary" style="justify-content:center"><i class="bi bi-plus-circle"></i> New Review Cycle</a>
                 <a href="{{ route('training.sessions.create') }}" class="btn-hims btn-hims-outline" style="justify-content:center"><i class="bi bi-calendar-plus"></i> Schedule Training</a>
                 <a href="{{ route('recognition.posts.create') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-star"></i> Give Recognition</a>
                 <a href="{{ route('learning.courses.create') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-book"></i> Create Course</a>
-            </div>
-        </div>
-        <div class="hims-card animate-in" style="animation-delay:.36s">
-            <div class="card-header"><h5>🤖 Gemini AI Assistant</h5></div>
-            <div class="card-body">
-                <p style="font-size:13px;color:#6b7280;margin-bottom:12px">Ask in English or Tagalog/Taglish</p>
-                <form action="{{ route('ai.query') }}" method="POST">
-                    @csrf
-                    <textarea name="query" class="hims-input" rows="3" placeholder="Sino ang successor para sa ICU Head Nurse?"></textarea>
-                    <button type="submit" class="btn-hims btn-hims-primary mt-2" style="width:100%;justify-content:center">
-                        <i class="bi bi-send"></i> Ask Gemini AI
-                    </button>
-                </form>
+                <a href="{{ route('succession.candidates.create') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-person-plus"></i> Nominate Candidate</a>
             </div>
         </div>
     </div>

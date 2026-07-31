@@ -13,7 +13,7 @@ class GeminiService
     public function __construct()
     {
         $this->apiKey   = config('services.gemini.api_key', env('GEMINI_API_KEY',''));
-        $this->endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+        $this->endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
     }
 
     public function ask(string $prompt): string
@@ -22,38 +22,51 @@ class GeminiService
             return '⚠️ Gemini API key not configured. Please add GEMINI_API_KEY to your .env file.';
         }
 
-        try {
-            $systemContext = "You are an AI assistant for a Hospital Information Management System (HIMS) "
-                . "in the Philippines. You help HR officers with performance reviews, competency gaps, "
-                . "succession planning, training schedules, learning pathways, and employee recognition. "
-                . "You understand both English and Tagalog/Taglish. Be concise and helpful. "
-                . "Always be professional and sensitive to healthcare context.";
+        $models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-pro'];
 
-            $response = Http::timeout(30)->post("{$this->endpoint}?key={$this->apiKey}", [
-                'contents' => [
-                    ['role' => 'user', 'parts' => [
-                        ['text' => $systemContext . "\n\nUser question: " . $prompt]
-                    ]]
-                ],
-                'generationConfig' => [
-                    'temperature'     => 0.7,
-                    'maxOutputTokens' => 1024,
-                ],
-            ]);
+        foreach ($models as $model) {
+            try {
+                $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent";
+                $systemContext = "You are an AI assistant for a Hospital Information Management System (HIMS) "
+                    . "in the Philippines. You help HR officers with performance reviews, competency gaps, "
+                    . "succession planning, training schedules, learning pathways, and employee recognition. "
+                    . "You understand both English and Tagalog/Taglish. Be concise and helpful. "
+                    . "Always be professional and sensitive to healthcare context.";
 
-            if ($response->successful()) {
-                $data = $response->json();
-                return $data['candidates'][0]['content']['parts'][0]['text']
-                    ?? 'No response generated.';
+                $response = Http::timeout(30)->post("{$endpoint}?key={$this->apiKey}", [
+                    'contents' => [
+                        ['role' => 'user', 'parts' => [
+                            ['text' => $systemContext . "\n\nUser question: " . $prompt]
+                        ]]
+                    ],
+                    'generationConfig' => [
+                        'temperature'     => 0.7,
+                        'maxOutputTokens' => 1024,
+                    ],
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    return $data['candidates'][0]['content']['parts'][0]['text']
+                        ?? 'No response generated.';
+                }
+
+                if ($response->status() === 404) {
+                    continue; // try next model
+                }
+
+                $errData = $response->json();
+                $msg = $errData['error']['message'] ?? $response->body();
+                Log::warning('Gemini API error', ['status' => $response->status(), 'body' => $response->body()]);
+                return "⚠️ Gemini API Error ({$response->status()}): {$msg}";
+
+            } catch (\Exception $e) {
+                Log::error('Gemini request failed', ['error' => $e->getMessage()]);
+                return '⚠️ AI service error: ' . $e->getMessage();
             }
-
-            Log::warning('Gemini API error', ['status' => $response->status(), 'body' => $response->body()]);
-            return '⚠️ AI service temporarily unavailable. Please try again later.';
-
-        } catch (\Exception $e) {
-            Log::error('Gemini request failed', ['error' => $e->getMessage()]);
-            return '⚠️ AI service error: ' . $e->getMessage();
         }
+
+        return '⚠️ Unable to connect to Gemini API. Please check your GEMINI_API_KEY in .env.';
     }
 
     /**

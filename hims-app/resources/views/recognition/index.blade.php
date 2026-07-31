@@ -64,7 +64,7 @@
                         <form method="POST" action="{{ route('recognition.react', $post->post_id) }}" style="display:inline">
                             @csrf
                             <input type="hidden" name="reaction_type" value="like">
-                            <button type="submit" style="border:none;background:none;cursor:pointer;display:flex;align-items:center;gap:4px;color:{{ $post->user_reacted ? 'var(--hims-primary)' : '#9ca3af' }};font-size:13px;font-weight:{{ $post->user_reacted ? '700' : '400' }}">
+                            <button type="submit" style="border:none;background:none;cursor:pointer;display:flex;align-items:center;gap:4px;color:{{ ($post->user_reacted ?? false) ? 'var(--hims-primary)' : '#9ca3af' }};font-size:13px;font-weight:{{ ($post->user_reacted ?? false) ? '700' : '400' }}">
                                 <i class="bi bi-heart-fill"></i> {{ $post->reactions_count ?? 0 }}
                             </button>
                         </form>

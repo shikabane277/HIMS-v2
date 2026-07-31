@@ -10,6 +10,8 @@ use App\Http\Controllers\SuccessionController;
 use App\Http\Controllers\RecognitionController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\DepartmentController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ──────────────────────────────────────────────────
@@ -99,21 +101,51 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ── Employees & Departments ──────────────────────────────
     Route::prefix('employees')->name('employees.')->group(function () {
-        Route::get('/',         [EmployeeController::class, 'index'])->name('index');
-        Route::get('/create',   [EmployeeController::class, 'create'])->name('create');
-        Route::post('/',        [EmployeeController::class, 'store'])->name('store');
-        Route::get('/{id}',     [EmployeeController::class, 'show'])->name('show');
+        Route::get('/',           [EmployeeController::class, 'index'])->name('index');
+        Route::get('/create',     [EmployeeController::class, 'create'])->name('create');
+        Route::post('/',          [EmployeeController::class, 'store'])->name('store');
+        Route::get('/{id}',       [EmployeeController::class, 'show'])->name('show');
+        Route::get('/{id}/edit',  [EmployeeController::class, 'edit'])->name('edit');
+        Route::put('/{id}',       [EmployeeController::class, 'update'])->name('update');
+        Route::delete('/{id}',    [EmployeeController::class, 'destroy'])->name('destroy');
     });
 
     Route::prefix('departments')->name('departments.')->group(function () {
         Route::get('/', function () {
-            $depts = \Illuminate\Support\Facades\DB::table('departments')->orderBy('name')->get();
+            $depts = \Illuminate\Support\Facades\DB::table('departments as d')
+                ->leftJoin('employees as e','d.department_id','=','e.department_id')
+                ->select('d.*', \Illuminate\Support\Facades\DB::raw('COUNT(e.employee_id) as employee_count'))
+                ->groupBy('d.department_id','d.name','d.department_code','d.head_employee_id',
+                          'd.parent_dept_id','d.is_clinical','d.created_at','d.updated_at')
+                ->orderBy('d.name')->get();
             return view('departments.index', compact('depts'));
         })->name('index');
+
+        Route::post('/', function (\Illuminate\Http\Request $request) {
+            $request->validate(['name'=>'required|string|max:150','department_code'=>'nullable|string|max:20']);
+            \Illuminate\Support\Facades\DB::table('departments')->insert([
+                'department_id'   => \Illuminate\Support\Str::uuid(),
+                'name'            => $request->name,
+                'department_code' => $request->department_code ?: null,
+                'is_clinical'     => (bool)$request->is_clinical,
+                'created_at'      => now(), 'updated_at' => now(),
+            ]);
+            return redirect()->route('departments.index')->with('success','Department added.');
+        })->name('store');
     });
 
     // ── AI ───────────────────────────────────────────────────
-    Route::post('/ai/query', [AiController::class, 'query'])->name('ai.query');
+    Route::post('/ai/query',          [AiController::class, 'query'])->name('ai.query');
+    Route::get('/ai/history',         [AiController::class, 'history'])->name('ai.history');
+    Route::delete('/ai/history',      [AiController::class, 'clearHistory'])->name('ai.history.clear');
+
+    Route::post('/log-error', function (\Illuminate\Http\Request $request) {
+        \Illuminate\Support\Facades\Log::error('JS ERROR: ' . $request->input('message') . ' in ' . $request->input('source') . ' on line ' . $request->input('lineno'));
+        return response()->json(['ok' => true]);
+    })->name('log-error');
+
+    // ── User Management ───────────────────────────────────────
+    Route::resource('users', UserController::class);
 
     // ── Profile ──────────────────────────────────────────────
     Route::get('/profile',      [ProfileController::class, 'edit'])->name('profile.edit');

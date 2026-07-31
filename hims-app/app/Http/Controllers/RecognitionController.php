@@ -20,6 +20,8 @@ class RecognitionController extends Controller
                                     ->orderByDesc('pts')->value('department_name') ?? '—',
         ];
 
+        $currentEmpId = auth()->user()->employee_id ?? '';
+
         $posts = DB::table('recognition_posts as rp')
             ->join('employees as author','rp.author_id','=','author.employee_id')
             ->join('employees as recip','rp.recipient_id','=','recip.employee_id')
@@ -36,11 +38,19 @@ class RecognitionController extends Controller
                 DB::raw("CONCAT(recip.first_name,' ',recip.last_name) AS recipient_name"),
                 'rb.badge_name','rb.badge_icon',
                 DB::raw('COUNT(DISTINCT rrr.reaction_id) as reactions_count'),
-                DB::raw('COUNT(DISTINCT rc2.comment_id) as comments_count')
+                DB::raw('COUNT(DISTINCT rc2.comment_id) as comments_count'),
+                DB::raw("EXISTS(
+                    SELECT 1 FROM recognition_reactions ur
+                    WHERE ur.post_id = rp.post_id
+                    AND ur.employee_id = " . DB::getPdo()->quote($currentEmpId) . "
+                ) as user_reacted")
             )
             ->where('rp.moderation_status','approved')
-            ->groupBy('rp.post_id','author.first_name','author.last_name','ad.name',
-                      'recip.first_name','recip.last_name','rb.badge_name','rb.badge_icon')
+            ->groupBy(
+                'rp.post_id','rp.message','rp.post_type','rp.is_featured','rp.created_at',
+                'author.first_name','author.last_name','ad.name',
+                'recip.first_name','recip.last_name','rb.badge_name','rb.badge_icon'
+            )
             ->orderByDesc('rp.created_at')->paginate(10);
 
         $leaderboard = DB::table('v_recognition_leaderboard')

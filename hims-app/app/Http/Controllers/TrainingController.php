@@ -112,6 +112,35 @@ class TrainingController extends Controller
     public function venuesIndex() { return view('training.venues.index', ['venues' => DB::table('training_venues')->get()]); }
     public function createVenue() { return view('training.venues.create'); }
 
+    public function showSession($id)
+    {
+        $session = DB::table('training_sessions as ts')
+            ->join('employees as i','ts.instructor_id','=','i.employee_id')
+            ->leftJoin('training_venues as tv','ts.venue_id','=','tv.venue_id')
+            ->leftJoin('training_registrations as tr','ts.session_id','=','tr.session_id')
+            ->leftJoin('training_feedback as tf','ts.session_id','=','tf.session_id')
+            ->select('ts.*','tv.venue_name',
+                DB::raw("CONCAT(i.first_name,' ',i.last_name) AS instructor_name"),
+                DB::raw('COUNT(DISTINCT tr.registration_id) as registered_count'),
+                DB::raw('AVG(tf.overall_rating) as avg_rating'))
+            ->where('ts.session_id',$id)
+            ->groupBy('ts.session_id','tv.venue_name','i.first_name','i.last_name')
+            ->first();
+
+        abort_if(!$session, 404);
+
+        $registrations = DB::table('training_registrations as tr')
+            ->join('employees as e','tr.employee_id','=','e.employee_id')
+            ->join('departments as d','e.department_id','=','d.department_id')
+            ->select('tr.*',
+                DB::raw("CONCAT(e.first_name,' ',e.last_name) as employee_name"),
+                'd.name as department_name')
+            ->where('tr.session_id',$id)
+            ->get();
+
+        return view('training.sessions.show', compact('session','registrations'));
+    }
+
     public function storeVenue(Request $request)
     {
         $request->validate(['venue_name'=>'required|string|max:150','capacity'=>'required|integer|min:1']);
@@ -127,3 +156,4 @@ class TrainingController extends Controller
         return redirect()->route('training.venues.index')->with('success','Venue added.');
     }
 }
+

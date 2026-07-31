@@ -22,7 +22,7 @@ class LearningController extends Controller
             ->select('c.*', DB::raw('COUNT(ce.enrollment_id) as enrollments_count'))
             ->where('c.is_active', true)
             ->groupBy('c.course_id')
-            ->orderByDesc('ce.enrollment_id')->limit(20)->get();
+            ->orderByDesc('enrollments_count')->limit(20)->get();
 
         $pathways = DB::table('learning_pathways as lp')
             ->leftJoin('pathway_courses as pc','lp.pathway_id','=','pc.pathway_id')
@@ -86,5 +86,59 @@ class LearningController extends Controller
         }
 
         return redirect()->route('learning.index')->with('success','Enrolled successfully!');
+    }
+
+    public function showCourse($id)
+    {
+        $course = DB::table('courses')->where('course_id',$id)->first();
+        abort_if(!$course, 404);
+        $enrollments = DB::table('course_enrollments as ce')
+            ->join('employees as e','ce.employee_id','=','e.employee_id')
+            ->where('ce.course_id',$id)
+            ->select('ce.*',DB::raw("CONCAT(e.first_name,' ',e.last_name) as employee_name"))
+            ->get();
+        return view('learning.courses.show', compact('course','enrollments'));
+    }
+
+    public function pathwaysIndex()
+    {
+        $pathways = DB::table('learning_pathways as lp')
+            ->leftJoin('pathway_courses as pc','lp.pathway_id','=','pc.pathway_id')
+            ->select('lp.*', DB::raw('COUNT(pc.id) as courses_count'))
+            ->groupBy('lp.pathway_id','lp.pathway_name','lp.description','lp.is_mandatory','lp.is_active','lp.created_at','lp.updated_at')
+            ->get();
+        return view('learning.pathways.index', compact('pathways'));
+    }
+
+    public function createPathway()
+    {
+        return view('learning.pathways.create');
+    }
+
+    public function storePathway(\Illuminate\Http\Request $request)
+    {
+        $request->validate(['pathway_name'=>'required|string|max:200']);
+        DB::table('learning_pathways')->insert([
+            'pathway_id'   => Str::uuid(),
+            'pathway_name' => $request->pathway_name,
+            'description'  => $request->description,
+            'is_mandatory' => $request->boolean('is_mandatory'),
+            'is_active'    => true,
+            'created_by'   => auth()->id(),
+            'created_at'   => now(), 'updated_at' => now(),
+        ]);
+        return redirect()->route('learning.pathways.index')->with('success','Pathway created.');
+    }
+
+    public function cpdIndex()
+    {
+        $records = DB::table('cpd_records as cr')
+            ->join('employees as e','cr.employee_id','=','e.employee_id')
+            ->leftJoin('employees as vb','cr.verified_by','=','vb.employee_id')
+            ->select('cr.*',
+                DB::raw("CONCAT(e.first_name,' ',e.last_name) as employee_name"),
+                DB::raw("CONCAT(COALESCE(vb.first_name,''),' ',COALESCE(vb.last_name,'')) as verified_by_name"))
+            ->orderByDesc('cr.date_earned')->paginate(30);
+        return view('learning.cpd.index', compact('records'));
     }
 }
