@@ -91,11 +91,19 @@
     </div>
 </aside>
 
+<!-- SIDEBAR BACKDROP (mobile) -->
+<div class="hims-sidebar-backdrop" id="sidebar-backdrop"></div>
+
 <!-- TOPBAR -->
 <header class="hims-topbar">
     <div class="topbar-left">
-        <h1 class="page-title">@yield('page-title', 'Dashboard')</h1>
-        <p class="page-breadcrumb">@yield('breadcrumb', 'HIMS / Dashboard')</p>
+        <button class="hims-menu-toggle" id="menu-toggle" aria-label="Toggle menu">
+            <i class="bi bi-list"></i>
+        </button>
+        <div>
+            <h1 class="page-title">@yield('page-title', 'Dashboard')</h1>
+            <p class="page-breadcrumb">@yield('breadcrumb', 'HIMS / Dashboard')</p>
+        </div>
     </div>
     <div class="topbar-right">
         <button class="topbar-btn" title="Notifications">
@@ -302,10 +310,28 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const sidebar = document.getElementById('sidebar');
+        const sidebar     = document.getElementById('sidebar');
+        const menuToggle  = document.getElementById('menu-toggle');
+        const backdrop    = document.getElementById('sidebar-backdrop');
+
+        // ── Mobile sidebar toggle ──
+        function openSidebar()  { sidebar.classList.add('open');  backdrop.classList.add('open'); }
+        function closeSidebar() { sidebar.classList.remove('open'); backdrop.classList.remove('open'); }
+        function toggleSidebar() { sidebar.classList.contains('open') ? closeSidebar() : openSidebar(); }
+
+        if (menuToggle) menuToggle.addEventListener('click', toggleSidebar);
+        if (backdrop)   backdrop.addEventListener('click', closeSidebar);
+
+        // Auto-close the drawer after tapping any nav link (mobile)
+        sidebar.querySelectorAll('.sidebar-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 768) closeSidebar();
+            });
+        });
+
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
-                sidebar.classList.remove('open');
+                closeSidebar();
                 closePanel();
             }
         });
