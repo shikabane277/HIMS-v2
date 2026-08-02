@@ -29,8 +29,17 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="hims-label">Target Role / Department</label>
-                            <input type="text" name="target_role" class="hims-input" value="{{ old('target_role') }}" placeholder="e.g. Staff Nurse">
+                            <label class="hims-label">Total CPD Hours</label>
+                            <input type="number" name="total_cpd_hours" class="hims-input" value="{{ old('total_cpd_hours') }}" min="0" step="0.5" placeholder="e.g. 24">
+                        </div>
+                        <div class="col-12">
+                            <label class="hims-label">Target Roles</label>
+                            <select name="target_roles[]" class="hims-input hims-select" multiple size="6">
+                                @foreach($roles ?? [] as $role)
+                                    <option value="{{ $role->role_id }}" @selected(in_array($role->role_id, old('target_roles', [])))>{{ $role->role_name }}</option>
+                                @endforeach
+                            </select>
+                            <small style="color:#9ca3af;font-size:11.5px">Leave empty to make this pathway available to all roles. Ctrl/Cmd-click to select several.</small>
                         </div>
                         <div class="col-12">
                             <label class="hims-label">Description</label>

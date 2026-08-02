@@ -60,7 +60,7 @@ class LearningController extends Controller
             'passing_score'    => $request->passing_score ?? 70,
             'is_mandatory'     => $request->boolean('is_mandatory'),
             'is_active'        => true,
-            'created_by'       => auth()->id(),
+            'created_by'       => $this->currentEmployeeId(),
             'created_at'       => now(), 'updated_at' => now(),
         ]);
 
@@ -69,19 +69,28 @@ class LearningController extends Controller
 
     public function enroll($courseId)
     {
+        $empId = $this->currentEmployeeId();
+
+        if (! $empId) {
+            return back()->with('error','Your account is not linked to an employee profile, so it cannot be enrolled.');
+        }
+
+        abort_if(! DB::table('courses')->where('course_id', $courseId)->exists(), 404);
+
         $exists = DB::table('course_enrollments')
-            ->where('employee_id', auth()->user()->employee_id ?? '')
+            ->where('employee_id', $empId)
             ->where('course_id', $courseId)->exists();
 
+        // course_enrollments has no timestamps(); it tracks enrollment_date/completed_at.
         if (!$exists) {
             DB::table('course_enrollments')->insert([
                 'enrollment_id'   => Str::uuid(),
-                'employee_id'     => auth()->user()->employee_id,
+                'employee_id'     => $empId,
                 'course_id'       => $courseId,
+                'enrolled_by'     => $empId,
                 'enrollment_date' => now()->toDateString(),
                 'status'          => 'enrolled',
                 'progress_pct'    => 0,
-                'created_at'      => now(), 'updated_at' => now(),
             ]);
         }
 
@@ -102,30 +111,43 @@ class LearningController extends Controller
 
     public function pathwaysIndex()
     {
+        // Group by the PK only — learning_pathways has no is_active column, and
+        // MySQL resolves the other selected columns as functionally dependent.
         $pathways = DB::table('learning_pathways as lp')
             ->leftJoin('pathway_courses as pc','lp.pathway_id','=','pc.pathway_id')
             ->select('lp.*', DB::raw('COUNT(pc.id) as courses_count'))
-            ->groupBy('lp.pathway_id','lp.pathway_name','lp.description','lp.is_mandatory','lp.is_active','lp.created_at','lp.updated_at')
+            ->groupBy('lp.pathway_id')
+            ->orderBy('lp.pathway_name')
             ->get();
         return view('learning.pathways.index', compact('pathways'));
     }
 
     public function createPathway()
     {
-        return view('learning.pathways.create');
+        return view('learning.pathways.create', [
+            'roles' => DB::table('roles')->orderBy('role_name')->get(),
+        ]);
     }
 
     public function storePathway(\Illuminate\Http\Request $request)
     {
-        $request->validate(['pathway_name'=>'required|string|max:200']);
+        $request->validate([
+            'pathway_name'    => 'required|string|max:200',
+            'description'     => 'nullable|string',
+            'total_cpd_hours' => 'nullable|numeric|min:0|max:9999.9',
+            'target_roles'    => 'nullable|array',
+            'target_roles.*'  => 'string|exists:roles,role_id',
+        ]);
+
         DB::table('learning_pathways')->insert([
-            'pathway_id'   => Str::uuid(),
-            'pathway_name' => $request->pathway_name,
-            'description'  => $request->description,
-            'is_mandatory' => $request->boolean('is_mandatory'),
-            'is_active'    => true,
-            'created_by'   => auth()->id(),
-            'created_at'   => now(), 'updated_at' => now(),
+            'pathway_id'      => Str::uuid(),
+            'pathway_name'    => $request->pathway_name,
+            'description'     => $request->description,
+            'target_roles'    => $request->target_roles ? json_encode(array_values($request->target_roles)) : null,
+            'total_cpd_hours' => $request->total_cpd_hours ?: null,
+            'is_mandatory'    => $request->boolean('is_mandatory'),
+            'created_by'      => $this->currentEmployeeId(),
+            'created_at'      => now(), 'updated_at' => now(),
         ]);
         return redirect()->route('learning.pathways.index')->with('success','Pathway created.');
     }

@@ -1,0 +1,4 @@
+
+# Local AI tooling config (personal, not project code)
+.claude/
+.clinerules

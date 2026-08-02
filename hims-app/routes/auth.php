@@ -7,15 +7,26 @@ use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
-
-    Route::post('register', [RegisteredUserController::class, 'store']);
+    /*
+    |--------------------------------------------------------------------------
+    | Public self-registration is deliberately DISABLED
+    |--------------------------------------------------------------------------
+    | This is an internal hospital HR system. A self-registered account would
+    | land with no employee_id and the users.role DB default of 'staff', which
+    | is a stranger holding a login to workforce data.
+    |
+    | Accounts are provisioned instead by an admin through /users
+    | (UserController, gated by 'role:admin'), which assigns both the role and
+    | the linked employee profile explicitly.
+    |
+    | The Breeze RegisteredUserController and auth/register.blade.php are left
+    | in place, unrouted, so the scaffolding stays intact if onboarding ever
+    | needs an invitation flow.
+    */
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');

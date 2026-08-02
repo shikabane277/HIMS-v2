@@ -60,21 +60,35 @@ class CompetencyController extends Controller
 
     public function storeAssessment(\Illuminate\Http\Request $request)
     {
-        $request->validate(['employee_id'=>'required','competency_id'=>'required','current_proficiency'=>'required|numeric|min:1|max:5']);
-        $required = DB::table('competencies')->where('competency_id',$request->competency_id)->value('required_proficiency') ?? 3;
-        DB::table('competency_assessments')->insert([
-            'assessment_id'      => \Illuminate\Support\Str::uuid(),
-            'employee_id'        => $request->employee_id,
-            'competency_id'      => $request->competency_id,
-            'current_proficiency'=> $request->current_proficiency,
-            'required_proficiency'=> $required,
-            'gap'                => round($request->current_proficiency - $required, 2),
-            'assessment_method'  => $request->assessment_method ?? 'self_assessment',
-            'assessment_date'    => $request->assessment_date ?? now()->toDateString(),
-            'assessor_notes'     => $request->assessor_notes,
-            'assessed_by'        => auth()->user()->employee_id ?? null,
-            'created_at'         => now(), 'updated_at' => now(),
+        $request->validate([
+            'employee_id'         => 'required|string|exists:employees,employee_id',
+            'competency_id'       => 'required|string|exists:competencies,competency_id',
+            'current_proficiency' => 'required|integer|min:1|max:5',
+            'assessment_method'   => 'nullable|in:observation,self_assessment,supervisor_rating,practical_test,written_exam',
+            'assessed_date'       => 'nullable|date',
+            'next_assessment_due' => 'nullable|date',
+            'notes'               => 'nullable|string',
         ]);
+
+        // assessed_by is a NOT NULL FK to employees; fall back to the subject so
+        // a self-assessment still records when the account has no linked profile.
+        $assessedBy = $this->currentEmployeeId() ?? $request->employee_id;
+
+        // gap is computed by the trg_compute_gap_* MySQL triggers on this table,
+        // so it is deliberately not set here.
+        DB::table('competency_assessments')->insert([
+            'assessment_id'       => \Illuminate\Support\Str::uuid(),
+            'employee_id'         => $request->employee_id,
+            'competency_id'       => $request->competency_id,
+            'assessed_by'         => $assessedBy,
+            'assessment_method'   => $request->assessment_method ?: 'self_assessment',
+            'current_proficiency' => $request->current_proficiency,
+            'notes'               => $request->notes,
+            'assessed_date'       => $request->assessed_date ?: now()->toDateString(),
+            'next_assessment_due' => $request->next_assessment_due ?: now()->addYear()->toDateString(),
+            'created_at'          => now(), 'updated_at' => now(),
+        ]);
+
         return redirect()->route('competency.index')->with('success','Assessment recorded.');
     }
 
@@ -102,7 +116,17 @@ class CompetencyController extends Controller
 
     public function storeCredential(\Illuminate\Http\Request $request)
     {
-        $request->validate(['employee_id'=>'required','credential_type'=>'required|string']);
+        $request->validate([
+            'employee_id'       => 'required|string|exists:employees,employee_id',
+            'credential_type'   => 'required|string|max:50',
+            'credential_number' => 'nullable|string|max:100',
+            'issuing_body'      => 'nullable|string|max:150',
+            'issue_date'        => 'nullable|date',
+            'expiry_date'       => 'nullable|date|after_or_equal:issue_date',
+        ]);
+
+        // There is no verification_status column: verification is recorded by
+        // stamping verified_by / verified_at, which stay null until reviewed.
         DB::table('employee_credentials')->insert([
             'credential_id'     => \Illuminate\Support\Str::uuid(),
             'employee_id'       => $request->employee_id,
@@ -111,7 +135,6 @@ class CompetencyController extends Controller
             'issuing_body'      => $request->issuing_body,
             'issue_date'        => $request->issue_date ?: null,
             'expiry_date'       => $request->expiry_date ?: null,
-            'verification_status'=> 'pending',
             'created_at'        => now(), 'updated_at' => now(),
         ]);
         return redirect()->route('competency.credentials.index')->with('success','Credential added.');
@@ -124,7 +147,7 @@ class CompetencyController extends Controller
 
     public function storeDomain(\Illuminate\Http\Request $request)
     {
-        $request->validate(['domain_name'=>'required|string|max:150']);
+        $request->validate(['domain_name'=>'required|string|max:100|unique:competency_domains,domain_name']);
         DB::table('competency_domains')->insert([
             'domain_id'   => \Illuminate\Support\Str::uuid(),
             'domain_name' => $request->domain_name,
@@ -138,7 +161,25 @@ class CompetencyController extends Controller
     {
         $domain = DB::table('competency_domains')->where('domain_id',$id)->first();
         abort_if(!$domain, 404);
-        $categories = DB::table('competency_categories')->where('domain_id',$id)->get();
-        return view('competency.domains.show', compact('domain','categories'));
+
+        // Categories carry the competency count so the page shows the framework,
+        // not just a list of empty headings.
+        $categories = DB::table('competency_categories as cc')
+            ->leftJoin('competencies as c','cc.category_id','=','c.category_id')
+            ->where('cc.domain_id',$id)
+            ->select('cc.*', DB::raw('COUNT(c.competency_id) as competency_count'))
+            ->groupBy('cc.category_id')
+            ->orderBy('cc.category_name')
+            ->get();
+
+        $competencies = DB::table('competencies as c')
+            ->join('competency_categories as cc','c.category_id','=','cc.category_id')
+            ->where('cc.domain_id',$id)
+            ->select('c.competency_id','c.competency_name','c.competency_code','c.description',
+                     'c.required_proficiency','c.is_mandatory','c.category_id','cc.category_name')
+            ->orderBy('cc.category_name')->orderBy('c.competency_name')
+            ->get();
+
+        return view('competency.domains.show', compact('domain','categories','competencies'));
     }
 }

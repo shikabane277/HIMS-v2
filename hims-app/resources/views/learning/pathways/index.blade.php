@@ -32,8 +32,12 @@
                 @if($pathway->description)
                 <p style="font-size:12.5px;color:#6b7280;margin-bottom:12px;line-height:1.6">{{ Str::limit($pathway->description,100) }}</p>
                 @endif
+                @php
+                    $targets = $pathway->target_roles ? json_decode($pathway->target_roles, true) : [];
+                    $targetCount = is_array($targets) ? count($targets) : 0;
+                @endphp
                 <div class="mt-2">
-                    <span class="hims-badge {{ $pathway->is_active ? 'green' : 'gray' }}">{{ $pathway->is_active ? 'Active' : 'Inactive' }}</span>
+                    <span class="hims-badge blue">{{ $targetCount ? $targetCount.' target role'.($targetCount === 1 ? '' : 's') : 'All roles' }}</span>
                 </div>
             </div>
         </div>

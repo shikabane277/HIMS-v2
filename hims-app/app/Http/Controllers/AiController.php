@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\GeminiService;
+use App\Contracts\AiProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class AiController extends Controller
 {
-    public function __construct(private GeminiService $gemini) {}
+    public function __construct(private AiProvider $ai) {}
 
     /** Load last 50 messages for the current user (called by the bubble on open) */
     public function history(Request $request)
@@ -43,7 +43,7 @@ class AiController extends Controller
         ]);
 
         // Get AI response
-        $response = $this->gemini->ask($prompt);
+        $response = $this->ai->ask($prompt);
 
         // Save AI reply
         DB::table('ai_chat_messages')->insert([

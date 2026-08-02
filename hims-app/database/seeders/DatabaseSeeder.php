@@ -89,14 +89,68 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // ── 4. LARAVEL USER (for login) ────────────────────
-        DB::table('users')->insert([
-            'name'              => 'HIMS Administrator',
+        // ── 4. LOGIN ACCOUNTS ──────────────────────────────
+        // Each account is linked to an employees row and given an explicit
+        // role. Both matter: role drives every authorisation check, and
+        // employee_id is written into NOT NULL FK columns by most write paths
+        // (recognition posts, enrolments, assessments), so an unlinked account
+        // cannot use the system.
+        //
+        // The administrator needs an employee profile of its own, so give it
+        // an Administration department, role and employee record.
+        $adminDeptId = Str::uuid();
+        DB::table('departments')->insert([
+            'department_id'   => $adminDeptId,
+            'name'            => 'Hospital Administration',
+            'department_code' => 'ADM',
+            'is_clinical'     => false,
+            'created_at'      => now(), 'updated_at' => now(),
+        ]);
+
+        $adminRoleId = Str::uuid();
+        DB::table('roles')->insert([
+            'role_id'       => $adminRoleId,
+            'role_name'     => 'System Administrator',
+            'role_slug'     => 'system_admin',
+            'department_id' => $adminDeptId,
+            'is_clinical'   => false,
+            'created_at'    => now(), 'updated_at' => now(),
+        ]);
+
+        $adminEmpId = Str::uuid();
+        DB::table('employees')->insert([
+            'employee_id'       => $adminEmpId,
+            'employee_code'     => 'EMP-0009',
+            'first_name'        => 'HIMS',
+            'last_name'         => 'Administrator',
             'email'             => 'admin@hospital.ph',
-            'password'          => Hash::make('password'),
-            'email_verified_at' => now(),
+            'department_id'     => $adminDeptId,
+            'role_id'           => $adminRoleId,
+            'position_title'    => 'System Administrator',
+            'hire_date'         => now()->subYears(2)->toDateString(),
+            'employment_status' => 'active',
             'created_at'        => now(), 'updated_at' => now(),
         ]);
+
+        $accounts = [
+            ['HIMS Administrator', 'admin@hospital.ph',       'admin',      $adminEmpId],
+            ['Luisa Garcia',       'l.garcia@hospital.ph',    'hr_manager', $empIds['EMP-0005']],
+            ['Roberto Lim',        'r.lim@hospital.ph',       'staff',      $empIds['EMP-0006']],
+            ['Maria Santos',       'm.santos@hospital.ph',    'supervisor', $empIds['EMP-0001']],
+            ['Jose Reyes',         'j.reyes@hospital.ph',     'staff',      $empIds['EMP-0002']],
+        ];
+
+        foreach ($accounts as [$name, $email, $role, $employeeId]) {
+            DB::table('users')->insert([
+                'name'              => $name,
+                'email'             => $email,
+                'password'          => Hash::make('password'),
+                'role'              => $role,
+                'employee_id'       => $employeeId,
+                'email_verified_at' => now(),
+                'created_at'        => now(), 'updated_at' => now(),
+            ]);
+        }
 
         // ── 5. RECOGNITION BADGES ─────────────────────────
         $badges = [
@@ -189,7 +243,15 @@ class DatabaseSeeder extends Seeder
             'created_at'        => now(), 'updated_at' => now(),
         ]);
 
+        // ── 11. COMPETENCY FRAMEWORK, KPIs, ASSESSMENTS ────
+        $this->call(CompetencyFrameworkSeeder::class);
+
         echo "✅ HIMS seed data installed successfully.\n";
-        echo "   Login: admin@hospital.ph / password\n";
+        echo "   Logins (all password: password)\n";
+        echo "     admin@hospital.ph      — admin       (full access)\n";
+        echo "     l.garcia@hospital.ph   — hr_manager  (org-wide HR)\n";
+        echo "     m.santos@hospital.ph   — supervisor  (Nursing Services only)\n";
+        echo "     j.reyes@hospital.ph    — staff       (own records only)\n";
+        echo "     r.lim@hospital.ph      — staff       (own records only)\n";
     }
 }

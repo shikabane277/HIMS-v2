@@ -2,6 +2,10 @@
 .DS_Store
 .env
 .env.backup
+.env.backup-*
+.env.bak
+.env.*.backup
+.env.local
 .env.production
 .phpactor.json
 .phpunit.result.cache

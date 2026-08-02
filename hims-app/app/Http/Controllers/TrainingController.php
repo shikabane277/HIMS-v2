@@ -71,7 +71,7 @@ class TrainingController extends Controller
             'cpd_hours'     => $request->cpd_hours ?? 0,
             'description'   => $request->description,
             'status'        => 'scheduled',
-            'created_by'    => auth()->id(),
+            'created_by'    => $this->currentEmployeeId(),
             'created_at'    => now(), 'updated_at' => now(),
         ]);
 

@@ -20,7 +20,7 @@ class RecognitionController extends Controller
                                     ->orderByDesc('pts')->value('department_name') ?? '—',
         ];
 
-        $currentEmpId = auth()->user()->employee_id ?? '';
+        $currentEmpId = $this->currentEmployeeId() ?? '';
 
         $posts = DB::table('recognition_posts as rp')
             ->join('employees as author','rp.author_id','=','author.employee_id')
@@ -42,9 +42,10 @@ class RecognitionController extends Controller
                 DB::raw("EXISTS(
                     SELECT 1 FROM recognition_reactions ur
                     WHERE ur.post_id = rp.post_id
-                    AND ur.employee_id = " . DB::getPdo()->quote($currentEmpId) . "
+                    AND ur.employee_id = ?
                 ) as user_reacted")
             )
+            ->addBinding($currentEmpId, 'select')
             ->where('rp.moderation_status','approved')
             ->groupBy(
                 'rp.post_id','rp.message','rp.post_type','rp.is_featured','rp.created_at',
@@ -53,8 +54,10 @@ class RecognitionController extends Controller
             )
             ->orderByDesc('rp.created_at')->paginate(10);
 
+        // `month` is a 'YYYY-MM-01' string from the view's DATE_FORMAT, so match
+        // the whole month — whereMonth() alone would pool every year together.
         $leaderboard = DB::table('v_recognition_leaderboard')
-            ->whereMonth('month', now()->month)
+            ->where('month', now()->startOfMonth()->toDateString())
             ->orderByDesc('total_points')->limit(10)->get();
 
         $badges = DB::table('recognition_badges')->where('is_active',true)->get();
@@ -72,16 +75,24 @@ class RecognitionController extends Controller
     public function storePost(Request $request)
     {
         $request->validate([
-            'recipient_id' => 'required|string',
+            'recipient_id' => 'required|string|exists:employees,employee_id',
             'message'      => 'required|string|max:1000',
+            'badge_id'     => 'nullable|string|exists:recognition_badges,badge_id',
+            'post_type'    => 'nullable|in:peer,management,team,milestone',
         ]);
+
+        $authorId = $this->currentEmployeeId();
+
+        if (! $authorId) {
+            return back()->withInput()->with('error','Your account is not linked to an employee profile, so it cannot post recognition.');
+        }
 
         DB::table('recognition_posts')->insert([
             'post_id'            => Str::uuid(),
-            'author_id'          => auth()->user()->employee_id,
+            'author_id'          => $authorId,
             'recipient_id'       => $request->recipient_id,
             'badge_id'           => $request->badge_id ?: null,
-            'post_type'          => $request->post_type ?? 'peer',
+            'post_type'          => $request->post_type ?: 'peer',
             'message'            => $request->message,
             'is_public'          => true,
             'moderation_status'  => 'approved',
@@ -93,8 +104,8 @@ class RecognitionController extends Controller
 
     public function react(Request $request, $postId)
     {
-        $empId = auth()->user()->employee_id ?? null;
-        if (!$empId) return back();
+        $empId = $this->currentEmployeeId();
+        if (!$empId) return back()->with('error','Your account is not linked to an employee profile.');
 
         $exists = DB::table('recognition_reactions')
             ->where('post_id',$postId)->where('employee_id',$empId)->exists();
@@ -117,10 +128,19 @@ class RecognitionController extends Controller
     public function storeComment(Request $request, $postId)
     {
         $request->validate(['comment_text' => 'required|string|max:500']);
+
+        $authorId = $this->currentEmployeeId();
+
+        if (! $authorId) {
+            return back()->with('error','Your account is not linked to an employee profile, so it cannot comment.');
+        }
+
+        abort_if(! DB::table('recognition_posts')->where('post_id', $postId)->exists(), 404);
+
         DB::table('recognition_comments')->insert([
             'comment_id'        => Str::uuid(),
             'post_id'           => $postId,
-            'author_id'         => auth()->user()->employee_id,
+            'author_id'         => $authorId,
             'comment_text'      => $request->comment_text,
             'moderation_status' => 'approved',
             'created_at'        => now(), 'updated_at' => now(),

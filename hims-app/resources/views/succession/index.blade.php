@@ -106,12 +106,23 @@
     <div class="card-header">
         <h5><i class="bi bi-people-fill"></i> Succession Candidate Pipeline</h5>
         <div class="d-flex gap-2">
-            <select class="hims-input hims-select" style="width:170px;padding:6px 12px;font-size:13px">
-                <option>All Positions</option>
-                @foreach($positions ?? [] as $pos)
-                <option>{{ $pos->position_title }}</option>
-                @endforeach
-            </select>
+            {{-- GET so the filter is shareable/bookmarkable and survives a refresh. --}}
+            <form method="GET" action="{{ route('succession.index') }}">
+                <select name="position_id" onchange="this.form.submit()"
+                        class="hims-input hims-select" style="width:190px;padding:6px 12px;font-size:13px">
+                    <option value="">All Positions</option>
+                    @foreach($positions ?? [] as $pos)
+                    <option value="{{ $pos->position_id }}" @selected(($filterPositionId ?? null) === $pos->position_id)>
+                        {{ $pos->position_title }}
+                    </option>
+                    @endforeach
+                </select>
+            </form>
+            @if($filterPositionId ?? null)
+            <a href="{{ route('succession.index') }}" class="btn-hims btn-hims-ghost btn-sm" title="Clear filter">
+                <i class="bi bi-x-lg"></i>
+            </a>
+            @endif
         </div>
     </div>
     <div class="card-body" style="padding:0">
@@ -154,10 +165,21 @@
                         </div>
                     </td>
                     <td><span class="hims-badge {{ $cand->status === 'approved' ? 'green' : 'yellow' }}">{{ ucfirst($cand->status ?? 'proposed') }}</span></td>
-                    <td><a href="{{ route('succession.candidates.show', $cand->candidate_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <a href="{{ route('succession.candidates.show', $cand->candidate_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
+                            @can('manage-succession')
+                            <a href="{{ route('succession.candidates.edit', $cand->candidate_id) }}" class="btn-hims btn-hims-ghost btn-sm" title="Edit nomination">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            @endcan
+                        </div>
+                    </td>
                 </tr>
                 @empty
-                <tr><td colspan="7" class="text-center" style="color:#9ca3af;padding:32px">No candidates nominated yet.</td></tr>
+                <tr><td colspan="7" class="text-center" style="color:#9ca3af;padding:32px">
+                    {{ ($filterPositionId ?? null) ? 'No candidates nominated for this position.' : 'No candidates nominated yet.' }}
+                </td></tr>
                 @endforelse
             </tbody>
         </table>

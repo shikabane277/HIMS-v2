@@ -60,7 +60,10 @@
                             </td>
                             <td>
                                 <a href="{{ route('training.sessions.show', $session->session_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
-                                <a href="{{ route('training.register', $session->session_id) }}" class="btn-hims btn-hims-primary btn-sm">Register</a>
+                                <form method="POST" action="{{ route('training.register', $session->session_id) }}" style="display:inline">
+                                    @csrf
+                                    <button type="submit" class="btn-hims btn-hims-primary btn-sm"><i class="bi bi-plus-circle"></i> Register</button>
+                                </form>
                             </td>
                         </tr>
                         @empty

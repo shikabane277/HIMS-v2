@@ -56,7 +56,10 @@
                             <td>{{ $course->enrollments_count ?? 0 }}</td>
                             <td>
                                 <a href="{{ route('learning.courses.show', $course->course_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
-                                <a href="{{ route('learning.enroll', $course->course_id) }}" class="btn-hims btn-hims-primary btn-sm">Enroll</a>
+                                <form method="POST" action="{{ route('learning.enroll', $course->course_id) }}" style="display:inline">
+                                    @csrf
+                                    <button type="submit" class="btn-hims btn-hims-primary btn-sm"><i class="bi bi-plus-circle"></i> Enroll</button>
+                                </form>
                             </td>
                         </tr>
                         @empty

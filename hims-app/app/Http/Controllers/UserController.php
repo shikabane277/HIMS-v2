@@ -31,10 +31,12 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
-            'password' => ['required', 'confirmed', Password::min(8)],
-            'role'     => 'required|in:admin,hr_manager,supervisor,staff',
+            'name'        => 'required|string|max:255',
+            'email'       => 'required|email|unique:users,email',
+            'password'    => ['required', 'confirmed', Password::min(8)],
+            'role'        => 'required|in:admin,hr_manager,supervisor,staff',
+            // One login per employee profile, and it must be a real profile.
+            'employee_id' => 'nullable|string|exists:employees,employee_id|unique:users,employee_id',
         ]);
 
         User::create([
@@ -65,10 +67,18 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $request->validate([
-            'name'  => 'required|string|max:255',
-            'email' => "required|email|unique:users,email,{$user->id}",
-            'role'  => 'required|in:admin,hr_manager,supervisor,staff',
+            'name'        => 'required|string|max:255',
+            'email'       => "required|email|unique:users,email,{$user->id}",
+            'role'        => 'required|in:admin,hr_manager,supervisor,staff',
+            'employee_id' => "nullable|string|exists:employees,employee_id|unique:users,employee_id,{$user->id}",
         ]);
+
+        // Don't allow the last administrator to be demoted — that would leave
+        // nobody able to manage users, roles or departments.
+        if ($user->role === 'admin' && $request->role !== 'admin' && $this->adminCount() <= 1) {
+            return back()->withInput()->with('error',
+                'This is the only administrator account. Promote another user to admin before changing this one.');
+        }
 
         $user->update([
             'name'        => $request->name,
@@ -87,14 +97,28 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        \Illuminate\Support\Facades\Log::info("UserController@destroy called for user ID: " . $user->id);
         if ($user->id === auth()->id()) {
-            \Illuminate\Support\Facades\Log::warning("UserController@destroy: Prevented self-deletion for user ID: " . $user->id);
             return back()->with('error', 'You cannot delete your own account.');
         }
+
+        // Deleting the last admin would lock everyone out of user management.
+        if ($user->role === 'admin' && $this->adminCount() <= 1) {
+            return back()->with('error',
+                'This is the only administrator account and cannot be deleted.');
+        }
+
         $name = $user->name;
         $user->delete();
-        \Illuminate\Support\Facades\Log::info("UserController@destroy: Successfully deleted user ID: " . $user->id);
+
         return redirect()->route('users.index')->with('success', "User \"{$name}\" deleted.");
+    }
+
+    /**
+     * Deleting a login does not touch the employee record it points at, so the
+     * only thing at risk here is administrative access itself.
+     */
+    private function adminCount(): int
+    {
+        return User::where('role', 'admin')->count();
     }
 }

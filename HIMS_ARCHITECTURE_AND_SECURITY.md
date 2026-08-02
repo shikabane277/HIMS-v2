@@ -3,53 +3,79 @@
 
 This document outlines the systems architecture, MySQL database design list, and security configurations for the Performance & Development (P&D) module of the Hospital Information Management System (HIMS).
 
+> **Status of this document — AS-BUILT.**
+> Revised to describe what is actually implemented in `hims-app/`, verified against source. Items that remain
+> designed-but-not-implemented are listed explicitly in [§4 Roadmap](#4-not-yet-implemented-roadmap) rather than
+> being described as if they exist. Where the code deliberately diverges from the original specification, the
+> divergence is stated inline.
+
 ---
 
 ## 1. Systems Architecture
 
-The module is structured as a MVC web application built on **PHP Laravel**, utilising a **MySQL 8.0+** relational database and rendering server-side views styled with **Bootstrap 5**.
+The module is an **MVC, server-rendered web application** built on **Laravel 13 / PHP 8.3**, backed by a
+**MySQL 8** relational database. Views are Blade templates styled by a single hand-authored stylesheet
+(`public/css/hims.css`, 742 lines) served directly via `asset()` — **not** Bootstrap and **not** through the
+Vite/Tailwind pipeline. Data access is **raw Query Builder** (`DB::table(...)`), not Eloquent ORM.
 
 ```mermaid
 graph TD
     subgraph "Presentation Layer (Client-Side)"
-        A["Bootstrap 5 Templates"] --- B["Vanilla JS Event Handlers"]
+        A["Blade Templates + public/css/hims.css<br/>(Bootstrap Icons font only)"] --- B["Vanilla JS Event Handlers"]
     end
 
     subgraph "Application Layer (Laravel MVC)"
-        C["Web Routing & Rate Limiting"] --> D["Laravel Breeze Session Auth Middleware"]
-        D --> E["Controllers (Performance, Competency, Learning, Training, Succession, Recognition)"]
-        E --> F["Google Gemini API Hub"]
-        E --> G["Zapier Webhooks dispatcher"]
+        C["Web Routing (routes/web.php) & Rate Limiting"] --> D["Laravel Breeze Session Auth"]
+        D --> RB["Gates + 'role' Middleware (RBAC)"]
+        RB --> E["Controllers (Performance, Competency, Learning,<br/>Training, Succession, Recognition, Employees, Users)"]
+        E --> F["AiProvider Contract → AiManager<br/>(Gemini / OpenAI / Anthropic / Compatible)"]
     end
 
-    subgraph "Data & Security Layer"
-        E --> H["Eloquent Models & Observers"]
-        H --> I["MySQL 8.0 Database (Tables, Views, Triggers)"]
-        H --> J["Redis (Session cache & locks)"]
-        H --> K["Laravel Crypt (AES-256-CBC)"]
+    subgraph "Data Layer"
+        E --> H["Raw Query Builder (DB::table)"]
+        H --> I["MySQL 8 (Tables, 1 View, 2 Triggers)"]
     end
 
     A --> C
 ```
 
-### Stack Components
+### Stack Components (as-built)
 
-| Layer | Component | Technical Role |
-|---|---|---|
-| **Frontend** | HTML5 / Bootstrap 5 / JS | Renders responsive grid layouts, tables, forms, validation cues, and alerts. |
-| **Backend** | PHP 8.2+ / Laravel | Controls data flow, business logic routines, controllers, routing, and notifications. |
-| **Database** | MySQL 8.0+ | Stores records with UUID keys, manages gaps via trigger routines, and runs relational checks. |
-| **Authentication** | Laravel Breeze | Manages cookie-based sessions, rate limiting, and password hashing. |
-| **Caching** | Redis | Caches session details, notification queues, and leaderboard stats. |
-| **AI Engine** | Google Gemini API | Conducts supervisor reviews audits, quiz creation, and Taglish command processing. |
-| **Integration** | Zapier Webhooks | Broadcasts recognition milestones and certification completions to external tools. |
-| **Local Staging** | Laragon | Standardised local server setup (Apache/Nginx + PHP + MySQL). |
+| Layer | Specified | Actually Implemented | Status |
+|---|---|---|---|
+| **Frontend** | HTML5 / Bootstrap 5 / JS | HTML5 + hand-authored `public/css/hims.css` (742 lines) + vanilla JS. **Bootstrap Icons** (font glyphs) via CDN only — the Bootstrap CSS *framework* is not used. Tailwind/Vite are installed but the domain UI bypasses the build (`resources/css/app.css` is 3 lines). 46 views extend `layouts/hims`; only `profile/edit` uses Breeze's `x-app-layout`. | ⚠️ Diverges |
+| **Backend** | PHP 8.2+ / Laravel | **PHP ^8.3**, **Laravel 13.22**. Controllers + routing as specified. Notifications are *not* implemented. | ✅ Yes |
+| **Database** | MySQL 8.0+ | MySQL 8 (`DB_CONNECTION=mysql`). `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`; MySQL triggers auto-compute competency gap; `GENERATED ALWAYS AS` stored columns; 1 view. | ✅ Yes |
+| **Authentication** | Laravel Breeze | Breeze v2.4 session auth on the `users` table. Login throttling = 5 attempts (`LoginRequest`), `throttle:6,1` on verification/password routes. Public self-registration is disabled — admins provision accounts via `UserController`. | ✅ Yes |
+| **Caching** | Redis | **Not used.** `CACHE_STORE=database`, `SESSION_DRIVER=file`, `QUEUE_CONNECTION=database`. Redis config exists only as framework scaffolding; no `predis`, no `Redis::` or `Cache::` calls in `app/`. | ❌ No |
+| **AI Engine** | Google Gemini API | **Superseded — now provider-agnostic.** Consumers depend on `App\Contracts\AiProvider`; `AiManager` resolves the driver from `AI_PROVIDER` (`gemini`\|`openai`\|`anthropic`\|`compatible`). Gemini remains the default. See [§5](#5-ai-provider-layer). | ✅ Exceeds |
+| **Integration** | Zapier Webhooks | `ZapierService` is fully written with 5 event helpers but is **never instantiated or called** anywhere, and all 5 webhook URLs are blank in `.env` — doubly inert. | ⚠️ Dormant |
+| **Local Staging** | Laragon | Laragon (Apache/Nginx + PHP + MySQL) on Windows. | ✅ Yes |
+| **Data Access** | Eloquent Models & Observers | **Not used.** `App\Models\User` is the only model; all 40+ domain tables use raw `DB::table()` Query Builder in controllers. No models, policies, observers, or repositories. | ❌ No |
 
 ---
 
 ## 2. Database Design (MySQL 8.0+)
 
-The relational model consists of **42 tables and views** grouped into 8 operational schemas. All record identifiers (`PRIMARY KEY` & `FOREIGN KEY`) use standard `CHAR(36)` UUID formatting.
+The relational model consists of **54 tables and 1 view** created across 15 migrations (this includes Laravel's
+own `users`, `sessions`, `cache`, `jobs`, `failed_jobs`, `job_batches`, `password_reset_tokens`, `cache_locks`
+infrastructure tables plus `ai_chat_messages`). All domain record identifiers (`PRIMARY KEY` & `FOREIGN KEY`) use
+standard `CHAR(36)` UUID formatting, **generated in PHP via `Str::uuid()` at insert time** — nothing is
+auto-generated by MySQL, so an insert that omits the PK will fail. `created_at`/`updated_at` must likewise be set
+manually, since Query Builder has no timestamp magic.
+
+> **⚠️ Schema-only (dead) tables.** The following tables are created by migrations but are **never referenced by
+> any code** in `app/`, `routes/`, `resources/`, or seeders. They represent designed-but-unbuilt features. Verified
+> by grep: zero references outside their creating migration.
+>
+> `permissions` · `role_permissions` · `audit_trails` · `system_users` · `notifications` ·
+> `course_modules` · `quiz_questions` · `quiz_attempts` · `training_tests` · `training_test_results` ·
+> `succession_reviews` · `credential_alert_log` · `pathway_courses`
+>
+> Consequences: the LMS quiz engine, training pre/post-tests, credential-expiry alert logging, succession
+> periodic reviews, in-app notifications, and the entire RBAC-permissions + audit-trail subsystem are **schema
+> without behaviour**. `system_users` is dead schema duplicating Laravel's `users` table — real authentication
+> runs off `users` (extended with `role` and a nullable `employee_id` FK by migration `..._000095`).
 
 ### 2.1 Core / Shared Subsystem
 1.  **`departments`**: Hospital divisions (clinical and non-clinical).
@@ -149,9 +175,29 @@ The relational model consists of **42 tables and views** grouped into 8 operatio
 35. **`critical_positions`**: Target critical hospital roles.
     *   *Columns*: `position_id` (PK), `position_title`, `department_id` (FK), `current_holder_id` (FK), `is_critical` (bool), `vacancy_risk` (enum check), `risk_factors` (JSON), `impact_description`, `created_at`, `updated_at`.
 36. **`succession_candidates`**: Target successor backup plans.
-    *   *Columns*: `candidate_id` (PK), `position_id` (FK), `employee_id` (FK), `performance_score` (CHECK 1 to 3), `potential_score` (CHECK 1 to 3), `nine_box_label` (stored generated column), `readiness_level` (enum check), `development_plan` (JSON), `mentor_id` (FK), `status` (enum check), `nominated_by` (FK), `nominated_at`, `reviewed_at`, `approved_at`.
-    *   *Generated 9-Box Label Logic*:
+    *   *Columns*: `candidate_id` (PK), `position_id` (FK), `employee_id` (FK), `performance_score` (**int, 1–5**), `potential_score` (**int, 1–5**), `nine_box_label` (**plain `VARCHAR(30)` — see below**), `readiness_level`, `development_plan` (JSON, unused), `mentor_id` (FK), `status`, `nominated_by` (FK), `nominated_at` (DEFAULT CURRENT_TIMESTAMP), `reviewed_at`, `approved_at`.
+    *   **⚠️ As-built vs. specified.** Two divergences here, both verified against the live schema:
+        1.  Scores are **1–5**, not the 1–3 originally specified. There is no `CHECK` constraint in the
+            migration; the range is enforced by `$request->validate(['performance_score' => 'integer|min:1|max:5'])`
+            and by `min`/`max` on the form inputs.
+        2.  `nine_box_label` is **not** a `GENERATED` column — `SHOW COLUMNS` reports
+            `varchar(30)` with an empty `Extra`. The DDL below was never applied.
+    *   *Actual 9-Box logic* — computed in PHP by `SuccessionController::nineBoxLabel()`, which runs on **every**
+        insert and update and ignores any submitted `nine_box_label`. Each 1–5 axis collapses to three bands
+        (low = 1–2, med = 3, high = 4–5), giving the standard nine cells:
+
+        | | pot 1–2 (low) | pot 3 (med) | pot 4–5 (high) |
+        |---|---|---|---|
+        | **perf 4–5 (high)** | `solid` | `high` | `star` |
+        | **perf 3 (med)** | `avg` | `core` | `potential` |
+        | **perf 1–2 (low)** | `under` | `inconsist` | `diamond` |
+
+        Because the value is derived server-side and never accepted from input, the badge cannot contradict the
+        scores displayed beside it — the same guarantee a generated column would give, enforced one layer up.
+    *   *Original (never applied) DDL*, retained for reference should the constraint ever move into MySQL:
         ```sql
+        -- NOT IN THE DATABASE. Superseded by SuccessionController::nineBoxLabel().
+        -- Note it also assumes the 1-3 score range, not the 1-5 range in use.
         nine_box_label VARCHAR(30) GENERATED ALWAYS AS (
             CASE
                 WHEN performance_score = 3 AND potential_score = 3 THEN 'star_talent'
@@ -166,11 +212,19 @@ The relational model consists of **42 tables and views** grouped into 8 operatio
             END
         ) STORED
         ```
-    *   *Constraint*: Unique combination of `(position_id, employee_id)`.
-37. **`succession_reviews`**: Audits of succession plans.
+    *   *Constraint*: Unique combination of `(position_id, employee_id)` — enforced, and pre-checked in
+        `storeCandidate()` so a duplicate nomination reports a message instead of a 500.
+    *   *Note*: this table has **no** `created_at`/`updated_at`; it tracks lifecycle via
+        `nominated_at` / `reviewed_at` / `approved_at`.
+37. **`succession_reviews`**: Audits of succession plans. 💀 **Schema-only — no code reads or writes it.**
     *   *Columns*: `review_id` (PK), `position_id` (FK), `review_period`, `reviewed_by` (FK), `review_notes`, `risk_assessment`, `action_items` (JSON), `created_at`.
-38. **`leadership_development_paths`**: Milestones tracking successor development.
-    *   *Columns*: `path_id` (PK), `candidate_id` (FK), `milestone_title`, `milestone_type`, `description`, `target_date`, `completed_date`, `status` (enum check), `linked_course_id` (FK), `linked_competency` (FK), `created_at`.
+38. **`leadership_development_paths`**: Milestones tracking successor development. **Live** — full CRUD via
+    `SuccessionController::storeMilestone()` / `updateMilestone()` / `destroyMilestone()`.
+    *   *Columns*: `path_id` (PK), `candidate_id` (FK), `milestone_title`, `milestone_type`, `description`, `target_date`, `completed_date`, `status`, `linked_course_id` (FK), `linked_competency` (FK), `created_at`, `updated_at`.
+    *   `status` moves `not_started` → `in_progress` → `completed`. `completed_date` is stamped on completion and
+        **cleared** if the status moves back, so the Dev Progress percentage only ever counts genuinely finished work.
+    *   Rows are deleted with their parent candidate (`withdrawCandidate()` wraps both deletes in a transaction),
+        since the FK would otherwise block the parent delete and an orphaned milestone belongs to nobody.
 
 ### 2.7 Social Recognition Subsystem
 39. **`recognition_badges`**: Badges mapped to core hospital values.
@@ -232,16 +286,91 @@ DELIMITER ;
 
 ## 3. Security Design
 
-Security is configured at multiple levels to ensure HIPAA and Philippine Data Privacy Act (RA 10173) compliance.
+Security controls that are **actually implemented**. The compliance posture targeted by the original design
+(HIPAA / Philippine Data Privacy Act RA 10173) is **not yet met** — the encryption, MFA, and audit-trail controls
+required for it are listed in [§4](#4-not-yet-implemented-roadmap).
 
-### 3.1 Portal Authentication (Laravel Breeze)
-*   **Session-based Authentication**: Handled via Laravel's built-in session handlers. Session cookie is secure, HttpOnly, and uses `SameSite=Lax` or `SameSite=Strict`.
-*   **Brute Force Protection**: Standard Login throttling locks user accounts for 15 minutes after 5 failed authentication attempts.
-*   **TOTP MFA**: Session-challenged multi-factor verification required for `hospital_admin` and `hr_admin` roles.
-*   **CSRF Protection**: Standard `VerifyCsrfToken` middleware verifies token presence on state-changing requests.
+### 3.1 Portal Authentication (Laravel Breeze) — implemented
 
-### 3.2 Granular Access Control (RBAC)
-Authorisation logic is managed via Laravel **Policies** and **Gates** mapping the core roles to database resources.
+*   **Session-based Authentication**: Laravel Breeze v2.4 on the `users` table via the `web` guard
+    (`Auth::attempt`). Passwords are bcrypt-hashed (`BCRYPT_ROUNDS=12`).
+*   **No public registration**: self-service signup is deliberately disabled. Accounts are provisioned by an
+    admin through `UserController` (`role:admin`-gated `users` resource routes).
+*   **Brute Force Protection**: `App\Http\Requests\Auth\LoginRequest` rate-limits on an email+IP throttle key —
+    **5 failed attempts, then a 60-second lockout** (Laravel's default decay), cleared on success. Password-reset
+    and email-verification routes carry `throttle:6,1`.
+    *Note:* this is request rate-limiting, **not** account locking. The `account_locked` / `failed_login_count`
+    columns in the spec live on the dead `system_users` table and are never written.
+*   **CSRF Protection**: Laravel's `VerifyCsrfToken` runs in the default `web` middleware group; all
+    state-changing Blade forms emit `@csrf`.
+*   **Session cookie**: `HttpOnly` and `SameSite=Lax` by framework default. `SESSION_ENCRYPT=false` and
+    `SESSION_DRIVER=file` in the current environment. The `Secure` flag only applies over HTTPS — the local
+    environment runs `APP_ENV=local` / `APP_URL=http://localhost:8000`, so it is **not** set locally.
+    `bootstrap/app.php` calls `trustProxies(at: '*')` so deployment behind a TLS-terminating proxy
+    (Railway) yields correct HTTPS scheme and asset URLs.
+*   **TOTP MFA**: ❌ **not implemented** — see [§4](#4-not-yet-implemented-roadmap).
+
+### 3.2 Granular Access Control (RBAC) — implemented, by a different mechanism
+
+Authorisation **is enforced**, but via **Gates + route middleware** rather than the Policies-and-permissions-tables
+design originally specified. There are no Policy classes, and the `permissions` / `role_permissions` tables are
+dead schema.
+
+*   **Role source of truth**: `users.role`, one of **`admin` | `hr_manager` | `supervisor` | `staff`**
+    (four roles — not the six roles named in `HIMS_SYSTEM_DOCUMENTATION.md` §3).
+    `App\Models\User` exposes `hasRole(...$roles)`, `isAdmin()`, `isHrManager()`, `isSupervisor()`, `isStaff()`.
+*   **13 Gates** are defined in `AppServiceProvider::registerGates()`: `manage-users`, `manage-departments`,
+    `manage-employees`, `view-employees`, `manage-performance`, `manage-review-cycles`, `manage-competency`,
+    `manage-learning`, `manage-training`, `manage-succession`, `view-succession`, `view-org-analytics`,
+    `run-gap-analysis`.
+*   **Route enforcement**: `App\Http\Middleware\EnsureUserHasRole`, aliased `role` in `bootstrap/app.php`, applied
+    as `role:admin,hr_manager,...` across `routes/web.php`.
+*   **Single definition, two consumers**: the same Gates back both the `@can` checks that show/hide sidebar
+    navigation and the middleware that enforces access, so the menu and the guard cannot drift apart.
+
+The intended (unbuilt) table-driven permission model is retained for reference in
+[§4.1](#41-table-driven-rbac-permissions--role_permissions).
+
+### 3.3 Data Protection — current state
+
+*   **In-Transit**: TLS is terminated by the hosting proxy in deployment; `trustProxies(at: '*')` in
+    `bootstrap/app.php` ensures Laravel generates `https://` URLs behind it. **TLS 1.3-only enforcement and HSTS
+    headers are not configured in the application.** Local development runs plain HTTP.
+*   **At-Rest field encryption**: ❌ **not implemented.** No `Crypt::`, `encryptString`, or `decryptString` calls
+    exist anywhere in `app/`. `employees.phone` and `employee_credentials.credential_number` are stored as
+    **plaintext**. This is the most significant gap against the RA 10173 / HIPAA posture the design targets.
+*   **Input validation**: every write path validates via `$request->validate([...])`; all queries go through
+    Query Builder parameter binding, so SQL injection is mitigated even though raw `DB::table()` is used.
+    Where raw SQL fragments are needed (`DB::raw` for `CONCAT`, `DATE_FORMAT`, `FIELD`), they contain no
+    user-supplied interpolation.
+*   **SQL-layer safety**: MySQL `BEFORE INSERT`/`BEFORE UPDATE` triggers compute `competency_assessments.gap`,
+    and a `GENERATED ALWAYS AS ... STORED` column derives `employee_credentials.status` — these values cannot be
+    falsified from application code.
+    **Correction:** `succession_candidates.nine_box_label` is **not** a generated column, despite §2.6 below
+    describing it as one. It is a plain `VARCHAR(30)`. The integrity guarantee is enforced in PHP instead —
+    `SuccessionController::nineBoxLabel()` recomputes it on every insert and update and never reads the
+    submitted value, so the label cannot contradict the scores. Verified by posting
+    `nine_box_label=star` alongside scores of 1/1: the stored label was `under`.
+
+### 3.4 Audit Logging — not implemented
+
+There is **no audit logging**. `audit_trails` is dead schema (see [§4.3](#43-tamper-proof-audit-trail)); there are
+no Observers, and no `::observe()` registrations anywhere in the app. The only write-tracking that exists is
+Laravel's own `created_at`/`updated_at` columns, set manually at each insert.
+
+---
+
+## 4. Not Yet Implemented (Roadmap)
+
+Everything below is **specified and, in most cases, already has its database schema migrated — but has zero
+implementing code.** Retained as the design of record for future work. Verified absent by source grep.
+
+### 4.1 Table-driven RBAC (`permissions` / `role_permissions`)
+
+Both tables exist in migration `..._000080_create_security_tables.php` and are **never read**. Live authorisation
+uses Gates + the `role` middleware instead ([§3.2](#32-granular-access-control-rbac--implemented-by-a-different-mechanism)).
+Adopting this model would add per-resource/action/scope grants (`own` / `department` / `all`), which Gates
+currently approximate with coarser role checks.
 
 ```sql
 CREATE TABLE permissions (
@@ -261,12 +390,21 @@ CREATE TABLE role_permissions (
 );
 ```
 
-### 3.3 Data Encryption (At-Rest & In-Transit)
-*   **In-Transit Routing**: Enforced via TLS 1.3 only, using HSTS configurations.
-*   **Database Encryption**: Sensitive fields (`employees.phone`, `employee_credentials.credential_number`, `system_users.mfa_secret`) are encrypted using Laravel's Crypt facade utilizing `AES-256-CBC` with HMAC verification.
+### 4.2 Field-Level Encryption (AES-256-CBC)
 
-### 3.4 Tamper-Proof Audit Trail (Observers)
-Instead of custom database schemas, Laravel model Observers monitor write events across Eloquent entities (`PerformanceReview`, `Credential`, `Employee`) and log transactions to `audit_trails`.
+**Target**: encrypt `employees.phone`, `employee_credentials.credential_number`, and (if MFA ships)
+`system_users.mfa_secret` using Laravel's `Crypt` facade (`AES-256-CBC` with HMAC).
+**Current**: plaintext. No `Crypt` usage exists. Note that encrypting a column removes the ability to
+`WHERE`/`LIKE` on it, which affects the employee search in `EmployeeController`.
+
+### 4.3 Tamper-Proof Audit Trail
+
+**Target**: Observers on write events logging to `audit_trails`, with SHA-256 `before_state_hash` /
+`after_state_hash` and a `chain_hash` linking each row to its predecessor.
+**Current**: the table below is migrated — including the three hash columns — but nothing inserts, reads, or
+hashes into it. There are no Observers. Because the app uses raw Query Builder and not Eloquent, an
+Observer-based approach is **not viable as designed**; audit capture would need explicit writes at each mutation
+site, a service wrapper around them, or DB-level triggers.
 
 ```sql
 CREATE TABLE audit_trails (
@@ -290,7 +428,98 @@ CREATE TABLE audit_trails (
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
-*   **Immutability**: Write permissions on the audit trails are locked at the database configuration layer (`REVOKE UPDATE, DELETE ON audit_trails FROM 'app_user'@'localhost'`).
-*   **Row Chain-Hashing**: Each audit log record contains a `chain_hash` computed as:
+*   **Immutability (planned)**: revoke write access at the DB layer — `REVOKE UPDATE, DELETE ON audit_trails FROM 'app_user'@'localhost'`.
+*   **Row Chain-Hashing (planned)**: each record's `chain_hash` computed as
     $$\text{chain\_hash} = \text{SHA256}(\text{current\_record\_contents} + \text{previous\_record\_chain\_hash})$$
-    This allows instant tamper detection if any past log record is modified.
+    allowing instant tamper detection if any past log row is modified.
+
+### 4.4 TOTP Multi-Factor Authentication
+
+**Target**: session-challenged TOTP for privileged roles.
+**Current**: ❌ absent. No 2FA package is installed (no `pragmarx/google2fa`, no `laravel/fortify`), and no
+`totp` / `two_factor` code exists. The `mfa_enabled` / `mfa_secret` columns live on the dead `system_users`
+table; implementing MFA against the live `users` table would require new columns there.
+
+### 4.5 Redis Caching & Queued Notifications
+
+**Target**: Redis for session cache, notification queues, and leaderboard stats.
+**Current**: `CACHE_STORE=database`, `SESSION_DRIVER=file`, `QUEUE_CONNECTION=database`. No `predis` package;
+no `Cache::` or `Redis::` calls in `app/` — the application performs **no caching at all**. The
+`v_recognition_leaderboard` view is queried live on each request. The `notifications` table is dead schema and
+no notification is ever dispatched.
+
+### 4.6 Zapier Webhook Dispatch
+
+`App\Services\ZapierService` is fully written — a generic `dispatch()` plus five helpers (`onReviewApproved`,
+`onCredentialExpired`, `onPipInitiated`, `onTrainingRegistration`, `onCertificateIssued`) — but **no controller,
+event, listener, or job ever calls it**, and all five `ZAPIER_WEBHOOK_*` URLs are empty in `.env`. Even if
+invoked, `dispatch()` would short-circuit on its `empty($webhookUrl)` guard and return `false`. Activating it
+requires both wiring call sites into the relevant controllers and populating the webhook URLs.
+
+### 4.7 Unbuilt Feature Schema
+
+Migrated but unused, blocking the features they were designed for:
+`course_modules`, `quiz_questions`, `quiz_attempts` (LMS quiz engine) ·
+`training_tests`, `training_test_results` (pre/post-test analytics) ·
+`credential_alert_log` (expiry alert audit) · `succession_reviews` (periodic plan review) ·
+`pathway_courses` (pathway→course sequencing) · `notifications` (in-app inbox).
+
+`leadership_development_paths` was never on this list — it was already read for display — but it is now
+**fully writable** too (add / advance / remove milestones), so the Dev Progress percentage reflects real data
+instead of always reading 0. Still absent: the succession **candidate approval workflow** — `status`,
+`reviewed_at`, and `approved_at` exist and `reviewed_at` is stamped on edit, but no UI transitions a candidate
+from `proposed` to `approved`.
+
+---
+
+## 5. AI Provider Layer
+
+**Supersedes the original "Google Gemini API" single-vendor design.** Consumers depend on an interface, not a
+vendor, so the provider can be swapped by changing one env var.
+
+```mermaid
+graph LR
+    A["AiController<br/>CompetencyGapAnalysisService"] --> B["App\\Contracts\\AiProvider<br/>(ask(string): string)"]
+    B --> C["AiManager<br/>(reads config services.ai)"]
+    C --> D["GeminiProvider"]
+    C --> E["OpenAiProvider"]
+    C --> F["AnthropicProvider"]
+    C --> G["OpenAiProvider<br/>(compatible: Groq / DeepSeek / xAI)"]
+```
+
+| Aspect | Detail |
+|---|---|
+| **Contract** | `App\Contracts\AiProvider` — a single method, `ask(string $prompt): string`. |
+| **Resolution** | `AiManager` reads `config('services.ai')`; `AppServiceProvider::register()` binds `AiProvider` to the default driver. |
+| **Selection** | `AI_PROVIDER` = `gemini` \| `openai` \| `anthropic` \| `compatible`. **Default: `gemini`**, so an existing `GEMINI_API_KEY` keeps working unchanged. |
+| **Drivers** | `GeminiProvider`, `OpenAiProvider`, `AnthropicProvider` — all raw HTTP over `Http::`, all extending `AbstractAiProvider`. The `compatible` slot reuses `OpenAiProvider` with a custom label and `base_url` for OpenAI-compatible hosts. |
+| **Model config** | Per-provider `*_MODEL` plus a `fallback_models` list; a 404/model-error response advances to the next candidate automatically. |
+| **Failure contract** | `ask()` **never throws** for an API or config problem — it returns a `⚠️`-prefixed string. `CompetencyGapAnalysisService::parseAiJson()` detects that prefix and degrades gracefully to "AI unavailable". Callers must not assume the return value is model output. |
+| **Consumers** | `AiController` (`POST /ai/query`, `GET`/`DELETE /ai/history`, persisted to `ai_chat_messages`) and `CompetencyGapAnalysisService` (gap-analysis narratives). |
+
+---
+
+## 6. Routing & Module Map (as-built)
+
+All application routes live in **`routes/web.php`** (plus `auth.php`, `console.php`). There is **no `api.php`
+and no `/api/v1` REST layer** — `bootstrap/app.php` registers only `web` and `commands` routing. Every domain
+route sits behind `['auth', 'verified']`, with per-route `role:` gating.
+
+| Module | Handler | Views | Access |
+|---|---|---|---|
+| Dashboard | `DashboardController` | `dashboard.blade.php` + `dashboard/partials/` | all authenticated |
+| Performance | `PerformanceController` | `performance/` (+ `cycles/`, `reviews/`) | read: all · write: `admin,hr_manager,supervisor` · cycles: `admin,hr_manager` |
+| Competency | `CompetencyController` | `competency/` (+ `assessments/`, `credentials/`, `domains/`) | read: all · assess: `admin,hr_manager,supervisor` · domains: `admin,hr_manager` |
+| Gap Analysis | `GapAnalysisController` (`competency.gap.*`) | `competency/gap-analysis/` | `admin,hr_manager,supervisor` |
+| Learning | `LearningController` | `learning/` (+ `courses/`, `cpd/`, `pathways/`) | read/enroll: all · authoring: `admin,hr_manager` |
+| Training | `TrainingController` | `training/` (+ `sessions/`, `venues/`) | read/register: all · sessions: `+supervisor` · venues: `admin,hr_manager` |
+| Succession | `SuccessionController` | `succession/` (+ `candidates/`, `positions/`) | whole group `admin,hr_manager,supervisor` (staff: no access) · create/edit/withdraw: `admin,hr_manager` · milestones: whole group |
+| Recognition | `RecognitionController` | `recognition/` (+ `badges/`, `posts/`) | open to all roles · badges: `admin,hr_manager` |
+| Employees | `EmployeeController` | `employees/` | group `admin,hr_manager,supervisor` · CRUD: `admin,hr_manager` |
+| Departments | **inline closures in `routes/web.php`** (no controller) | `departments/index.blade.php` | `admin,hr_manager` |
+| Users | `UserController` (resource, no `show`) | `users/` | `admin` only |
+| AI | `AiController` | rendered inside the app shell | all authenticated |
+
+> `routes/web.php` imports `App\Http\Controllers\DepartmentController`, **a class that does not exist**. The
+> import is harmless (unused imports are never autoloaded) but misleading — departments are handled by two
+> inline closures.

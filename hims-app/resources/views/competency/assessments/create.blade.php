@@ -37,7 +37,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Current Proficiency (1–5) *</label>
-                            <input type="number" name="current_proficiency" class="hims-input" value="{{ old('current_proficiency') }}" required min="1" max="5" step="0.1">
+                            <input type="number" name="current_proficiency" class="hims-input" value="{{ old('current_proficiency') }}" required min="1" max="5" step="1">
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Assessment Method</label>
@@ -51,11 +51,11 @@
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Assessment Date</label>
-                            <input type="date" name="assessment_date" class="hims-input" value="{{ old('assessment_date', now()->toDateString()) }}">
+                            <input type="date" name="assessed_date" class="hims-input" value="{{ old('assessed_date', now()->toDateString()) }}">
                         </div>
                         <div class="col-12">
                             <label class="hims-label">Notes</label>
-                            <textarea name="assessor_notes" class="hims-input" rows="3" placeholder="Observations and recommendations…">{{ old('assessor_notes') }}</textarea>
+                            <textarea name="notes" class="hims-input" rows="3" placeholder="Observations and recommendations…">{{ old('notes') }}</textarea>
                         </div>
                         <div class="col-12 d-flex gap-2 justify-content-end mt-2">
                             <a href="{{ route('competency.index') }}" class="btn-hims btn-hims-outline">Cancel</a>

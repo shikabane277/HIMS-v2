@@ -46,32 +46,47 @@
         <a href="{{ route('performance.index') }}" class="sidebar-link {{ request()->routeIs('performance.*') ? 'active' : '' }}">
             <span class="nav-icon">📋</span> Performance
         </a>
-        <a href="{{ route('competency.index') }}" class="sidebar-link {{ request()->routeIs('competency.*') ? 'active' : '' }}">
+        <a href="{{ route('competency.index') }}" class="sidebar-link {{ request()->routeIs('competency.index') || request()->routeIs('competency.assessments.*') || request()->routeIs('competency.credentials.*') || request()->routeIs('competency.domains.*') ? 'active' : '' }}">
             <span class="nav-icon">🎯</span> Competency
         </a>
+        @can('run-gap-analysis')
+        <a href="{{ route('competency.gap.index') }}" class="sidebar-link {{ request()->routeIs('competency.gap.*') ? 'active' : '' }}">
+            <span class="nav-icon">🤖</span> AI Gap Analysis
+        </a>
+        @endcan
         <a href="{{ route('learning.index') }}" class="sidebar-link {{ request()->routeIs('learning.*') ? 'active' : '' }}">
             <span class="nav-icon">📚</span> Learning
         </a>
         <a href="{{ route('training.index') }}" class="sidebar-link {{ request()->routeIs('training.*') ? 'active' : '' }}">
             <span class="nav-icon">🎓</span> Training
         </a>
+        @can('view-succession')
         <a href="{{ route('succession.index') }}" class="sidebar-link {{ request()->routeIs('succession.*') ? 'active' : '' }}">
             <span class="nav-icon">🏆</span> Succession
         </a>
+        @endcan
         <a href="{{ route('recognition.index') }}" class="sidebar-link {{ request()->routeIs('recognition.*') ? 'active' : '' }}">
             <span class="nav-icon">⭐</span> Recognition
         </a>
 
+        @canany(['view-employees','manage-departments','manage-users'])
         <div class="sidebar-section-label">Admin</div>
+        @can('view-employees')
         <a href="{{ route('employees.index') }}" class="sidebar-link {{ request()->routeIs('employees.*') ? 'active' : '' }}">
             <span class="nav-icon">👥</span> Employees
         </a>
+        @endcan
+        @can('manage-departments')
         <a href="{{ route('departments.index') }}" class="sidebar-link {{ request()->routeIs('departments.*') ? 'active' : '' }}">
             <span class="nav-icon">🏢</span> Departments
         </a>
+        @endcan
+        @can('manage-users')
         <a href="{{ route('users.index') }}" class="sidebar-link {{ request()->routeIs('users.*') ? 'active' : '' }}">
             <span class="nav-icon">🔐</span> Users & Access
         </a>
+        @endcan
+        @endcanany
     </nav>
 
     <div class="sidebar-footer">
@@ -79,7 +94,7 @@
             <div class="user-avatar">{{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}</div>
             <div class="user-info">
                 <span class="user-name">{{ Auth::user()->name ?? 'User' }}</span>
-                <span class="user-role">{{ Auth::user()->role ?? 'Staff' }}</span>
+                <span class="user-role">{{ ucwords(str_replace('_',' ', Auth::user()->role ?? 'staff')) }}</span>
             </div>
         </a>
         <form method="POST" action="{{ route('logout') }}">

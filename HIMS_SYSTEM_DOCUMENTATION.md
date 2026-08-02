@@ -9,23 +9,29 @@ This document describes the architectural, functional, security, and data design
 
 The **HIMS Performance & Development Module** is an enterprise-grade subsystem designed to manage, evaluate, and develop clinical (physicians, nurses, allied health professionals) and non-clinical (administrative, facilities, finance) hospital personnel. The primary objective is to align individual clinical competency with hospital quality standards, Joint Commission International (JCI) accreditation requirements, and employee development goals.
 
-The system integrates six (6) distinct subsystems under a unified interface, controlled by Laravel session-based authentication (Laravel Breeze) and enhanced by the **HIMS Performance AI Assistant**, powered by the **Google Gemini API**.
+The system integrates six (6) distinct subsystems under a unified interface, controlled by Laravel session-based authentication (Laravel Breeze) and enhanced by the **HIMS Performance AI Assistant**, which runs on a **provider-agnostic AI layer** (Gemini by default; OpenAI, Anthropic, or any OpenAI-compatible host selectable via one env var).
 
-### 1.1 High-Level Architecture
+> **Status of this document — AS-BUILT, with roadmap items flagged.**
+> Revised against the source in `hims-app/`. Sections describing features that are **specified but not
+> implemented** are marked **📋 Planned** and, where a database table exists with no code behind it, called out as
+> *schema-only*. Everything not so marked has been verified present in code.
+> For the authoritative stack/security breakdown see `HIMS_ARCHITECTURE_AND_SECURITY.md`.
+
+### 1.1 High-Level Architecture (as-built)
 
 ```mermaid
 graph TB
     subgraph "Client Layer"
-        SPA["Frontend Views<br/>(HTML5 + Bootstrap 5 + Vanilla JS)"]
+        SPA["Blade Views (server-rendered)<br/>HTML5 + public/css/hims.css + Vanilla JS<br/>(Bootstrap Icons font only)"]
     end
 
     subgraph "Laravel Core Backend"
-        GW["Routing & Middleware<br/>(Rate Limiting, CSRF verification)"]
-        AUTH["Laravel Breeze Auth<br/>(Session-Based & Password/MFA)"]
-        INTEG["Integration Hub<br/>(Gemini, Zapier)"]
+        GW["Routing & Middleware<br/>(routes/web.php, Rate Limiting, CSRF)"]
+        AUTH["Laravel Breeze Auth<br/>(Session-Based, no MFA)"]
+        INTEG["AiManager<br/>(Gemini / OpenAI / Anthropic / Compatible)"]
     end
 
-    subgraph "Application Subsystems (Laravel Services)"
+    subgraph "Application Subsystems (Controllers)"
         PM["Performance<br/>Management"]
         CM["Competency<br/>Management"]
         LM["Learning<br/>Management"]
@@ -35,27 +41,36 @@ graph TB
     end
 
     subgraph "Data Layer"
-        MY["MySQL 8.0+<br/>(Primary Relational DB)"]
-        RD["Redis<br/>(Session & Cache Store)"]
+        QB["Raw Query Builder (DB::table)"]
+        MY["MySQL 8<br/>(Tables, 1 View, 2 Triggers)"]
     end
 
-    subgraph "Security & Laravel Middleware"
-        RBAC["Gates & Policies (RBAC)"]
-        AUDIT["Model Observers (Audit Trail)"]
-        ENC["Crypt Facade<br/>(AES-256-CBC)"]
+    subgraph "Security Middleware"
+        RBAC["13 Gates + 'role' Middleware (RBAC)"]
     end
 
     SPA --> GW
     GW --> AUTH
-    GW --> PM & CM & LM & TM & SP & SR & INTEG
-    PM & CM & LM & TM & SP & SR --> MY
-    PM & CM & LM & TM & SP & SR --> RD
-    INTEG --> MY
     AUTH --> RBAC
-    PM & CM & LM & TM & SP & SR --> AUDIT
-    AUDIT --> MY
-    MY --> ENC
+    RBAC --> PM & CM & LM & TM & SP & SR
+    GW --> INTEG
+    PM & CM & LM & TM & SP & SR --> QB
+    INTEG --> QB
+    QB --> MY
 ```
+
+**Deliberate divergences from the original design** (detail in `HIMS_ARCHITECTURE_AND_SECURITY.md`):
+
+| Original design | As-built |
+|---|---|
+| Bootstrap 5 CSS framework | Hand-authored `public/css/hims.css` (742 lines); Bootstrap **Icons** font only |
+| Eloquent Models & Observers | Raw `DB::table()` Query Builder; `App\Models\User` is the only model |
+| Policies + `permissions` tables | 13 Gates + `EnsureUserHasRole` middleware; permission tables are schema-only |
+| Redis cache / queue | `CACHE_STORE=database`, `SESSION_DRIVER=file`, `QUEUE_CONNECTION=database`; no caching at all |
+| Google Gemini only | Provider-agnostic `AiProvider` contract; 4 selectable providers |
+| `/api/v1/...` REST API | Server-rendered web routes only; no `api.php` |
+| Six roles | Four roles: `admin` \| `hr_manager` \| `supervisor` \| `staff` |
+| MFA · field encryption · audit trail | **📋 Planned** — not implemented |
 
 ### 1.2 Subsystems Layout
 
@@ -72,11 +87,14 @@ graph TB
 |  |    Performance     |  |     Competency     |  |      Learning      |  |      Training      | |
 |  |     Management     |  |     Management     |  |     Management     |  |     Management     | |
 |  +--------------------+  +--------------------+  +--------------------+  +--------------------+ |
-|  |     Succession     |  |       Social       |  |   Google Gemini    |  |  Session Audit logs| |
-|  |      Planning      |  |    Recognition     |  |    AI Assistant    |  |     & Security     | |
+|  |     Succession     |  |       Social       |  |  Multi-Provider    |  |  Gates + role MW   | |
+|  |      Planning      |  |    Recognition     |  |   AI Assistant     |  |     (Security)     | |
 |  +--------------------+  +--------------------+  +--------------------+  +--------------------+ |
 +-------------------------------------------------------------------------------------------------+
 ```
+
+Seven live modules (the six above plus Employees/Departments/Users administration). Audit logging is **📋 not
+implemented** — see §7.4.
 
 ---
 
@@ -89,14 +107,41 @@ The system supports the following functional requirements:
 - **Training Logistics**: Attendance tracking, calendar visualization, resources mapping, and trainee feedback analysis.
 - **Leadership Pipelines**: Succession mapping using a Performance-Potential 9-Box Grid, critical roles identification, risk tracking (e.g., loss of key specialists), and leadership development pathways.
 - **Social Recognition**: Public recognition wall, peer-to-peer appreciation badges (e.g., Compassion, Patient Care, Reliability), and recognition highlights.
-- **AI Automation**: Google Gemini integration for evaluations auditing, Taglish translation/query support, competency extraction, and automatic quiz generation.
-- **Integrations**: Zapier webhooks to sync recognition events or external HR actions.
+- **AI Automation**: Provider-agnostic AI integration (Gemini default; OpenAI / Anthropic / OpenAI-compatible selectable) for the in-app assistant and competency gap-analysis narratives. Bias auditing, quiz generation, and sentiment helpers exist in `AbstractAiProvider` but are **📋 not yet wired to UI actions**.
+- **Integrations**: Zapier webhooks — **📋 Planned.** `ZapierService` is written with five event helpers but is never called, and all webhook URLs are blank.
 
 ---
 
 ## 3. User Roles and Permissions
 
-To ensure compliance with data privacy regulations (e.g., HIPAA, Philippine Data Privacy Act of 2012), permissions are enforced via Laravel Gates and Policies mapping the following roles:
+Permissions are enforced via **13 Laravel Gates** (`AppServiceProvider::registerGates()`) plus the
+`EnsureUserHasRole` middleware (aliased `role`) applied per-route in `routes/web.php`. There are **no Policy
+classes**, and the `permissions` / `role_permissions` tables are schema-only.
+
+The implementation uses **four** roles stored in `users.role`, not the six originally specified. The original
+six-role model is retained below for reference as a future refinement.
+
+### 3.1 Implemented roles (`users.role`)
+
+| Role | Maps to | Employees | Performance | Competency | Learning & Training | Succession | Recognition | Users/Depts |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`admin`** | Hospital Admin + system owner | Full CRUD | Full CRUD + cycles | Full + domains | Full authoring | Full | Post + badges | Full (users + depts) |
+| **`hr_manager`** | HR Admin + Training Officer | Full CRUD | Full CRUD + cycles | Full + domains | Full authoring | Full | Post + badges | Departments only |
+| **`supervisor`** | Dept Head + Supervisor | Read | Create/score reviews | Assess + credentials | Create sessions | Read + candidate scores | Post | — |
+| **`staff`** | Employee | — | Read own | Read own | Enroll / register | **No access** | Post + react + comment | — |
+
+**Gates defined:** `manage-users`, `manage-departments`, `manage-employees`, `view-employees`,
+`manage-performance`, `manage-review-cycles`, `manage-competency`, `manage-learning`, `manage-training`,
+`manage-succession`, `view-succession`, `view-org-analytics`, `run-gap-analysis`.
+
+The same Gates drive both the `@can` checks that show/hide sidebar navigation and the route middleware that
+enforces access, so the menu and the guard cannot drift apart.
+
+### 3.2 📋 Planned six-role model (not implemented)
+
+Retained as the design target. Adopting it requires migrating `users.role`, expanding the Gate definitions, and
+splitting the currently-merged responsibilities (`hr_manager` presently covers both HR Admin and Training
+Officer; `supervisor` covers both Dept Head and Supervisor).
 
 | Role | Description | Performance Access | Competency Access | Learning & Training | Succession Access | Social Recognition |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -182,14 +227,20 @@ stateDiagram-v2
 ### E. Succession Planning
 
 *   **Critical Role Registry**: Flagging key medical positions (e.g., Chief of Surgery, ICU Head Nurse) that present high operational risk if vacant.
-*   **9-Box Grid Placement**: Maps candidates to a grid of "Performance (X-axis)" vs. "Potential (Y-axis)" (calculated via employee scores):
-    | | Low Potential (1) | Medium Potential (2) | High Potential (3) |
+*   **9-Box Grid Placement**: Maps candidates on Performance vs. Potential. Scores are **1–5** on each axis (not 1–3), banded low (1–2) / med (3) / high (4–5) to give the nine cells:
+    | | Low Potential (1–2) | Medium Potential (3) | High Potential (4–5) |
     |---|---|---|---|
-    | **High Performance (3)** | Solid Performer | High Performer | ⭐ Star Talent |
-    | **Medium Performance (2)** | Average Performer | Core Contributor | High Potential |
-    | **Low Performance (1)** | Underperformer | Inconsistent | Rough Diamond |
-*   **Readiness Scale**: Categorizes successors as "Ready Now," "Ready in 1-2 Years," or "Ready in 3+ Years."
-*   **Replacement Charts**: Visual organizational backups representing immediate backups for crucial clinical functions.
+    | **High Performance (4–5)** | Solid Performer | High Performer | ⭐ Star Talent |
+    | **Medium Performance (3)** | Average Performer | Core Contributor | High Potential |
+    | **Low Performance (1–2)** | Underperformer | Inconsistent | Rough Diamond |
+
+    The label is **derived server-side on every write** and never accepted from the form, so it cannot contradict the scores. The nomination form shows a live preview of the resulting placement as scores are entered.
+*   **Readiness Scale**: Categorises successors as "Ready Now," "Ready in 1–2 Years," "Ready in 2–5 Years," or "Long Term."
+*   **Candidate Pipeline**: A single table of everyone nominated across all critical positions — candidate, target role, 9-box placement, readiness, development progress, and status. Filterable by position.
+*   **Leadership Development Paths**: Per-candidate milestones (course, assignment, mentoring, rotation, certification, project) with target dates. Each advances `not started → in progress → completed`; the completion date is stamped automatically and cleared if the milestone moves back. Completion drives the pipeline's Dev Progress percentage.
+*   **Nomination Management**: Scores, readiness, and mentor can be revised after nomination (stamping `reviewed_at`); a candidate can be withdrawn, which also removes their milestones.
+*   **Replacement Charts**: Visual organisational backups representing immediate backups for crucial clinical functions. **📋 Not implemented.**
+*   **📋 Approval workflow not implemented**: `status`, `reviewed_at`, and `approved_at` exist in the data, but nothing transitions a candidate from `proposed` to `approved`.
 *   **Risk Dashboard**: Vacancy risk scoring based on holder's age, tenure, market scarcity, and successor readiness.
 
 ### F. Social Recognition
@@ -209,18 +260,48 @@ stateDiagram-v2
 
 The P&D module leverages core APIs to extend functionality:
 
-1.  **Google Gemini API**:
-    *   **Evaluations Bias Audit**: Analyzes supervisor evaluations for subjective comments (e.g., Taglish review notes) and suggests descriptive, JCI-compliant phrasing.
-    *   **Auto Quiz Generation**: Processes uploaded learning PDFs/documents and produces JSON-formatted multiple-choice questions for LMS assessments.
-    *   **Natural Language Queries**: Translates Taglish or casual inputs into SQL query inputs for HR reports (e.g., "Sino ang successor para sa ICU Head Nurse?").
-2.  **Zapier**:
-    *   **HR Synchronization**: Triggers Zapier hooks when recognition posts are created or certificates are issued, allowing seamless connection with external corporate systems (e.g., Google Sheets, Slack, HR payroll dashboards).
+### 5.1 AI Provider Layer (implemented)
+
+The original Gemini-only design has been **replaced by a provider-agnostic layer**. Application code depends on
+the `App\Contracts\AiProvider` interface (one method: `ask(string): string`); `AiManager` resolves the concrete
+driver from `config('services.ai')` at runtime.
+
+| Setting | Value |
+|---|---|
+| **Selector** | `AI_PROVIDER` = `gemini` \| `openai` \| `anthropic` \| `compatible` |
+| **Default** | `gemini` — an existing `GEMINI_API_KEY` keeps working with no other change |
+| **Drivers** | `GeminiProvider` · `OpenAiProvider` · `AnthropicProvider` · `compatible` (reuses `OpenAiProvider` with a custom label + `base_url` for Groq / DeepSeek / xAI / Mistral / Together / OpenRouter / Ollama) |
+| **Transport** | Raw `Http::` calls — no vendor SDKs |
+| **Model fallback** | Per-provider `*_MODEL` plus a `fallback_models` list; a 404/model error advances to the next candidate |
+| **Failure contract** | `ask()` **never throws** on an API or config error — it returns a `⚠️`-prefixed string that callers detect and degrade on |
+
+**Live AI features:**
+*   **In-app assistant** (`AiController` → `POST /ai/query`): conversational queries in English/Tagalog/Taglish, with per-user history persisted to `ai_chat_messages` (`GET`/`DELETE /ai/history`).
+*   **Competency gap-analysis narratives** (`CompetencyGapAnalysisService`): AI-generated summaries and development recommendations over assessment data, surfaced by `GapAnalysisController`.
+
+**📋 Planned AI features** — helper methods exist on `AbstractAiProvider` (`checkBias()`, `generateQuizQuestions()`, `analyzeSentiment()`) but no controller or UI action calls them yet:
+*   **Evaluations Bias Audit**: analyse supervisor evaluations for subjective comments and suggest JCI-compliant phrasing.
+*   **Auto Quiz Generation**: produce JSON multiple-choice questions for LMS assessments. Blocked additionally by the LMS quiz tables being schema-only.
+*   **Training Feedback Sentiment**: populate `training_feedback.ai_sentiment_score` / `ai_sentiment_label`.
+
+### 5.2 Zapier — 📋 Planned (dormant)
+
+`App\Services\ZapierService` is fully written — a generic `dispatch()` plus `onReviewApproved`,
+`onCredentialExpired`, `onPipInitiated`, `onTrainingRegistration`, and `onCertificateIssued` — but **no
+controller, event, listener, or job ever calls it**, and all five `ZAPIER_WEBHOOK_*` URLs are empty. Even if
+invoked, `dispatch()` short-circuits on its empty-URL guard and returns `false`. Activating it requires wiring
+call sites into the relevant controllers *and* populating the webhook URLs.
 
 ---
 
 ## 6. Database Schema (MySQL 8.0+)
 
-The relational schema is configured for **MySQL 8.0+**. All primary and foreign keys use UUIDs represented as `CHAR(36)`. Arrays are represented as `JSON` columns.
+The relational schema is configured for **MySQL 8**. All domain primary and foreign keys use UUIDs represented as `CHAR(36)`. Arrays are represented as `JSON` columns.
+
+> **Implementation notes.**
+> *   UUIDs are generated **in PHP** via `Str::uuid()` at insert time — MySQL generates nothing. An insert that omits the PK will fail. `created_at` / `updated_at` must likewise be set explicitly, since raw Query Builder has no timestamp magic.
+> *   Access is via **raw `DB::table()` Query Builder** throughout — there are no Eloquent models, relationships, or eager loading for these tables. Joins are written by hand in the controllers.
+> *   **13 of the tables below are schema-only** (migrated, never referenced by code). Each is flagged 💀 in §15, and the affected features are listed there. Read the schema as the intended data model, not as proof a feature exists.
 
 ### 6.1 Entity-Relationship Diagram
 
@@ -870,24 +951,19 @@ CREATE TABLE succession_candidates (
     candidate_id        CHAR(36) PRIMARY KEY,
     position_id         CHAR(36) NOT NULL REFERENCES critical_positions(position_id) ON DELETE CASCADE,
     employee_id         CHAR(36) NOT NULL REFERENCES employees(employee_id),
-    performance_score   INT NOT NULL CHECK (performance_score BETWEEN 1 AND 3),
-    potential_score     INT NOT NULL CHECK (potential_score BETWEEN 1 AND 3),
-    nine_box_label      VARCHAR(30) GENERATED ALWAYS AS (
-                            CASE
-                                WHEN performance_score = 3 AND potential_score = 3 THEN 'star_talent'
-                                WHEN performance_score = 3 AND potential_score = 2 THEN 'high_performer'
-                                WHEN performance_score = 3 AND potential_score = 1 THEN 'solid_performer'
-                                WHEN performance_score = 2 AND potential_score = 3 THEN 'high_potential'
-                                WHEN performance_score = 2 AND potential_score = 2 THEN 'core_contributor'
-                                WHEN performance_score = 2 AND potential_score = 1 THEN 'average_performer'
-                                WHEN performance_score = 1 AND potential_score = 3 THEN 'rough_diamond'
-                                WHEN performance_score = 1 AND potential_score = 2 THEN 'inconsistent'
-                                ELSE 'underperformer'
-                            END
-                        ) STORED,                         -- Managed automatically by MySQL
-    readiness_level     VARCHAR(20) NOT NULL
-        CHECK (readiness_level IN ('ready_now','1_2_years','3_plus_years')),
-    development_plan    JSON,
+    -- AS BUILT: plain INT, range 1-5, no CHECK constraint. The range is enforced
+    -- by request validation and the form inputs, not by MySQL.
+    performance_score   INT NOT NULL,                     -- 1-5 (spec said 1-3 + CHECK)
+    potential_score     INT NOT NULL,                     -- 1-5 (spec said 1-3 + CHECK)
+    -- AS BUILT: a plain VARCHAR, NOT a generated column. SHOW COLUMNS reports
+    -- varchar(30) with an empty Extra. The value is computed in PHP by
+    -- SuccessionController::nineBoxLabel() on every insert and update, and any
+    -- submitted value is ignored, so it still cannot contradict the scores.
+    -- Labels in use: star | high | solid | potential | core | avg | diamond |
+    --                inconsist | under   (bands: low 1-2, med 3, high 4-5)
+    nine_box_label      VARCHAR(30),
+    readiness_level     VARCHAR(20) NOT NULL,             -- ready_now | 1_2_years | 2_5_years | long_term
+    development_plan    JSON,                             -- unused; milestones live in leadership_development_paths
     mentor_id           CHAR(36) REFERENCES employees(employee_id),
     status              VARCHAR(20) DEFAULT 'proposed'
         CHECK (status IN ('proposed','hr_reviewed','approved','withdrawn')),
@@ -1007,35 +1083,45 @@ GROUP BY rp.recipient_id, e.first_name, e.last_name, e.department_id, d.name, DA
 
 ## 7. Security and Compliance Architecture
 
-### 7.1 Authentication & Sessions
+> **Compliance status.** The HIPAA / RA 10173 posture this design targets is **not yet met**. Field-level
+> encryption, MFA, and the audit trail — all prerequisites — are unimplemented. See §7.5.
+> Authoritative detail lives in `HIMS_ARCHITECTURE_AND_SECURITY.md` §3–4.
+
+### 7.1 Authentication & Sessions (implemented)
 
 ```mermaid
 graph TD
-    A["Login Form (Bootstrap 5)"] --> B["CSRF Middleware Validation"]
-    B --> C["Laravel Rate Limiter (Throttle)"]
+    A["Login Form (Blade + hims.css)"] --> B["CSRF Middleware Validation"]
+    B --> C["Laravel Rate Limiter (5 attempts / email+IP)"]
     C --> D["Breeze Session Authentication"]
     D --> E{"Credentials Valid?"}
-    E -- No --> F["Increment failed count & Redirect back"]
-    E -- Yes --> G{"MFA Enabled?"}
-    G -- Yes --> H["TOTP Token Verification (Session challenge)"]
-    G -- No --> I["Generate Laravel Session Cookie"]
-    H --> I
+    E -- No --> F["RateLimiter::hit + redirect back with error"]
+    E -- Yes --> I["Regenerate session + issue cookie"]
     I --> J["Redirect to Dashboard"]
 ```
 
+Public self-registration is **disabled**; accounts are provisioned by an admin through `UserController`.
+
 ### 7.2 Security Settings
 
-*   **Laravel Breeze & Sessions**: Enforces standard session cookie policies. Cookies are flagged as `HttpOnly`, `Secure` (when running HTTPS), and set with `SameSite=Lax` or `SameSite=Strict`.
-*   **CSRF Protection**: Verified automatically via Laravel's built-in `VerifyCsrfToken` middleware on all state-changing requests (POST, PUT, PATCH, DELETE).
-*   **Role-Based Access Control (RBAC)**: Maps permissions using Laravel **Policies** (e.g., `ReviewPolicy`, `CredentialPolicy`) and **Gates**.
-*   **Encryption**: Sensitive columns (like `employees.phone` and `employee_credentials.credential_number`) are encrypted using Laravel's Crypt system, utilizing `AES-256-CBC` under PHP OpenSSL.
-*   **Tamper Protection**: Database configurations revoke raw modification access on log files. Laravel Observers compute record hashes before logging transactions to the audit trail.
+*   **Laravel Breeze & Sessions** ✅ — session cookies are `HttpOnly` with `SameSite=Lax` by framework default. `SESSION_DRIVER=file`, `SESSION_ENCRYPT=false`. The `Secure` flag applies only over HTTPS; local dev runs plain HTTP on `http://localhost:8000`. `bootstrap/app.php` sets `trustProxies(at: '*')` for correct scheme detection behind a TLS-terminating proxy.
+*   **CSRF Protection** ✅ — `VerifyCsrfToken` in the default `web` group; all state-changing forms emit `@csrf`.
+*   **Brute-force throttling** ✅ — `LoginRequest` throttles on an email+IP key at **5 failed attempts** with Laravel's standard decay, cleared on success. `throttle:6,1` guards password-reset and verification routes. *This is request rate-limiting, not account locking* — the `account_locked` / `failed_login_count` columns belong to the dead `system_users` table and are never written.
+*   **Role-Based Access Control (RBAC)** ✅ *(different mechanism)* — 13 **Gates** + the `EnsureUserHasRole` middleware, keyed on `users.role`. **No Policy classes exist**, and the `permissions` / `role_permissions` tables are schema-only. See §3.1.
+*   **Input validation & SQL safety** ✅ — every write path calls `$request->validate([...])`; all queries use Query Builder parameter binding. `DB::raw` fragments (`CONCAT`, `DATE_FORMAT`, `FIELD`) contain no user-supplied interpolation.
+*   **Encryption at rest** ❌ **📋 Planned** — no `Crypt::` / `encryptString` usage anywhere. `employees.phone` and `employee_credentials.credential_number` are stored **plaintext**.
+*   **TOTP MFA** ❌ **📋 Planned** — no 2FA package installed, no `totp` / `two_factor` code.
+*   **Tamper-proof audit trail** ❌ **📋 Planned** — no Observers, no writes to `audit_trails`.
 
-### 7.3 Laravel Breeze RBAC Permission Table
+### 7.3 📋 Planned — Table-driven RBAC (schema-only)
+
+Both tables are migrated in `..._000080_create_security_tables.php` and **never read**. Live authorisation uses
+Gates instead. Adopting this model would add per-resource/action/scope grants (`own`/`department`/`all`) that
+the current role checks only approximate.
 
 ```sql
 -- ═══════════════════════════════════════════════════════
--- RBAC PERMISSION TABLES
+-- RBAC PERMISSION TABLES  (migrated, but unused by code)
 -- ═══════════════════════════════════════════════════════
 
 CREATE TABLE permissions (
@@ -1058,7 +1144,12 @@ CREATE TABLE role_permissions (
 
 ---
 
-### 7.4 Audit Trail Log (MySQL 8.0+)
+### 7.4 📋 Planned — Audit Trail Log (schema-only)
+
+The table below is migrated **including its three hash columns**, but nothing inserts, reads, or hashes into it,
+and there are no Observers. Because the app uses raw Query Builder rather than Eloquent, the Observer-based
+approach originally specified is **not viable as designed** — audit capture would need explicit writes at each
+mutation site, a service wrapper around them, or database-level triggers.
 
 ```sql
 -- ═══════════════════════════════════════════════════════
@@ -1093,6 +1184,29 @@ CREATE INDEX idx_audit_user ON audit_trails(user_id, timestamp DESC);
 CREATE INDEX idx_audit_resource ON audit_trails(resource_type, resource_id, timestamp DESC);
 ```
 
+*   **📋 Immutability (planned)**: `REVOKE UPDATE, DELETE ON audit_trails FROM 'application_user'@'localhost';`
+*   **📋 Row Chain-Hashing (planned)**: `chain_hash = SHA256(current_record_contents + previous_record_chain_hash)`, giving instant tamper detection if any past row is altered.
+
+---
+
+### 7.5 Compliance Control Summary
+
+| Control | Required for | Status |
+|---|---|---|
+| Session auth, CSRF, password hashing | Baseline | ✅ Implemented |
+| Login rate-limiting | Baseline | ✅ Implemented (5 attempts, email+IP) |
+| Role-based access enforcement | Baseline | ✅ Implemented (13 Gates + `role` middleware) |
+| Input validation / SQL-injection defence | Baseline | ✅ Implemented (validation + bound params) |
+| HTTPS in deployment | HIPAA · RA 10173 | ⚠️ Proxy-terminated; no app-level HSTS or TLS-1.3-only enforcement |
+| Field-level encryption at rest | HIPAA · RA 10173 | ❌ Not implemented — PII stored plaintext |
+| Multi-factor authentication | HIPAA | ❌ Not implemented |
+| Audit trail of PHI access/modification | HIPAA · RA 10173 | ❌ Not implemented — no logging of any kind |
+| Account lockout policy | Hospital policy | ❌ Not implemented (throttling ≠ lockout) |
+
+**Net position:** the application is soundly built against everyday web risks (CSRF, injection, unauthorised
+navigation), but the three controls that regulated health data specifically requires — encryption at rest, MFA,
+and audit logging — are absent. It should be treated as **pre-compliance** until §7.3–7.4 and MFA are built.
+
 ---
 
 ## 8. Sample Workflows
@@ -1119,7 +1233,7 @@ CREATE INDEX idx_audit_resource ON audit_trails(resource_type, resource_id, time
 
 ## 9. Sample Dashboard Layouts
 
-### HR Admin Dashboard Layout (Bootstrap 5)
+### HR Admin Dashboard Layout (`layouts/hims` + `public/css/hims.css`)
 ```
 +------------------------------------------------------------------------------------------------------+
 |  HIMS Performance & Development | HR View                                      [ Notifications ] [Role] |
@@ -1172,167 +1286,258 @@ CREATE INDEX idx_audit_resource ON audit_trails(resource_type, resource_id, time
 
 ---
 
-## 12. API Endpoints
+## 12. Routes & Endpoints
 
-### 12.1 Performance Management APIs
+> **⚠️ Correction — there is no REST API.** The `/api/v1/...` endpoints previously listed in this section were
+> never built. `hims-app/routes/` contains only `web.php`, `auth.php`, and `console.php`; `bootstrap/app.php`
+> registers **`web` and `commands` routing only** (no `api:` key), so `routes/api.php` would not even be loaded
+> if it existed. Laravel Sanctum and Passport are both absent from `composer.json`.
+>
+> The application is **entirely server-rendered**: routes return Blade views, forms POST with `@csrf`, and
+> redirects carry flash messages. The two exceptions that return JSON are noted below. A REST API remains a
+> reasonable future addition — see §12.9.
 
-| Method | Endpoint | Description | Authorized Roles |
+All domain routes sit behind `['auth', 'verified']` and are gated per-route by the `role` middleware.
+Roles: `admin` | `hr_manager` | `supervisor` | `staff`.
+
+### 12.1 Performance Management
+
+| Method | Route | Name | Access |
 |---|---|---|---|
-| GET | `/api/v1/performance/cycles` | List all review cycles | All authenticated |
-| POST | `/api/v1/performance/cycles` | Create new review cycle | HR Admin |
-| GET | `/api/v1/performance/reviews` | Get reviews (filtered by employee_id, cycle_id, dept_id) | Role-scoped |
-| POST | `/api/v1/performance/reviews` | Create review draft | HR Admin, Supervisor |
-| PUT | `/api/v1/performance/reviews/:id` | Update review (ratings, comments) | Assigned Reviewer |
-| POST | `/api/v1/performance/reviews/:id/submit` | Submit for Dept Head approval | Supervisor |
-| POST | `/api/v1/performance/reviews/:id/approve` | Approve and digitally sign review | Dept Head |
-| POST | `/api/v1/performance/reviews/:id/return` | Return review for revision | Dept Head |
-| POST | `/api/v1/performance/reviews/:id/ai-audit` | Run Google Gemini bias check | Supervisor+ |
-| GET | `/api/v1/performance/pips` | List PIPs (filtered by employee_id, status) | HR Admin, Supervisor |
-| POST | `/api/v1/performance/pips` | Create Performance Improvement Plan | HR Admin |
-| PUT | `/api/v1/performance/pips/:id` | Update PIP milestones/status | HR Admin, Supervisor |
-| GET | `/api/v1/performance/goals/:employee_id` | Get employee goals | Role-scoped |
-| POST | `/api/v1/performance/goals` | Create goal for employee | Employee, Supervisor |
+| GET | `/performance` | `performance.index` | all authenticated |
+| GET | `/performance/reviews` | `performance.reviews.index` | all authenticated |
+| GET | `/performance/reviews/create` | `performance.reviews.create` | `admin,hr_manager,supervisor` |
+| POST | `/performance/reviews` | `performance.reviews.store` | `admin,hr_manager,supervisor` |
+| GET | `/performance/reviews/{id}` | `performance.show` | all authenticated |
+| GET | `/performance/reviews/{id}/score` | `performance.reviews.score` | `admin,hr_manager,supervisor` |
+| PUT | `/performance/reviews/{id}/score` | `performance.reviews.score.save` | `admin,hr_manager,supervisor` |
+| GET | `/performance/cycles/create` | `performance.cycles.create` | `admin,hr_manager` |
+| POST | `/performance/cycles` | `performance.cycles.store` | `admin,hr_manager` |
+| GET | `/performance/cycles/{id}` | `performance.cycles.show` | `admin,hr_manager` |
+| GET | `/performance/cycles/{id}/edit` | `performance.cycles.edit` | `admin,hr_manager` |
+| PUT | `/performance/cycles/{id}` | `performance.cycles.update` | `admin,hr_manager` |
 
-### 12.2 Competency Management APIs
+**📋 Not implemented:** review submit / approve / return state transitions, digital signing, PIP CRUD screens,
+and goal CRUD screens. The `performance_improvement_plans` and `review_goals` tables are read for display but
+have no management UI.
 
-| Method | Endpoint | Description | Authorized Roles |
+### 12.2 Competency Management
+
+| Method | Route | Name | Access |
 |---|---|---|---|
-| GET | `/api/v1/competency/frameworks` | List domains, categories, competencies | All authenticated |
-| POST | `/api/v1/competency/competencies` | Create new competency | HR Admin, Training Officer |
-| GET | `/api/v1/competency/gap-matrix/:dept_id` | Department gap analysis heatmap data | HR Admin, Dept Head |
-| GET | `/api/v1/competency/skills-matrix/:dept_id` | Department skills matrix | HR Admin, Dept Head, Supervisor |
-| POST | `/api/v1/competency/assessments` | Record competency assessment | Supervisor+ |
-| GET | `/api/v1/competency/assessments/:employee_id` | Get employee's competency profile | Role-scoped |
-| GET | `/api/v1/competency/credentials/:employee_id` | Get employee's credentials | Role-scoped |
-| POST | `/api/v1/competency/credentials` | Add/update credential | HR Admin |
-| GET | `/api/v1/competency/credentials/expiring` | List all expiring/expired credentials | HR Admin, Hospital Admin |
-| POST | `/api/v1/competency/credentials/:id/verify` | Verify credential authenticity | HR Admin |
+| GET | `/competency` | `competency.index` | all authenticated |
+| GET | `/competency/assessments/create` | `competency.assessments.create` | `admin,hr_manager,supervisor` |
+| POST | `/competency/assessments` | `competency.assessments.store` | `admin,hr_manager,supervisor` |
+| GET | `/competency/credentials` | `competency.credentials.index` | `admin,hr_manager,supervisor` |
+| GET | `/competency/credentials/create` | `competency.credentials.create` | `admin,hr_manager,supervisor` |
+| POST | `/competency/credentials` | `competency.credentials.store` | `admin,hr_manager,supervisor` |
+| GET | `/competency/domains/create` | `competency.domains.create` | `admin,hr_manager` |
+| POST | `/competency/domains` | `competency.domains.store` | `admin,hr_manager` |
+| GET | `/competency/domains/{id}` | `competency.domains.show` | `admin,hr_manager` |
 
-### 12.3 Learning Management APIs
+> Route order matters: the `domains/{id}` wildcard is registered **last** so it cannot swallow `domains/create`.
 
-| Method | Endpoint | Description | Authorized Roles |
+### 12.3 Competency Gap Analysis
+
+Nested under the competency prefix, named `competency.gap.*`. Whole group requires `admin,hr_manager,supervisor`.
+
+| Method | Route | Name | Notes |
 |---|---|---|---|
-| GET | `/api/v1/learning/courses` | Browse course catalog | All authenticated |
-| POST | `/api/v1/learning/courses` | Create new course | HR Admin, Training Officer |
-| PUT | `/api/v1/learning/courses/:id` | Update course details | HR Admin, Training Officer |
-| GET | `/api/v1/learning/pathways` | List learning pathways | All authenticated |
-| POST | `/api/v1/learning/pathways` | Create learning pathway | HR Admin, Training Officer |
-| POST | `/api/v1/learning/enroll` | Enroll in course | Employee+ |
-| PUT | `/api/v1/learning/enrollments/:id/progress` | Update course progress | Employee (own) |
-| POST | `/api/v1/learning/quiz/:module_id/submit` | Submit quiz answers | Employee |
-| GET | `/api/v1/learning/cpd/:employee_id` | Get CPD summary and history | Role-scoped |
-| GET | `/api/v1/learning/certificates/:employee_id` | List certificates earned | Role-scoped |
-| GET | `/api/v1/learning/certificates/verify/:code` | Public QR certificate verification | Public (no auth) |
+| GET | `/competency/gap-analysis` | `competency.gap.index` | organisation-wide overview |
+| GET | `/competency/gap-analysis/department` | `competency.gap.department` | per-department heatmap |
+| GET | `/competency/gap-analysis/employee/{employeeId}` | `competency.gap.employee` | individual profile |
+| GET | `/competency/gap-analysis/employee/{employeeId}/json` | `competency.gap.employee.json` | **returns JSON** |
 
-### 12.4 Training Management APIs
+Backed by `CompetencyGapAnalysisService`, which calls the configured AI provider for narrative summaries and
+degrades gracefully when the provider returns its `⚠️` unavailable marker.
 
-| Method | Endpoint | Description | Authorized Roles |
+### 12.4 Learning Management
+
+| Method | Route | Name | Access |
 |---|---|---|---|
-| GET | `/api/v1/training/sessions` | List training sessions (filterable) | All authenticated |
-| POST | `/api/v1/training/sessions` | Create training session | Training Officer, HR Admin |
-| PUT | `/api/v1/training/sessions/:id` | Update session details | Training Officer, HR Admin |
-| DELETE | `/api/v1/training/sessions/:id` | Cancel training session | Training Officer, HR Admin |
-| GET | `/api/v1/training/venues` | List available venues | Training Officer+ |
-| POST | `/api/v1/training/sessions/:id/register` | Register for training | Employee+ |
-| POST | `/api/v1/training/sessions/:id/checkin` | QR code check-in | Training Officer |
-| POST | `/api/v1/training/sessions/:id/feedback` | Submit post-training feedback | Attendee |
-| GET | `/api/v1/training/sessions/:id/analytics` | Pre/post-test delta analytics | Training Officer+ |
-| GET | `/api/v1/training/sessions/:id/attendance` | Attendance report | Training Officer+ |
-| GET | `/api/v1/training/calendar` | Calendar view data (date range) | All authenticated |
+| GET | `/learning` | `learning.index` | all authenticated |
+| GET | `/learning/courses/{id}` | `learning.courses.show` | all authenticated |
+| POST | `/learning/courses/{id}/enroll` | `learning.enroll` | all authenticated |
+| GET | `/learning/courses/create` | `learning.courses.create` | `admin,hr_manager` |
+| POST | `/learning/courses` | `learning.courses.store` | `admin,hr_manager` |
+| GET | `/learning/pathways` | `learning.pathways.index` | all authenticated |
+| GET | `/learning/pathways/create` | `learning.pathways.create` | `admin,hr_manager` |
+| POST | `/learning/pathways` | `learning.pathways.store` | `admin,hr_manager` |
+| GET | `/learning/cpd` | `learning.cpd.index` | all authenticated |
 
-### 12.5 Succession Planning APIs
+**📋 Not implemented:** module delivery, quiz taking/scoring, certificate issuance, and QR verification.
+`course_modules`, `quiz_questions`, `quiz_attempts`, and `pathway_courses` are schema-only.
 
-| Method | Endpoint | Description | Authorized Roles |
+### 12.5 Training Management
+
+| Method | Route | Name | Access |
 |---|---|---|---|
-| GET | `/api/v1/succession/positions` | List critical positions | HR Admin, Hospital Admin |
-| POST | `/api/v1/succession/positions` | Register critical position | HR Admin |
-| PUT | `/api/v1/succession/positions/:id` | Update position risk/details | HR Admin |
-| POST | `/api/v1/succession/candidates` | Nominate succession candidate | HR Admin, Dept Head |
-| PUT | `/api/v1/succession/candidates/:id` | Update candidate scores/readiness | HR Admin, Supervisor |
-| PUT | `/api/v1/succession/candidates/:id/approve` | Approve candidate nomination | HR Admin |
-| GET | `/api/v1/succession/nine-box/:dept_id` | 9-Box grid data for department | HR Admin, Hospital Admin |
-| GET | `/api/v1/succession/risk-dashboard` | Vacancy risk overview | HR Admin, Hospital Admin |
-| GET | `/api/v1/succession/development/:candidate_id` | Leadership development milestones | Role-scoped |
-| POST | `/api/v1/succession/development` | Add development milestone | HR Admin |
+| GET | `/training` | `training.index` | all authenticated |
+| GET | `/training/sessions/{id}` | `training.sessions.show` | all authenticated |
+| POST | `/training/sessions/{id}/register` | `training.register` | all authenticated |
+| GET | `/training/sessions/create` | `training.sessions.create` | `admin,hr_manager,supervisor` |
+| POST | `/training/sessions` | `training.sessions.store` | `admin,hr_manager,supervisor` |
+| GET | `/training/venues` | `training.venues.index` | all authenticated |
+| GET | `/training/venues/create` | `training.venues.create` | `admin,hr_manager` |
+| POST | `/training/venues` | `training.venues.store` | `admin,hr_manager` |
 
-### 12.6 Social Recognition APIs
+**📋 Not implemented:** QR check-in, pre/post-test delivery and delta analytics, attendance reporting, calendar
+data endpoint, session cancellation. `training_tests` and `training_test_results` are schema-only.
 
-| Method | Endpoint | Description | Authorized Roles |
+### 12.6 Succession Planning
+
+Whole group requires `admin,hr_manager,supervisor` — **`staff` have no access to this module at all.**
+
+| Method | Route | Name | Access |
 |---|---|---|---|
-| GET | `/api/v1/recognition/feed` | Activity wall feed (paginated) | All authenticated |
-| POST | `/api/v1/recognition/posts` | Create recognition post | All (cannot self-recognize) |
-| GET | `/api/v1/recognition/posts/:id` | Get single recognition post | All authenticated |
-| POST | `/api/v1/recognition/posts/:id/react` | Add reaction to post | All authenticated |
-| DELETE | `/api/v1/recognition/posts/:id/react` | Remove reaction | Reactor (own) |
-| POST | `/api/v1/recognition/posts/:id/comment` | Add comment to post | All authenticated |
-| PUT | `/api/v1/recognition/posts/:id/moderate` | Moderate post (flag/remove) | HR Admin |
-| GET | `/api/v1/recognition/leaderboard` | Monthly leaderboard rankings | All authenticated |
-| GET | `/api/v1/recognition/badges` | List available badges | All authenticated |
+| GET | `/succession` | `succession.index` | group |
+| GET | `/succession/positions` | `succession.positions.index` | group |
+| GET | `/succession/positions/{id}` | `succession.positions.show` | group |
+| GET | `/succession/positions/create` | `succession.positions.create` | `admin,hr_manager` |
+| POST | `/succession/positions` | `succession.positions.store` | `admin,hr_manager` |
+| GET | `/succession/candidates/{id}` | `succession.candidates.show` | group |
+| GET | `/succession/candidates/create` | `succession.candidates.create` | `admin,hr_manager` |
+| POST | `/succession/candidates` | `succession.candidates.store` | `admin,hr_manager` |
+| GET | `/succession/candidates/{id}/edit` | `succession.candidates.edit` | `admin,hr_manager` |
+| PUT | `/succession/candidates/{id}` | `succession.candidates.update` | `admin,hr_manager` |
+| DELETE | `/succession/candidates/{id}` | `succession.candidates.withdraw` | `admin,hr_manager` |
+| POST | `/succession/candidates/{id}/milestones` | `succession.milestones.store` | group |
+| PUT | `/succession/candidates/{id}/milestones/{pathId}` | `succession.milestones.update` | group |
+| DELETE | `/succession/candidates/{id}/milestones/{pathId}` | `succession.milestones.destroy` | group |
 
-### 12.7 AI Assistant Gateway
+**Pipeline filter.** `/succession?position_id={uuid}` narrows the candidate table to one position. The value is
+validated against the loaded position list, so an unrecognised id is discarded rather than reaching the query.
 
-| Method | Endpoint | Description | Authorized Roles |
+**9-Box integrity.** `nine_box_label` is computed by `SuccessionController::nineBoxLabel()` on every insert and
+update, and any submitted value is ignored — the badge cannot contradict the scores shown next to it. Scores are
+1–5, each axis banding to low (1–2) / med (3) / high (4–5). Note this is a **PHP-enforced** guarantee: the column
+is a plain `VARCHAR(30)`, not the `GENERATED` column the original spec described.
+
+**Dev Progress.** The percentage on the pipeline is
+`completed milestones / total milestones` per candidate, with `NULLIF(COUNT(...), 0)` guarding the
+zero-milestone case. (The earlier `AVG(CASE WHEN ... THEN 100 ELSE 0 END)` formula was replaced — it produced
+misleading figures once a candidate had a mix of statuses.)
+
+**Withdraw** deletes the nomination and its milestones inside a transaction. It is a hard delete: the table has
+no soft-delete column, and the `(position_id, employee_id)` unique key would otherwise block re-nominating the
+same person later.
+
+**📋 Not implemented:** the candidate **approval workflow**. `status`, `reviewed_at`, and `approved_at` exist —
+and `reviewed_at` is now stamped when a nomination is edited — but nothing moves a candidate from `proposed` to
+`approved`. Periodic succession reviews (`succession_reviews`) remain schema-only.
+
+### 12.7 Social Recognition
+
+Deliberately open to **every** role — recognition is peer-to-peer.
+
+| Method | Route | Name | Access |
 |---|---|---|---|
-| POST | `/api/v1/ai/nlp-command` | Natural language query (English/Tagalog/Taglish) via Google Gemini | All authenticated |
-| POST | `/api/v1/ai/bias-check` | Standalone text bias analysis (Gemini audit) | Supervisor+ |
-| POST | `/api/v1/ai/generate-quiz` | Generate quiz from training text using Gemini | Training Officer, HR Admin |
-| POST | `/api/v1/ai/extract-competencies` | Extract skills from resume/text via Gemini | HR Admin |
-| POST | `/api/v1/ai/summarize` | Summarize review/feedback text using Gemini | Supervisor+ |
+| GET | `/recognition` | `recognition.index` | all authenticated |
+| GET | `/recognition/posts/create` | `recognition.posts.create` | all authenticated |
+| POST | `/recognition/posts` | `recognition.posts.store` | all authenticated |
+| POST | `/recognition/posts/{id}/react` | `recognition.react` | all authenticated |
+| POST | `/recognition/posts/{id}/comments` | `recognition.comments.store` | all authenticated |
+| GET | `/recognition/badges/create` | `recognition.badges.create` | `admin,hr_manager` |
+| POST | `/recognition/badges` | `recognition.badges.store` | `admin,hr_manager` |
+
+The leaderboard is read from the `v_recognition_leaderboard` MySQL view. A `CHECK` constraint prevents
+self-recognition at the database level. **📋 Not implemented:** post moderation UI, reaction removal.
+
+### 12.8 Employees, Departments, Users & AI
+
+| Method | Route | Name | Access |
+|---|---|---|---|
+| GET | `/dashboard` | `dashboard` | all authenticated |
+| GET | `/employees` | `employees.index` | `admin,hr_manager,supervisor` |
+| GET | `/employees/{id}` | `employees.show` | `admin,hr_manager,supervisor` |
+| GET | `/employees/create` · POST `/employees` | `employees.create` · `.store` | `admin,hr_manager` |
+| GET | `/employees/{id}/edit` · PUT `/employees/{id}` | `employees.edit` · `.update` | `admin,hr_manager` |
+| DELETE | `/employees/{id}` | `employees.destroy` | `admin,hr_manager` |
+| GET | `/departments` · POST `/departments` | `departments.index` · `.store` | `admin,hr_manager` |
+| — | `/users` resource (no `show`) | `users.*` | `admin` only |
+| POST | `/ai/query` | `ai.query` | all authenticated — **returns JSON** |
+| GET | `/ai/history` | `ai.history` | all authenticated — **returns JSON** |
+| DELETE | `/ai/history` | `ai.history.clear` | all authenticated — **returns JSON** |
+| POST | `/log-error` | `log-error` | inline closure; receives client-side JS errors |
+
+Notes:
+*   `employees.show` constrains `{id}` to a UUID pattern (`[0-9a-fA-F-]{36}`) so it cannot capture `/employees/create`.
+*   **Departments have no controller** — `departments.index` and `.store` are inline closures in `routes/web.php`. `web.php` imports a `DepartmentController` class that does not exist; the unused import is harmless but misleading.
+*   `AiController` persists both sides of each exchange to `ai_chat_messages`, scoped per user.
+
+### 12.9 📋 Planned — REST API layer
+
+If external integration is required later, the natural shape is a `routes/api.php` registered in
+`bootstrap/app.php` with Sanctum token auth, mirroring the controllers above. The original `/api/v1/...` design
+(cycles, reviews, gap-matrix, enrolment, sessions, nine-box, recognition feed, AI gateway) remains a sound
+target. Note that `bootstrap/app.php` already configures `shouldRenderJsonWhen` for `api/*` requests, so error
+responses would render correctly the moment such routes are added.
 
 ---
 
-## 13. Implementation Roadmap
+## 13. Implementation Status & Remaining Work
 
-```mermaid
-gantt
-    title HIMS P&D Laravel/MySQL Subsystem Implementation Timeline
-    dateFormat  YYYY-MM-DD
-    axisFormat  %b %d
+### 13.1 Delivered
 
-    section Phase 1 - Foundation
-    MySQL Database Design & Migrations   :p1a, 2026-08-04, 10d
-    Laravel Breeze Session Auth Setup     :p1b, 2026-08-04, 10d
-    Laravel Gates/Policies & RBAC Setup   :p1c, 2026-08-11, 7d
-    Audit Trail Observers Setup          :p1d, 2026-08-14, 5d
+| Area | Status |
+|---|---|
+| MySQL schema & migrations (54 tables, 1 view, 2 triggers, generated columns) | ✅ Complete |
+| Laravel Breeze session auth; admin-provisioned accounts, registration disabled | ✅ Complete |
+| RBAC — 13 Gates + `EnsureUserHasRole` middleware over 4 roles | ✅ Complete *(Gates, not Policies)* |
+| Performance module — cycles, reviews, KPI scoring | ✅ Core paths |
+| Competency module — domains, assessments (trigger-computed gap), credentials | ✅ Core paths |
+| Competency Gap Analysis (Objective 6) — org / department / employee views + JSON | ✅ Complete |
+| Learning module — courses, pathways, enrolment, CPD ledger | ✅ Core paths |
+| Training module — sessions, venues, registration, feedback | ✅ Core paths |
+| Succession module — critical positions, candidates, 9-box, development milestones | ✅ Complete except approval workflow |
+| Recognition module — posts, reactions, comments, badges, leaderboard view | ✅ Complete |
+| Employees / Departments / Users administration | ✅ Complete |
+| AI assistant + provider-agnostic AI layer (4 providers, fallback models) | ✅ Complete |
+| UI shell, design system, full mobile-responsive support | ✅ Complete |
 
-    section Phase 2 - Core Subsystems
-    Performance Subsystem (Laravel DB)    :p2a, 2026-08-18, 14d
-    Competency Subsystem (JCI / Trigger)  :p2b, 2026-08-25, 14d
-    LMS Subsystem (Course/Quiz/Cert DDL)  :p2c, 2026-09-08, 14d
-    Training Logistics Setup              :p2d, 2026-09-15, 14d
+### 13.2 Remaining Work
 
-    section Phase 3 - Advanced Subsystems
-    9-Box Grid & Succession logic        :p3a, 2026-09-29, 10d
-    Recognition Activity Wall (Bootstrap) :p3b, 2026-10-06, 10d
-    Google Gemini NLP Engine Integration  :p3c, 2026-10-13, 14d
+Ordered by dependency. Items marked **schema ready** already have their tables migrated.
 
-    section Phase 4 - QA & Deploy
-    Integration & Controller Testing      :p4a, 2026-10-27, 7d
-    Laravel Security Audit & Lockdowns    :p4b, 2026-11-03, 7d
-    Zapier Webhooks verification          :p4c, 2026-11-03, 7d
-    Laragon Local UAT & Deployment Prep   :p4d, 2026-11-10, 10d
-    Production Live Deployment            :milestone, 2026-11-20, 0d
-```
-
-### Phase Summary
-
-| Phase | Duration | Key Deliverables |
+| Priority | Item | Notes |
 |---|---|---|
-| **Phase 1: Foundation** | Weeks 1–3 | MySQL migrations deployment, Laravel Breeze setup, Policy security mappings, observer audit hooks |
-| **Phase 2: Core Subsystems** | Weeks 3–8 | Performance evaluations controller, competency mappings + MySQL trigger, LMS pathways + Quiz models, training logistics |
-| **Phase 3: Advanced Subsystems** | Weeks 9–12 | Succession 9-Box grid, Bootstrap-themed recognition feed, Google Gemini API wrappers |
-| **Phase 4: Quality & Deployment**| Weeks 12–16 | PHPUnit execution, Zapier hooks test, Laragon local staging validation |
+| **1 — Compliance blockers** | Field-level encryption (`Crypt`, AES-256-CBC) | `employees.phone`, `employee_credentials.credential_number` are plaintext. Encrypting removes `WHERE`/`LIKE` on those columns — affects employee search. |
+| | Audit logging → `audit_trails` | **Schema ready** (incl. hash columns). Observer approach is **not viable** — no Eloquent. Needs explicit writes per mutation, a service wrapper, or DB triggers. |
+| | TOTP MFA | No package installed. `mfa_*` columns sit on the dead `system_users` table; would need adding to `users`. |
+| | HSTS / TLS-1.3-only enforcement | Currently proxy-terminated TLS with no app-level header policy. |
+| **2 — Feature completion** | LMS quiz engine (module delivery, attempts, scoring) | **Schema ready**: `course_modules`, `quiz_questions`, `quiz_attempts`. Unblocks AI quiz generation (helper already exists). |
+| | Certificate issuance + QR verification | `certificates` table is live but nothing issues them. |
+| | Training pre/post-tests + delta analytics | **Schema ready**: `training_tests`, `training_test_results`. |
+| | Review workflow state machine (submit → approve → return, digital signing) | Reviews are created and scored but have no approval transitions. |
+| | PIP & goal management UI | Tables read for display only. |
+| | Credential expiry alerting | **Schema ready**: `credential_alert_log`. Depends on notifications or Zapier. |
+| | In-app notifications | **Schema ready**: `notifications`. Requires a queue worker. |
+| | Post moderation UI | Recognition posts have a `moderation_status` but no UI to change it. |
+| | Succession candidate approval | `status` / `reviewed_at` / `approved_at` exist and `reviewed_at` is stamped on edit, but nothing promotes `proposed` → `approved`. |
+| | Periodic succession reviews | **Schema ready**: `succession_reviews`. |
+| **3 — Infrastructure** | Wire up Zapier dispatch | Service written; needs call sites **and** webhook URLs. |
+| | Table-driven permissions | **Schema ready**: `permissions`, `role_permissions`. Would add `own`/`department`/`all` scoping the Gates only approximate. |
+| | Redis for cache/queue/session | Optional; app currently does no caching at all. |
+| | REST API + Sanctum | Only if external integration is needed. See §12.9. |
+| **4 — Quality** | Fix test suite | **24 of 25 tests fail.** 23 error during `RefreshDatabase` setup: the competency trigger migration calls `DB::unprepared('CREATE TRIGGER … DECLARE …')` with **no SQLite guard**, which is invalid on the `:memory:` test connection (`near "DECLARE": syntax error`). The 24th is a scaffold `ExampleTest` asserting `/` returns 200 when it redirects (302). Fix by guarding the trigger migration on `DB::getDriverName() === 'mysql'`, or pointing `phpunit.xml` at MySQL. |
+| | Remove dead `DepartmentController` import from `routes/web.php` | Class does not exist; unused import is harmless but misleading. |
+| | Decide on `system_users` | Dead schema duplicating `users`. Either drop it or migrate auth onto it — keeping both invites confusion. |
+| | Resolve mixed Tailwind v3/v4 setup | `tailwindcss@3` core and `@tailwindcss/vite@4` plugin are both declared. |
 
 ---
 
 ## 14. Technology Stack & Dev Environment
 
-*   **Frontend**: HTML5, CSS3, Bootstrap 5 (Styling layout elements, form layouts, alerts), Vanilla JavaScript.
-*   **Backend Framework**: PHP (PHP 8.2+), Laravel Framework.
-*   **Database**: MySQL 8.0+ (relational engine, index limits, virtual stored columns, raw triggers), Redis (cache manager).
-*   **Authentication**: Laravel Breeze, Session-Based Authentication.
-*   **Integrations**: Google Gemini API (NLP tasks), Zapier Webhooks.
-*   **Local Setup & DevOps**: Laragon development environment, Git & GitHub repository management, Vercel asset orchestration.
+*   **Frontend**: HTML5, CSS3, vanilla JavaScript. Styling is a **single hand-authored stylesheet**, `public/css/hims.css` (742 lines), loaded via `asset()` — including a hand-rolled 12-column `.row`/`.col-*` grid and 7 media queries for mobile. **Bootstrap Icons 1.11.3** (font glyphs, CDN) is the only Bootstrap artefact; the Bootstrap **CSS framework is not used**. 46 views extend `layouts/hims`; Alpine.js + Tailwind reach only `profile/edit` via Breeze's `x-app-layout`.
+*   **Backend Framework**: **PHP ^8.3**, **Laravel 13.22**. Data access is **raw Query Builder** (`DB::table()`) — not Eloquent; `App\Models\User` is the only model.
+*   **Database**: MySQL 8 — `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`, two `BEFORE INSERT`/`BEFORE UPDATE` triggers for competency gap, `GENERATED ALWAYS AS ... STORED` columns for credential status and the 9-box label, and one view (`v_recognition_leaderboard`).
+*   **Caching / Queue / Session**: `CACHE_STORE=database`, `QUEUE_CONNECTION=database`, `SESSION_DRIVER=file`. **Redis is not used** — its config is framework scaffolding only, no `predis` package, and the app makes no `Cache::` calls at all.
+*   **Authentication**: Laravel Breeze v2.4, session-based, bcrypt (12 rounds). Public registration disabled; admin-provisioned accounts.
+*   **Authorisation**: 13 Laravel Gates + `EnsureUserHasRole` middleware over `users.role` (`admin`/`hr_manager`/`supervisor`/`staff`). No Policies.
+*   **AI Integration**: provider-agnostic `App\Contracts\AiProvider` resolved by `AiManager` — Gemini (default), OpenAI, Anthropic, or any OpenAI-compatible host, selected by `AI_PROVIDER`. Raw `Http::` calls via Guzzle; no vendor SDKs.
+*   **Build tooling**: Vite 8 + `laravel-vite-plugin` 3.1, Tailwind (v3 core + v4 Vite plugin), Alpine.js 3 — present but largely bypassed by the domain UI. Pint for formatting, PHPUnit 12 for tests, Pail for log tailing.
+*   **Local Setup & DevOps**: Laragon (Apache/Nginx + PHP + MySQL) on Windows, Git & GitHub. Deployed behind a **Railway** TLS-terminating proxy — `bootstrap/app.php` calls `trustProxies(at: '*')` so HTTPS asset URLs resolve correctly. *(The earlier reference to Vercel was inaccurate.)*
+*   **📋 Planned / absent**: Redis, Zapier dispatch, TOTP MFA, field-level encryption, audit logging, REST API (no Sanctum/Passport).
 
 ---
 
@@ -1340,13 +1545,20 @@ gantt
 
 | Subsystem | Tables / Views | Key MySQL Features Used |
 |---|---|---|
-| **Core / Shared** | `departments`, `roles`, `employees`, `system_users`, `notifications` | UUID formatting represented as `CHAR(36)`, indexing on login credentials, self-referential parent department mapping |
+| **Core / Shared** | `departments`, `roles`, `employees`, ~~`system_users`~~ 💀, ~~`notifications`~~ 💀 | UUID formatting represented as `CHAR(36)`, indexing on login credentials, self-referential parent department mapping |
 | **Performance** | `review_cycles`, `kpi_library`, `performance_reviews`, `review_kpi_scores`, `peer_reviews`, `performance_improvement_plans`, `review_goals` | JSON column stores for AI bias outputs and PIP steps, composite unique key indexes |
-| **Competency** | `competency_domains`, `competency_categories`, `competencies`, `role_competency_requirements`, `competency_assessments`, `employee_credentials`, `credential_alert_log` | MySQL `BEFORE INSERT` and `BEFORE UPDATE` trigger routines to auto-populate numerical gaps, Virtual `GENERATED ALWAYS AS` columns for license active states |
-| **Learning** | `learning_pathways`, `courses`, `pathway_courses`, `course_modules`, `course_enrollments`, `quiz_questions`, `quiz_attempts`, `cpd_records`, `certificates` | JSON schema for quiz questions, enrollment metadata indexes, certificate verifying hash uniqueness |
-| **Training** | `training_venues`, `training_sessions`, `training_registrations`, `training_tests`, `training_test_results`, `training_feedback` | Unique indexes mapping venue dates and times to prevent overlaps |
-| **Succession** | `critical_positions`, `succession_candidates`, `succession_reviews`, `leadership_development_paths` | Stored `GENERATED ALWAYS AS` column automatically evaluating candidate scores into 9-Box grid categories |
+| **Competency** | `competency_domains`, `competency_categories`, `competencies`, `role_competency_requirements`, `competency_assessments`, `employee_credentials`, ~~`credential_alert_log`~~ 💀 | MySQL `BEFORE INSERT` and `BEFORE UPDATE` trigger routines to auto-populate numerical gaps, Virtual `GENERATED ALWAYS AS` columns for license active states |
+| **Learning** | `learning_pathways`, `courses`, ~~`pathway_courses`~~ 💀, ~~`course_modules`~~ 💀, `course_enrollments`, ~~`quiz_questions`~~ 💀, ~~`quiz_attempts`~~ 💀, `cpd_records`, `certificates` | JSON schema for quiz questions, enrollment metadata indexes, certificate verifying hash uniqueness |
+| **Training** | `training_venues`, `training_sessions`, `training_registrations`, ~~`training_tests`~~ 💀, ~~`training_test_results`~~ 💀, `training_feedback` | Unique indexes mapping venue dates and times to prevent overlaps |
+| **Succession** | `critical_positions`, `succession_candidates`, ~~`succession_reviews`~~ 💀, `leadership_development_paths` | 9-Box placement derived in PHP (`SuccessionController::nineBoxLabel()`) on every write — **not** a `GENERATED` column, despite the DDL in §6.7 of earlier revisions. Milestone completion drives the pipeline's Dev Progress percentage. |
 | **Recognition** | `recognition_badges`, `recognition_posts`, `recognition_reactions`, `recognition_comments`, `v_recognition_leaderboard` | View table mapping monthly score leaderboards, self-recognition constraint CHECK expressions |
-| **Security / Audit** | `permissions`, `role_permissions`, `audit_trails` | Granular permission records, transaction state logs structured as JSON, row auditing linking hashes |
+| **Security / Audit** | ~~`permissions`~~ 💀, ~~`role_permissions`~~ 💀, ~~`audit_trails`~~ 💀 | *Entire group is schema-only — no code reads or writes any of it.* |
+| **AI** | `ai_chat_messages` | Per-user assistant history (`AiController`) |
+| **Laravel infrastructure** | `users`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `password_reset_tokens` | Framework tables. `users` is the real auth table, extended with `role` + nullable `employee_id` FK. |
 
-**Total: 42 tables/views** across 8 schema groups, fully configured for MySQL 8.0+.
+**💀 = schema-only (dead)**: created by a migration but referenced by **zero** code in `app/`, `routes/`,
+`resources/`, or seeders. 13 tables are in this state.
+
+**Total: 54 tables + 1 view** created across 15 migrations (including the 8 Laravel infrastructure tables),
+configured for MySQL 8. Of these, **13 domain tables are dead schema** — the effective live surface is ~33
+domain tables plus the view.
