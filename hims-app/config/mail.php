@@ -37,6 +37,23 @@ return [
 
     'mailers' => [
 
+        /*
+        |----------------------------------------------------------------------
+        | A note on 'timeout' — do not set it back to null
+        |----------------------------------------------------------------------
+        | MailManager only forwards this to the socket when isset() is true, and
+        | isset(null) is false. Left null, the connection inherits PHP's
+        | default_socket_timeout (60s), which on a host that firewalls outbound
+        | SMTP is longer than max_execution_time: PHP hits its own limit while
+        | still blocked in stream_socket_client() and dies with a FatalError, so
+        | Symfony never raises the TransportException that
+        | PasswordResetLinkController is there to catch. The visitor gets a crash
+        | page instead of the friendly message.
+        |
+        | An explicit timeout shorter than max_execution_time keeps the failure
+        | inside the framework, where it is handled and logged.
+        */
+
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),
@@ -45,7 +62,7 @@ return [
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            'timeout' => (int) (env('MAIL_TIMEOUT') ?: 15),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
@@ -60,6 +77,12 @@ return [
         | app-specific password generated from the account's security settings,
         | and each requires MAIL_FROM_ADDRESS to be the same mailbox that is
         | authenticating, or the message is rejected or filed as spam.
+        |
+        | All three are also SMTP on port 587, which many PaaS hosts (Railway,
+        | Render, Heroku, Vercel, Fly) firewall on lower plans to protect their
+        | IP reputation. Where that is the case these presets cannot work at any
+        | timeout — the platform drops the connection — and an HTTPS API
+        | transport such as Resend, Brevo or Postmark is the only option.
         */
 
         'gmail' => [
@@ -69,7 +92,7 @@ return [
             'port' => 587,
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            'timeout' => (int) (env('MAIL_TIMEOUT') ?: 15),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
@@ -80,7 +103,7 @@ return [
             'port' => 587,
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            'timeout' => (int) (env('MAIL_TIMEOUT') ?: 15),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
@@ -91,7 +114,7 @@ return [
             'port' => 587,
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            'timeout' => (int) (env('MAIL_TIMEOUT') ?: 15),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
