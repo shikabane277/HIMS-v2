@@ -530,12 +530,49 @@ URLs. It reads the **active** mailer's config rather than a hardcoded `smtp` blo
 their real host. Run `php artisan config:clear` after every `.env` change, and restart `php artisan serve` —
 a running server holds the old config.
 
+**A third trap — `'timeout' => null` turns a hung connection into a fatal error.** `MailManager` forwards this
+value to the socket only `if (isset($config['timeout']))`, and `isset(null)` is **false**, so a null timeout is
+silently dropped and the connection inherits PHP's `default_socket_timeout` (60s). Where that exceeds
+`max_execution_time`, PHP hits its own limit while still blocked inside
+`SocketStream::initialize()` → `stream_socket_client()` and dies with a **`FatalError`** — *before* Symfony's
+`set_error_handler()` on the surrounding lines can convert it into a `TransportException`. The result is that
+`PasswordResetLinkController`'s try/catch, which exists precisely to prevent a crash page here, never runs.
+
+All four mailers therefore set `'timeout' => (int) (env('MAIL_TIMEOUT') ?: 15)` — short enough to abort inside
+the framework, long enough for a real SMTP handshake, and overridable per environment. Verified by pointing the
+`gmail` preset at `203.0.113.1` (RFC 5737 blackhole, so the connect hangs exactly as a firewalled port does):
+the send now aborts at the configured timeout as a caught `TransportException` instead of a fatal.
+**Do not restore `null` here.** Note the `?:` — the same blank-env-key rule as `MAIL_FROM_ADDRESS` applies.
+
 **Production caveats.** `APP_URL` is baked into the emailed reset link, so a wrong value produces a link that
 resolves nowhere for the recipient. Railway does **not** read `.env` — `MAIL_MAILER`, `MAIL_USERNAME`,
 `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS` and `APP_URL` must be set in its dashboard. Consumer Gmail is not a
 production transport (~500 sends/day, and reset mail from a personal address is frequently spam-filed); a
 transactional provider on the hospital domain — Brevo, SendGrid, or Resend — is the correct choice, and
 `.env.example` documents the SMTP details for each.
+
+#### ⚠️ SMTP does not work on Railway below the Pro plan
+
+**No environment variable can fix this.** [Railway blocks outbound SMTP on Free, Trial, and Hobby
+plans](https://docs.railway.com/networking/outbound-networking) to prevent spam and protect its IP reputation.
+Ports 25, 465, 587 and 2525 are all affected, so every preset in this file — all of which are port 587 — fails
+identically: the connection to `smtp.gmail.com` hangs until it times out, because the platform drops it before
+the provider is ever reached. Credentials, `MAIL_FROM_ADDRESS`, and the reset flow itself are irrelevant to this
+failure; the same configuration that works locally cannot work there.
+
+Two paths resolve it:
+
+1.  **Upgrade to Railway Pro, then redeploy the service.** The redeploy is required — new egress rules do not
+    apply to a running deployment. Gmail/Outlook/Yahoo presets then work unchanged.
+2.  **Switch to an HTTPS API transport**, which is not SMTP and is therefore unaffected on every plan. Railway
+    recommends Resend; SendGrid, Mailgun, Postmark and Brevo are equivalent in kind. This needs a Composer
+    bridge package (e.g. `resend/resend-laravel`) and `MAIL_MAILER=resend` — **not currently installed**, so it
+    is a code change, not a configuration change.
+
+For option 2, note a sandbox restriction that catches people out: until a sending **domain** is DNS-verified,
+Resend only delivers to the address the account was registered with. A password-reset flow must mail arbitrary
+registered users, so domain verification (or a provider whose free tier verifies a single sender address
+instead) is a prerequisite, not an optimisation.
 
 ---
 

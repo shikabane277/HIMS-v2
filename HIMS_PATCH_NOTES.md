@@ -137,6 +137,39 @@ are updated with every system change so they describe the as-built state.
 
 ## Unreleased — working tree
 
+### Fixed — `'timeout' => null` crashed the reset page on hosts that firewall SMTP
+
+Reported from the Railway deployment: clicking **Forgot password?** returned
+`Symfony\Component\ErrorHandler\Error\FatalError` at `SocketStream.php:154`.
+
+`MailManager` forwards the mailer's `timeout` to the socket only `if (isset($config['timeout']))`, and
+`isset(null)` is **false** — so `'timeout' => null` was silently dropped and the connection inherited PHP's
+`default_socket_timeout` of 60s. Where that exceeds `max_execution_time`, PHP hits its own limit while still
+blocked in `stream_socket_client()` and dies with a `FatalError` **before** Symfony's `set_error_handler()` can
+raise the `TransportException` — so the try/catch added to `PasswordResetLinkController` in v2.5.0-beta.1, which
+exists to prevent exactly this crash page, never ran.
+
+All four mailers now use `'timeout' => (int) (env('MAIL_TIMEOUT') ?: 15)`. Note the `?:` — the same
+blank-env-key rule that caused the From-header bug applies here too. Verified against `203.0.113.1`
+(RFC 5737 blackhole, so the connect hangs exactly as a firewalled port does): the send now aborts at the
+configured timeout as a caught `TransportException`, exit 0, no fatal.
+
+This converts the crash into the intended friendly message. **It does not make email work on Railway below
+Pro** — see below.
+
+### Docs — Railway blocks outbound SMTP below the Pro plan
+
+Not a defect in this codebase, but the reason mail fails on the deployed instance, so it is now documented in
+`HIMS_ARCHITECTURE_AND_SECURITY.md` §4.8. Railway firewalls ports 25/465/587/2525 on Free, Trial and Hobby
+plans, so all four presets here (every one of them port 587) fail identically regardless of credentials. Either
+upgrade to Pro **and redeploy** (new egress rules do not apply to a running deployment), or move to an HTTPS API
+transport such as Resend — which requires a Composer bridge package and is therefore a code change, not a
+configuration change.
+
+---
+
+## Unreleased — earlier working-tree changes
+
 Not yet committed: **31 modified, 26 new, 1 deleted** (per `git status`; new directories such as
 `app/Services/Ai/` count once). Covers the AI provider refactor, the RBAC layer, competency gap analysis, auth
 hardening, role-aware dashboards, the succession pipeline build-out, two data-integrity migrations, and the
