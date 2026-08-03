@@ -1494,6 +1494,8 @@ responses would render correctly the moment such routes are added.
 | Employees / Departments / Users administration | ✅ Complete |
 | AI assistant + provider-agnostic AI layer (4 providers, fallback models) | ✅ Complete |
 | UI shell, design system, full mobile-responsive support | ✅ Complete |
+| Password reset by email — request, delivery, tokenised reset, single-use enforcement | ✅ Complete *(needs SMTP credentials + a correct `APP_URL`; see §14.1)* |
+| Topbar Notifications and Help/FAQ dropdowns | ✅ UI complete *(notifications have no data source — see §13.2)* |
 
 ### 13.2 Remaining Work
 
@@ -1511,7 +1513,7 @@ Ordered by dependency. Items marked **schema ready** already have their tables m
 | | Review workflow state machine (submit → approve → return, digital signing) | Reviews are created and scored but have no approval transitions. |
 | | PIP & goal management UI | Tables read for display only. |
 | | Credential expiry alerting | **Schema ready**: `credential_alert_log`. Depends on notifications or Zapier. |
-| | In-app notifications | **Schema ready**: `notifications`. Requires a queue worker. |
+| | In-app notifications | **Schema ready**: `notifications`. Requires a queue worker. As of v2.5.0-beta.1 the topbar bell opens a working dropdown, but it is **presentation only** — permanently showing "You're all caught up." because nothing reads or writes the table. The UI shell is done; the data source is the remaining work. |
 | | Post moderation UI | Recognition posts have a `moderation_status` but no UI to change it. |
 | | Succession candidate approval | `status` / `reviewed_at` / `approved_at` exist and `reviewed_at` is stamped on edit, but nothing promotes `proposed` → `approved`. |
 | | Periodic succession reviews | **Schema ready**: `succession_reviews`. |
@@ -1519,7 +1521,7 @@ Ordered by dependency. Items marked **schema ready** already have their tables m
 | | Table-driven permissions | **Schema ready**: `permissions`, `role_permissions`. Would add `own`/`department`/`all` scoping the Gates only approximate. |
 | | Redis for cache/queue/session | Optional; app currently does no caching at all. |
 | | REST API + Sanctum | Only if external integration is needed. See §12.9. |
-| **4 — Quality** | Fix test suite | **24 of 25 tests fail.** 23 error during `RefreshDatabase` setup: the competency trigger migration calls `DB::unprepared('CREATE TRIGGER … DECLARE …')` with **no SQLite guard**, which is invalid on the `:memory:` test connection (`near "DECLARE": syntax error`). The 24th is a scaffold `ExampleTest` asserting `/` returns 200 when it redirects (302). Fix by guarding the trigger migration on `DB::getDriverName() === 'mysql'`, or pointing `phpunit.xml` at MySQL. |
+| **4 — Quality** | Finish test suite cleanup | ✅ **Largely resolved in v2.5.0-beta.1 — 22 of 25 pass, up from 1.** The MySQL-only DDL in the competency trigger and recognition view migrations is now behind `if (DB::getDriverName() === 'mysql')`, so `RefreshDatabase` no longer dies on the sqlite `:memory:` connection. The 3 remaining failures are stale Breeze scaffolding: two `RegistrationTest` cases expect the self-registration route deliberately removed for an internal system, and `ExampleTest` asserts `/` returns 200 where it redirects (302). Delete or rewrite those three. Note the guard means **triggers and `v_recognition_leaderboard` do not exist under sqlite** — a feature test covering `RecognitionController` or assessment `gap` must target MySQL. |
 | | Remove dead `DepartmentController` import from `routes/web.php` | Class does not exist; unused import is harmless but misleading. |
 | | Decide on `system_users` | Dead schema duplicating `users`. Either drop it or migrate auth onto it — keeping both invites confusion. |
 | | Resolve mixed Tailwind v3/v4 setup | `tailwindcss@3` core and `@tailwindcss/vite@4` plugin are both declared. |

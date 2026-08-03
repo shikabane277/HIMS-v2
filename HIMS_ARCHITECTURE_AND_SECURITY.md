@@ -310,6 +310,27 @@ required for it are listed in [§4](#4-not-yet-implemented-roadmap).
     (Railway) yields correct HTTPS scheme and asset URLs.
 *   **TOTP MFA**: ❌ **not implemented** — see [§4](#4-not-yet-implemented-roadmap).
 
+#### Password reset by email — implemented
+
+The standard Breeze broker flow over `password_reset_tokens`: `/forgot-password` accepts an address,
+`Password::sendResetLink()` mails a signed link to **that** address if it belongs to a `users` row, and
+`/reset-password/{token}` sets the new hash. Tokens are **single-use** — consumed on success, and a replayed
+link is rejected. Both routes carry `throttle:6,1`.
+
+Security properties worth noting:
+
+*   **No account enumeration beyond Laravel's default.** An unregistered address returns the framework's
+    "We can't find a user with that email address" — this is Breeze's stock behaviour, retained as-is. If
+    enumeration resistance is required, switch to a generic confirmation for every submission.
+*   **Transport failures do not leak configuration.** `PasswordResetLinkController::store()` wraps
+    `sendResetLink()` because `PasswordBroker` calls `sendPasswordResetNotification()` unguarded — an
+    unreachable SMTP host would otherwise surface as a **500 on an unauthenticated page**. The visitor gets a
+    generic message; the mailer name, host, and exception go to `Log::error` for an operator. A separate
+    `Log::warning` fires when `MAIL_MAILER` is `log`/`array`, so a deployment that silently swallows reset
+    mail is visible in the log rather than to the user.
+*   **Deployment dependency**: the emailed link is built from `APP_URL`. A wrong `APP_URL` yields a link that
+    resolves nowhere for the recipient — the reset itself works, the URL does not. See §4.8.
+
 ### 3.2 Granular Access Control (RBAC) — implemented, by a different mechanism
 
 Authorisation **is enforced**, but via **Gates + route middleware** rather than the Policies-and-permissions-tables
@@ -446,7 +467,8 @@ table; implementing MFA against the live `users` table would require new columns
 **Current**: `CACHE_STORE=database`, `SESSION_DRIVER=file`, `QUEUE_CONNECTION=database`. No `predis` package;
 no `Cache::` or `Redis::` calls in `app/` — the application performs **no caching at all**. The
 `v_recognition_leaderboard` view is queried live on each request. The `notifications` table is dead schema and
-no notification is ever dispatched.
+no notification is ever dispatched — the topbar bell added in v2.5.0-beta.1 renders a dropdown but has no data
+source behind it, so it permanently reports "You're all caught up."
 
 ### 4.6 Zapier Webhook Dispatch
 
@@ -469,6 +491,51 @@ Migrated but unused, blocking the features they were designed for:
 instead of always reading 0. Still absent: the succession **candidate approval workflow** — `status`,
 `reviewed_at`, and `approved_at` exist and `reviewed_at` is stamped on edit, but no UI transitions a candidate
 from `proposed` to `approved`.
+
+### 4.8 Outbound Mail — implemented, credential-dependent
+
+Password reset is the only feature that sends mail, and it is entirely dependent on the transport being real.
+The failure mode is silent by design in Laravel: `MAIL_MAILER=log` accepts every message, writes it to
+`storage/logs/laravel.log`, and reports success — so the app tells the user "We have emailed your password
+reset link" while nothing is delivered.
+
+**Provider presets.** `config/mail.php` defines `gmail`, `outlook`, and `yahoo` alongside the stock `smtp`
+mailer, each with host, port (587) and scheme baked in, so `MAIL_MAILER` alone selects the provider and only
+`MAIL_USERNAME` / `MAIL_PASSWORD` differ. Work/school Outlook tenants override the host via
+`MAIL_OUTLOOK_HOST=smtp.office365.com`.
+
+**Two constraints all three consumer providers impose:**
+
+1.  A normal account password is rejected over SMTP — an **app-specific password** is required
+    (Gmail additionally requires 2-Step Verification to be enabled first).
+2.  `MAIL_FROM_ADDRESS` must be the **same mailbox** as `MAIL_USERNAME`; they refuse to send as an address
+    the session did not authenticate as, or file the result as spam.
+
+**Two configuration traps documented here because both produce misleading errors:**
+
+*   **`env()` returns `''`, not the default, for a key that is present but blank.** `MAIL_FROM_ADDRESS=` with
+    no value meant `env('MAIL_FROM_ADDRESS', 'hello@example.com')` evaluated to an empty string, and every
+    send failed with *"An email must have a From or Sender header"* — an error that points nowhere near the
+    cause. The config now reads
+    `env('MAIL_FROM_ADDRESS') ?: (env('MAIL_USERNAME') ?: 'no-reply@hospital.ph')`. **Any future config value
+    that must survive a blank env key needs `?:`, not a second `env()` argument.**
+*   **An unquoted value containing whitespace breaks the entire dotenv parse.** Google presents app passwords
+    in groups of four; pasted verbatim, dotenv fails with *"The environment file is invalid!"* and **every**
+    artisan command dies, not just mail. Paste as 16 unbroken characters.
+
+**Diagnostics.** `php artisan hims:mail-test {email}` prints the resolved mailer, host, port, username,
+password-set state and From address, warns on a `MAIL_FROM_ADDRESS` / `MAIL_USERNAME` mismatch, fails with an
+explicit missing-key list before attempting a send, and on failure prints the provider-specific app-password
+URLs. It reads the **active** mailer's config rather than a hardcoded `smtp` block, so the presets report
+their real host. Run `php artisan config:clear` after every `.env` change, and restart `php artisan serve` —
+a running server holds the old config.
+
+**Production caveats.** `APP_URL` is baked into the emailed reset link, so a wrong value produces a link that
+resolves nowhere for the recipient. Railway does **not** read `.env` — `MAIL_MAILER`, `MAIL_USERNAME`,
+`MAIL_PASSWORD`, `MAIL_FROM_ADDRESS` and `APP_URL` must be set in its dashboard. Consumer Gmail is not a
+production transport (~500 sends/day, and reset mail from a personal address is frequently spam-filed); a
+transactional provider on the hospital domain — Brevo, SendGrid, or Resend — is the correct choice, and
+`.env.example` documents the SMTP details for each.
 
 ---
 
@@ -495,6 +562,7 @@ graph LR
 | **Drivers** | `GeminiProvider`, `OpenAiProvider`, `AnthropicProvider` — all raw HTTP over `Http::`, all extending `AbstractAiProvider`. The `compatible` slot reuses `OpenAiProvider` with a custom label and `base_url` for OpenAI-compatible hosts. |
 | **Model config** | Per-provider `*_MODEL` plus a `fallback_models` list; a 404/model-error response advances to the next candidate automatically. |
 | **Failure contract** | `ask()` **never throws** for an API or config problem — it returns a `⚠️`-prefixed string. `CompetencyGapAnalysisService::parseAiJson()` detects that prefix and degrades gracefully to "AI unavailable". Callers must not assume the return value is model output. |
+| **System prompt** | `AbstractAiProvider::systemContext()` — shared by all four drivers, so a change there applies everywhere. It sets the HIMS/hospital-HR domain framing and, since v2.5.0-beta.1, an explicit **English-by-default** instruction: switch to Tagalog or Taglish only when the user clearly writes in it, then match their language. The previous wording only stated that the assistant *understood* both languages, which — combined with Tagalog cues in the widget UI — produced Tagalog replies to English questions. Bilingual capability is unchanged. |
 | **Consumers** | `AiController` (`POST /ai/query`, `GET`/`DELETE /ai/history`, persisted to `ai_chat_messages`) and `CompetencyGapAnalysisService` (gap-analysis narratives). |
 
 ---

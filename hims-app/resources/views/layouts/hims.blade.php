@@ -121,15 +121,60 @@
         </div>
     </div>
     <div class="topbar-right">
-        <button class="topbar-btn" title="Notifications">
-            <i class="bi bi-bell"></i>
-            <span class="notif-dot"></span>
-        </button>
+        <div class="topbar-menu-wrap">
+            <button class="topbar-btn" id="notif-btn" title="Notifications" aria-haspopup="true" aria-expanded="false">
+                <i class="bi bi-bell"></i>
+                <span class="notif-dot" id="notif-dot"></span>
+            </button>
+            <div class="topbar-dropdown" id="notif-dropdown" role="menu">
+                <div class="topbar-dropdown-header">
+                    <span>Notifications</span>
+                    <button type="button" id="notif-clear" class="topbar-dropdown-action">Mark all read</button>
+                </div>
+                <div class="topbar-dropdown-body" id="notif-list">
+                    <div class="topbar-dropdown-empty" id="notif-empty">
+                        <i class="bi bi-bell-slash"></i>
+                        <span>You're all caught up.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="topbar-menu-wrap">
+            <button class="topbar-btn" id="help-btn" title="Help &amp; FAQ" aria-haspopup="true" aria-expanded="false">
+                <i class="bi bi-question-circle"></i>
+            </button>
+            <div class="topbar-dropdown" id="help-dropdown" role="menu">
+                <div class="topbar-dropdown-header">
+                    <span>Help &amp; FAQ</span>
+                </div>
+                <div class="topbar-dropdown-body">
+                    <details class="help-faq">
+                        <summary>How do I run an AI competency gap analysis?</summary>
+                        <p>Open <strong>AI Gap Analysis</strong> from the sidebar (requires HR or admin access). Pick an organisation, department, or employee scope and the assistant compares assessed proficiency against role requirements.</p>
+                    </details>
+                    <details class="help-faq">
+                        <summary>Why is the AI assistant unavailable?</summary>
+                        <p>The chat bubble degrades gracefully when no AI provider is configured. An admin sets <code>AI_PROVIDER</code> and the matching API key in the server environment, then runs <code>php artisan config:clear</code>.</p>
+                    </details>
+                    <details class="help-faq">
+                        <summary>How do I add a succession candidate?</summary>
+                        <p>Go to <strong>Succession</strong> → open a position → <strong>Nominate candidate</strong>. Performance and potential scores (1–5) derive the 9-box placement automatically.</p>
+                    </details>
+                    <details class="help-faq">
+                        <summary>I forgot my password.</summary>
+                        <p>Use <strong>Forgot password?</strong> on the login screen to request a reset link. If email isn't configured on this deployment, the page explains where the link went — or an administrator can reset it for you from <strong>Users &amp; Access</strong>.</p>
+                    </details>
+                    <details class="help-faq">
+                        <summary>Who do I contact for support?</summary>
+                        <p>Reach out to your HIMS administrator or the hospital IT helpdesk. Include the page you were on and what you expected to happen.</p>
+                    </details>
+                </div>
+            </div>
+        </div>
+
         <button class="topbar-btn" title="Search">
             <i class="bi bi-search"></i>
-        </button>
-        <button class="topbar-btn" title="Help">
-            <i class="bi bi-question-circle"></i>
         </button>
     </div>
 </header>
@@ -303,22 +348,22 @@
 </style>
 
 <!-- Bubble toggle button -->
-<div id="ai-bubble" title="Ask Gemini AI">🤖</div>
+<div id="ai-bubble" title="Ask AI Assistant">🤖</div>
 
 <!-- Slide-up chat panel -->
 <div id="ai-panel">
     <div id="ai-panel-header">
         <span>🤖</span>
-        <span>Gemini AI Assistant</span>
-        <span style="font-size:11px;opacity:.7;font-weight:400">EN / Tagalog</span>
+        <span>AI Assistant</span>
+        <span style="font-size:11px;opacity:.7;font-weight:400">English</span>
         <button id="ai-clear-btn" title="Clear chat" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;margin-left:auto;transition:color .15s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,.7)'">🗑 Clear</button>
         <button class="ai-close" id="ai-close-btn" title="Close">✕</button>
     </div>
     <div id="ai-messages">
-        <div id="ai-welcome" class="ai-msg ai" style="display:none">Kamusta! I'm your HIMS AI assistant. Ask me about performance, competency, training, succession, or anything HR-related. 🏥</div>
+        <div id="ai-welcome" class="ai-msg ai" style="display:none">Hello! I'm your HIMS AI assistant. Ask me about performance, competency, training, succession, or anything HR-related. 🏥</div>
     </div>
     <div id="ai-input-row">
-        <textarea id="ai-input" placeholder="Ask in English or Tagalog…" rows="1"></textarea>
+        <textarea id="ai-input" placeholder="Ask me anything…" rows="1"></textarea>
         <button id="ai-send-btn" title="Send"><i class="bi bi-send-fill"></i></button>
     </div>
 </div>
@@ -337,6 +382,40 @@
         if (menuToggle) menuToggle.addEventListener('click', toggleSidebar);
         if (backdrop)   backdrop.addEventListener('click', closeSidebar);
 
+        // ── Topbar dropdowns (notifications + help) ──
+        const dropdownPairs = [
+            { btn: document.getElementById('notif-btn'),  menu: document.getElementById('notif-dropdown') },
+            { btn: document.getElementById('help-btn'),   menu: document.getElementById('help-dropdown')  },
+        ].filter(p => p.btn && p.menu);
+
+        function closeDropdowns(except) {
+            dropdownPairs.forEach(p => {
+                if (p.menu === except) return;
+                p.menu.classList.remove('open');
+                p.btn.setAttribute('aria-expanded', 'false');
+            });
+        }
+        dropdownPairs.forEach(p => {
+            p.btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const willOpen = !p.menu.classList.contains('open');
+                closeDropdowns(p.menu);
+                p.menu.classList.toggle('open', willOpen);
+                p.btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            });
+            p.menu.addEventListener('click', e => e.stopPropagation());
+        });
+        document.addEventListener('click', () => closeDropdowns(null));
+
+        // Notifications: "Mark all read" clears the unread dot
+        const notifClear = document.getElementById('notif-clear');
+        const notifDot   = document.getElementById('notif-dot');
+        if (notifClear) {
+            notifClear.addEventListener('click', () => {
+                if (notifDot) notifDot.style.display = 'none';
+            });
+        }
+
         // Auto-close the drawer after tapping any nav link (mobile)
         sidebar.querySelectorAll('.sidebar-link').forEach(link => {
             link.addEventListener('click', () => {
@@ -348,6 +427,7 @@
             if (e.key === 'Escape') {
                 closeSidebar();
                 closePanel();
+                closeDropdowns(null);
             }
         });
         setTimeout(() => {

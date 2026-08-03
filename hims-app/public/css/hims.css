@@ -227,6 +227,88 @@ body {
     border: 2px solid #fff;
 }
 
+/* ── Topbar dropdowns (notifications + help) ── */
+.topbar-menu-wrap { position: relative; }
+.topbar-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    background: #fff;
+    border: 1px solid var(--hims-border);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.14);
+    z-index: 1100;
+    opacity: 0;
+    transform: translateY(-6px) scale(.98);
+    pointer-events: none;
+    transition: opacity .16s ease, transform .16s ease;
+    overflow: hidden;
+}
+.topbar-dropdown.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+.topbar-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -6px; right: 14px;
+    width: 12px; height: 12px;
+    background: #fff;
+    border-left: 1px solid var(--hims-border);
+    border-top: 1px solid var(--hims-border);
+    transform: rotate(45deg);
+}
+.topbar-dropdown-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    font-weight: 700; font-size: 13px;
+    color: var(--hims-text-dark);
+    border-bottom: 1px solid var(--hims-primary-pale);
+}
+.topbar-dropdown-action {
+    border: none; background: none;
+    color: var(--hims-primary);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; padding: 2px 4px; border-radius: 6px;
+}
+.topbar-dropdown-action:hover { background: var(--hims-primary-pale); }
+.topbar-dropdown-body { max-height: 340px; overflow-y: auto; padding: 6px; }
+.topbar-dropdown-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 28px 16px; color: var(--hims-text-muted); font-size: 13px;
+}
+.topbar-dropdown-empty i { font-size: 24px; color: var(--hims-primary-light); }
+.help-faq {
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+.help-faq + .help-faq { border-top: 1px solid var(--hims-primary-pale); }
+.help-faq summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--hims-text-dark);
+    list-style: none;
+    padding: 4px 0;
+}
+.help-faq summary::-webkit-details-marker { display: none; }
+.help-faq summary::before { content: '▸ '; color: var(--hims-primary); }
+.help-faq[open] summary::before { content: '▾ '; }
+.help-faq p {
+    margin: 6px 0 4px;
+    color: var(--hims-text);
+    line-height: 1.55;
+    font-size: 12.5px;
+}
+.help-faq code {
+    background: var(--hims-primary-pale);
+    color: var(--hims-primary-dark);
+    padding: 1px 5px; border-radius: 4px; font-size: 12px;
+}
+
 /* ═══════════════ MAIN CONTENT ═══════════════ */
 .hims-main {
     margin-left: var(--hims-sidebar-w);

@@ -49,6 +49,52 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
+        /*
+        |----------------------------------------------------------------------
+        | Consumer webmail presets
+        |----------------------------------------------------------------------
+        | Host, port and scheme are baked in so switching provider is a single
+        | change of MAIL_MAILER — only MAIL_USERNAME and MAIL_PASSWORD differ.
+        |
+        | All three reject a normal account password over SMTP. Each needs an
+        | app-specific password generated from the account's security settings,
+        | and each requires MAIL_FROM_ADDRESS to be the same mailbox that is
+        | authenticating, or the message is rejected or filed as spam.
+        */
+
+        'gmail' => [
+            'transport' => 'smtp',
+            'scheme' => 'smtp',
+            'host' => 'smtp.gmail.com',
+            'port' => 587,
+            'username' => env('MAIL_USERNAME'),
+            'password' => env('MAIL_PASSWORD'),
+            'timeout' => null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        'outlook' => [
+            'transport' => 'smtp',
+            'scheme' => 'smtp',
+            'host' => env('MAIL_OUTLOOK_HOST', 'smtp-mail.outlook.com'),
+            'port' => 587,
+            'username' => env('MAIL_USERNAME'),
+            'password' => env('MAIL_PASSWORD'),
+            'timeout' => null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        'yahoo' => [
+            'transport' => 'smtp',
+            'scheme' => 'smtp',
+            'host' => 'smtp.mail.yahoo.com',
+            'port' => 587,
+            'username' => env('MAIL_USERNAME'),
+            'password' => env('MAIL_PASSWORD'),
+            'timeout' => null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
         'ses' => [
             'transport' => 'ses',
         ],
@@ -110,9 +156,19 @@ return [
     |
     */
 
+    /*
+    | The "or null" fallbacks matter: env() returns an empty string for a key
+    | that is present but blank (MAIL_FROM_ADDRESS=), and an empty string is not
+    | a missing value, so the second argument to env() would never apply. That
+    | left the From header empty and made every send fail with "An email must
+    | have a From or Sender header". Falling back to MAIL_USERNAME keeps the
+    | sender aligned with the authenticated mailbox, which is what Gmail,
+    | Outlook and Yahoo require anyway.
+    */
+
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
+        'address' => env('MAIL_FROM_ADDRESS') ?: (env('MAIL_USERNAME') ?: 'no-reply@hospital.ph'),
+        'name' => env('MAIL_FROM_NAME') ?: env('APP_NAME', 'HIMS'),
     ],
 
 ];

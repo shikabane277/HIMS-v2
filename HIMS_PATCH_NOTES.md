@@ -11,6 +11,130 @@ Entries marked 📋 are specified but not implemented.
 
 ---
 
+## v2.5.0-beta.1 — 2026-08-03 (pre-release)
+
+Bug-fix release. Four reported defects in the app shell and the password-reset flow, plus working
+outbound email and a test-suite fix. No schema changes.
+
+### Fixed — Notifications button did nothing
+
+The topbar bell was `<button class="topbar-btn" title="Notifications">` with no `id`, no event listener
+and no panel markup anywhere in the DOM — nothing was broken, nothing had been built. It now opens a
+dropdown with a header, a **Mark all read** action that clears the unread dot, and an empty state
+("You're all caught up.").
+
+The panel is presentation only. The `notifications` table remains dead schema — no row is ever written
+or read, so the list has no server-side source yet. 📋 Wiring it to `notifications` is still open.
+
+### Fixed — Help/FAQ button did nothing
+
+Same root cause, same fix: the icon now opens a dropdown containing five `<details>` entries — running
+an AI competency gap analysis, what to do when AI is unavailable, adding a succession candidate,
+resetting a forgotten password, and how to contact support.
+
+Both dropdowns share one open/close controller in `layouts/hims.blade.php`: opening one closes the
+other, an outside click closes both, and <kbd>Esc</kbd> closes them alongside the existing sidebar and
+slide-over panel. `aria-haspopup` / `aria-expanded` are maintained on both triggers. Styles are ~85 new
+lines in `public/css/hims.css` using the existing `--hims-*` variables.
+
+### Fixed — AI chatbot always replied in Tagalog
+
+Two layers pushed the model toward Tagalog. `AbstractAiProvider::systemContext()` said only *"You
+understand both English and Tagalog/Taglish"* — describing a capability, never setting a default — while
+the UI greeted with "Kamusta!", labelled itself `EN / Tagalog` and prompted "Ask in English or
+Tagalog…". The model reasonably mirrored those cues.
+
+*   The shared system prompt now reads: reply in English by default, and switch to Tagalog or Taglish
+    only when the user clearly writes in it, then match their language. This lives on
+    `AbstractAiProvider`, so all four drivers (Gemini, OpenAI, Anthropic, compatible) inherit it.
+*   The Tagalog cues are gone from the widget: header `AI Assistant` · `English`, welcome "Hello! I'm
+    your HIMS AI assistant…", placeholder "Ask me anything…", launcher `Ask AI Assistant`. Rendered
+    Tagalog cue count: 0.
+
+Bilingual support is unchanged — a user who writes in Tagalog still gets Tagalog back.
+
+### Fixed — Forgot password did not work at all
+
+The reset views were fully built; delivery was the problem, in four separate ways.
+
+*   **No mail transport.** `MAIL_MAILER=log` wrote the reset email to `storage/logs/laravel.log` and
+    reported success to the user, so the mail silently never arrived.
+*   **A transport failure returned HTTP 500.** `Password::sendResetLink()` does not catch transport
+    exceptions (`PasswordBroker` calls `sendPasswordResetNotification()` unguarded), so bad SMTP
+    credentials crashed an unauthenticated page. `PasswordResetLinkController::store()` now wraps the
+    call and returns a friendly, actionable message instead.
+*   **The From header was always empty.** `config/mail.php` had
+    `env('MAIL_FROM_ADDRESS', 'hello@example.com')`, but `env()` returns `''` — not the default — for a
+    key that is present but blank, and `''` is not a missing value. Every send failed with *"An email
+    must have a From or Sender header."* Now `env('MAIL_FROM_ADDRESS') ?: (env('MAIL_USERNAME') ?: 'no-reply@hospital.ph')`,
+    which also keeps the sender aligned with the authenticated mailbox that Gmail, Outlook and Yahoo require.
+*   **An app password containing spaces broke every artisan command.** Google displays app passwords in
+    groups of four; pasted verbatim into `.env`, the unquoted whitespace made dotenv fail with *"The
+    environment file is invalid!"* — not just mail, the whole CLI. Documented in `.env` and `.env.example`.
+
+Verified end-to-end against a registered account: submit → 302, "We have emailed your password reset
+link.", email addressed to the requesting address (not a fixed one), link opens 200, password changes,
+old password rejected, new password logs in, dashboard reachable, and **a replayed link is rejected**
+(tokens are single-use and consumed on success).
+
+### Added — Consumer webmail presets
+
+`MAIL_MAILER=gmail | outlook | yahoo` now selects host, port and scheme from `config/mail.php`, so only
+`MAIL_USERNAME` and `MAIL_PASSWORD` differ between providers. Work/school Outlook tenants override with
+`MAIL_OUTLOOK_HOST=smtp.office365.com`. All three reject a normal account password over SMTP and require
+an app-specific one; all three require `MAIL_FROM_ADDRESS` to equal `MAIL_USERNAME`.
+
+### Added — `php artisan hims:mail-test {email}`
+
+Diagnostic for the most common silent failure. Prints the resolved mailer, host, port, username,
+password-set state and From address; warns when `MAIL_FROM_ADDRESS` does not match `MAIL_USERNAME` on a
+consumer preset; fails with an explicit missing-key list before attempting a send (otherwise the
+transport reports a misleading "missing From header"); and on failure prints the provider-specific
+app-password URLs. Reads the *active* mailer's config, not a hardcoded `smtp` block, so the presets
+report their real host. First file in `app/Console/Commands/`.
+
+### Fixed — Test suite: MySQL-only DDL crashed on sqlite
+
+`phpunit.xml` runs on sqlite `:memory:`, but two migrations issued MySQL-only SQL at migrate time and
+took the whole suite down before any test ran: the `competency_assessments` gap triggers
+(`DECLARE`/`SET` procedural syntax) and `v_recognition_leaderboard` (`CREATE OR REPLACE VIEW` with
+`CONCAT()` and `DATE_FORMAT()`). Both are now behind `if (DB::getDriverName() === 'mysql')`.
+
+**22 of 25 tests pass, up from 1.** MySQL behaviour is unchanged — the triggers and the view are still
+created there, and `RecognitionController` still reads the view. The 3 remaining failures are stale
+Breeze scaffolding, not regressions: two `RegistrationTest` cases expect the self-registration route
+that was deliberately removed for an internal hospital system, and `ExampleTest` expects HTTP 200 at
+`/` where the app redirects to login.
+
+### Security
+
+*   **Removed a config disclosure on an unauthenticated page.** An earlier development build rendered a
+    hint on `/forgot-password` that named `MAIL_MAILER=log` and listed internal remediation steps to
+    anyone who could type an email address. The visitor-facing message is now generic; the diagnostic
+    goes to `Log::warning` for an operator.
+*   **The reset-failure log names the mailer actually in use.** The first version of the catch block read
+    `config('mail.mailers.smtp.host')` and logged `127.0.0.1` while the `gmail` preset was active —
+    actively misleading whoever debugs it. It now reads `config("mail.mailers.{$mailer}.host")`.
+*   **No secret is committed.** `.env` is gitignored (`hims-app/.gitignore:3`); only `.env.example`, with
+    empty placeholders, is tracked.
+
+### Docs
+
+Architecture, system documentation and these patch notes updated together — per project rule, the docs
+are updated with every system change so they describe the as-built state.
+
+### Known issues
+
+*   **`APP_URL=http://localhost:8000` is baked into the emailed reset link.** Correct on the dev
+    machine, dead on any other device. Production must set `APP_URL` to the deployment HTTPS URL.
+*   **Railway does not read `.env`.** `MAIL_MAILER`, `MAIL_USERNAME`, `MAIL_PASSWORD`,
+    `MAIL_FROM_ADDRESS` and `APP_URL` must be set in the dashboard.
+*   **Consumer Gmail is not a production transport** — roughly 500 sends/day, and reset mail from a
+    personal address is frequently spam-filed. Use Brevo, SendGrid or Resend on the hospital domain.
+*   The notifications dropdown has no data source (see above).
+
+---
+
 ## Unreleased — working tree
 
 Not yet committed: **31 modified, 26 new, 1 deleted** (per `git status`; new directories such as

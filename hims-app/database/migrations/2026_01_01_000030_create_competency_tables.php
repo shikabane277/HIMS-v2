@@ -2,10 +2,11 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('competency_domains', function (Blueprint $table) {
@@ -65,27 +66,31 @@ return new class extends Migration {
             $table->foreign('assessed_by')->references('employee_id')->on('employees');
         });
 
-        // MySQL trigger to auto-compute gap
-        DB::unprepared('
-            CREATE TRIGGER trg_compute_gap_insert
-            BEFORE INSERT ON competency_assessments
-            FOR EACH ROW
-            BEGIN
-                DECLARE req_prof INT;
-                SELECT required_proficiency INTO req_prof FROM competencies WHERE competency_id = NEW.competency_id;
-                SET NEW.gap = NEW.current_proficiency - req_prof;
-            END
-        ');
-        DB::unprepared('
-            CREATE TRIGGER trg_compute_gap_update
-            BEFORE UPDATE ON competency_assessments
-            FOR EACH ROW
-            BEGIN
-                DECLARE req_prof INT;
-                SELECT required_proficiency INTO req_prof FROM competencies WHERE competency_id = NEW.competency_id;
-                SET NEW.gap = NEW.current_proficiency - req_prof;
-            END
-        ');
+        // MySQL trigger to auto-compute gap.
+        // Guarded: this is MySQL-specific procedural SQL (DECLARE/SET), which is a
+        // syntax error on the sqlite :memory: connection phpunit.xml runs tests on.
+        if (DB::getDriverName() === 'mysql') {
+            DB::unprepared('
+                CREATE TRIGGER trg_compute_gap_insert
+                BEFORE INSERT ON competency_assessments
+                FOR EACH ROW
+                BEGIN
+                    DECLARE req_prof INT;
+                    SELECT required_proficiency INTO req_prof FROM competencies WHERE competency_id = NEW.competency_id;
+                    SET NEW.gap = NEW.current_proficiency - req_prof;
+                END
+            ');
+            DB::unprepared('
+                CREATE TRIGGER trg_compute_gap_update
+                BEFORE UPDATE ON competency_assessments
+                FOR EACH ROW
+                BEGIN
+                    DECLARE req_prof INT;
+                    SELECT required_proficiency INTO req_prof FROM competencies WHERE competency_id = NEW.competency_id;
+                    SET NEW.gap = NEW.current_proficiency - req_prof;
+                END
+            ');
+        }
 
         Schema::create('employee_credentials', function (Blueprint $table) {
             $table->char('credential_id', 36)->primary();
@@ -118,8 +123,10 @@ return new class extends Migration {
 
     public function down(): void
     {
-        DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_update');
-        DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_insert');
+        if (DB::getDriverName() === 'mysql') {
+            DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_update');
+            DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_insert');
+        }
         Schema::dropIfExists('credential_alert_log');
         Schema::dropIfExists('employee_credentials');
         Schema::dropIfExists('competency_assessments');

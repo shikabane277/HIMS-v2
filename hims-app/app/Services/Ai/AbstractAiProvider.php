@@ -31,10 +31,11 @@ abstract class AbstractAiProvider implements AiProvider
     protected function systemContext(): string
     {
         return 'You are an AI assistant for a Hospital Information Management System (HIMS) '
-            . 'in the Philippines. You help HR officers with performance reviews, competency gaps, '
-            . 'succession planning, training schedules, learning pathways, and employee recognition. '
-            . 'You understand both English and Tagalog/Taglish. Be concise and helpful. '
-            . 'Always be professional and sensitive to healthcare context.';
+            .'in the Philippines. You help HR officers with performance reviews, competency gaps, '
+            .'succession planning, training schedules, learning pathways, and employee recognition. '
+            .'Reply in English by default. Only switch to Tagalog or Taglish when the user clearly '
+            .'writes to you in Tagalog or Taglish, and then match their language. Be concise and helpful. '
+            .'Always be professional and sensitive to healthcare context.';
     }
 
     protected function apiKey(): string
@@ -56,7 +57,7 @@ abstract class AbstractAiProvider implements AiProvider
     protected function models(): array
     {
         $configured = $this->model();
-        $fallbacks  = array_map('strval', (array) ($this->config['fallback_models'] ?? []));
+        $fallbacks = array_map('strval', (array) ($this->config['fallback_models'] ?? []));
 
         $all = array_values(array_unique(array_filter(
             array_merge($configured !== '' ? [$configured] : [], $fallbacks)
@@ -83,8 +84,8 @@ abstract class AbstractAiProvider implements AiProvider
     /** Standard "no key" failure string (honours the ⚠️ contract). */
     protected function missingKey(): string
     {
-        return '⚠️ ' . $this->label() . ' API key not configured. '
-            . 'Please add the relevant key to your .env file (see AI_PROVIDER settings).';
+        return '⚠️ '.$this->label().' API key not configured. '
+            .'Please add the relevant key to your .env file (see AI_PROVIDER settings).';
     }
 
     /* ───────── provider-agnostic JSON helpers (moved off GeminiService) ───────── */
@@ -97,8 +98,8 @@ abstract class AbstractAiProvider implements AiProvider
     public function checkBias(string $reviewText): array
     {
         $prompt = 'Analyze this performance review text for potential unconscious bias (gender, age, nationality, etc). '
-            . 'Return a JSON object with: {has_bias: bool, flags: [{type, excerpt, suggestion}], confidence: 0-1}. '
-            . 'Review text: ' . $reviewText;
+            .'Return a JSON object with: {has_bias: bool, flags: [{type, excerpt, suggestion}], confidence: 0-1}. '
+            .'Review text: '.$reviewText;
 
         return $this->decodeJson($this->ask($prompt)) ?? ['has_bias' => false, 'flags' => []];
     }
@@ -111,8 +112,8 @@ abstract class AbstractAiProvider implements AiProvider
     public function generateQuizQuestions(string $content, int $count = 5): array
     {
         $prompt = "Generate {$count} multiple-choice quiz questions based on this content. "
-            . 'Return JSON array: [{question_text, options: [4 strings], correct_answer, explanation}]. '
-            . 'Content: ' . Str::limit($content, 2000);
+            .'Return JSON array: [{question_text, options: [4 strings], correct_answer, explanation}]. '
+            .'Content: '.Str::limit($content, 2000);
 
         $decoded = $this->decodeJson($this->ask($prompt));
 
@@ -127,8 +128,8 @@ abstract class AbstractAiProvider implements AiProvider
     public function analyzeSentiment(string $feedbackText): array
     {
         $prompt = 'Analyze the sentiment of this training feedback. '
-            . "Return JSON: {label: 'positive'|'neutral'|'negative', score: 0-1, summary: string}. "
-            . 'Feedback: ' . $feedbackText;
+            ."Return JSON: {label: 'positive'|'neutral'|'negative', score: 0-1, summary: string}. "
+            .'Feedback: '.$feedbackText;
 
         return $this->decodeJson($this->ask($prompt))
             ?? ['label' => 'neutral', 'score' => 0.5];
