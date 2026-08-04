@@ -135,17 +135,17 @@ class MailTest extends Command
     private function handleApiMailer(string $mailer, array $cfg, string $from, string $to): int
     {
         $apiKey = match ($mailer) {
-            'brevo'    => (string) ($cfg['key'] ?? config('services.brevo.key')),
+            'brevo' => (string) ($cfg['key'] ?? config('services.brevo.key')),
             'postmark' => (string) config('services.postmark.key'),
-            'ses'      => (string) config('services.ses.key'),
-            default    => '',
+            'ses' => (string) config('services.ses.key'),
+            default => '',
         };
 
         $keyEnvName = match ($mailer) {
-            'brevo'    => 'BREVO_API_KEY',
+            'brevo' => 'BREVO_API_KEY',
             'postmark' => 'POSTMARK_API_KEY',
-            'ses'      => 'AWS_ACCESS_KEY_ID',
-            default    => '(unknown)',
+            'ses' => 'AWS_ACCESS_KEY_ID',
+            default => '(unknown)',
         };
 
         $keyIsSet = $apiKey !== '';
