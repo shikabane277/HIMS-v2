@@ -6,6 +6,8 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
+        @include('partials.favicon')
+
         @fonts
 
         <!-- Styles / Scripts -->
