@@ -135,7 +135,9 @@ are updated with every system change so they describe the as-built state.
 
 ---
 
-## Unreleased — working tree
+## v2.5.0-beta.2 — 2026-08-04 (pre-release)
+
+SMTP timeout fix & Brevo HTTPS API mail transport. Password reset now works on Railway without a Pro plan.
 
 ### Fixed — `'timeout' => null` crashed the reset page on hosts that firewall SMTP
 
@@ -157,14 +159,30 @@ configured timeout as a caught `TransportException`, exit 0, no fatal.
 This converts the crash into the intended friendly message. **It does not make email work on Railway below
 Pro** — see below.
 
+### Added — Brevo (Sendinblue) HTTPS API mail transport
+
+`symfony/brevo-mailer` is now installed. Setting `MAIL_MAILER=brevo` and `BREVO_API_KEY` in the Railway
+dashboard (or `.env`) is all that is needed — **no code change, no SMTP port, no app password**.
+
+Railway (and most PaaS hosts on lower plans) blocks outbound SMTP entirely. The four SMTP presets
+(gmail/outlook/yahoo/smtp) all use port 587 and therefore all fail there. Brevo sends via HTTPS (port 443
+to `api.brevo.com`), which is open on every plan, so it bypasses the block completely.
+
+*   `config/mail.php` now includes the `brevo` mailer entry.
+*   `config/services.php` includes `'brevo' => ['key' => env('BREVO_API_KEY')]`.
+*   `.env.example` documents the setup: `MAIL_MAILER=brevo`, `BREVO_API_KEY`, `MAIL_FROM_ADDRESS`.
+*   `php artisan hims:mail-test` understands API transports (brevo, postmark, ses) and prints API key
+    status and Brevo-specific diagnostics rather than SMTP host/port/username checks.
+
+**Single Sender advantage:** Brevo allows verifying a single personal or work email address in their dashboard
+(`https://app.brevo.com/senders`) via an email link, without requiring full DNS domain verification.
+
 ### Docs — Railway blocks outbound SMTP below the Pro plan
 
 Not a defect in this codebase, but the reason mail fails on the deployed instance, so it is now documented in
 `HIMS_ARCHITECTURE_AND_SECURITY.md` §4.8. Railway firewalls ports 25/465/587/2525 on Free, Trial and Hobby
-plans, so all four presets here (every one of them port 587) fail identically regardless of credentials. Either
-upgrade to Pro **and redeploy** (new egress rules do not apply to a running deployment), or move to an HTTPS API
-transport such as Resend — which requires a Composer bridge package and is therefore a code change, not a
-configuration change.
+plans, so all four SMTP presets here fail identically regardless of credentials. The recommended path is now
+`MAIL_MAILER=brevo` (see above), which requires only a Brevo account and API key — no code change.
 
 ---
 

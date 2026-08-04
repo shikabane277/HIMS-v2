@@ -5,7 +5,9 @@ namespace App\Providers;
 use App\Contracts\AiProvider;
 use App\Services\Ai\AiManager;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
+use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoApiTransport;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +31,12 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerGates();
+
+        Mail::extend('brevo', function (array $config) {
+            $key = $config['key'] ?? config('services.brevo.key');
+
+            return new BrevoApiTransport($key);
+        });
     }
 
     /**

@@ -564,15 +564,12 @@ Two paths resolve it:
 
 1.  **Upgrade to Railway Pro, then redeploy the service.** The redeploy is required — new egress rules do not
     apply to a running deployment. Gmail/Outlook/Yahoo presets then work unchanged.
-2.  **Switch to an HTTPS API transport**, which is not SMTP and is therefore unaffected on every plan. Railway
-    recommends Resend; SendGrid, Mailgun, Postmark and Brevo are equivalent in kind. This needs a Composer
-    bridge package (e.g. `resend/resend-laravel`) and `MAIL_MAILER=resend` — **not currently installed**, so it
-    is a code change, not a configuration change.
+2.  **Switch to Brevo (HTTPS API transport).** `symfony/brevo-mailer` is installed and the `brevo` mailer is
+    configured in `config/mail.php`. Set `MAIL_MAILER=brevo`, `BREVO_API_KEY=xkeysib-…`, and `MAIL_FROM_ADDRESS` in
+    the Railway dashboard (or `.env` locally), then run `php artisan config:clear`. No code change required.
 
-For option 2, note a sandbox restriction that catches people out: until a sending **domain** is DNS-verified,
-Resend only delivers to the address the account was registered with. A password-reset flow must mail arbitrary
-registered users, so domain verification (or a provider whose free tier verifies a single sender address
-instead) is a prerequisite, not an optimisation.
+Single Sender advantage: Brevo allows verifying a single personal or work email address in their dashboard
+(without needing DNS domain records), making it easy to test and use custom sender addresses.
 
 ---
 

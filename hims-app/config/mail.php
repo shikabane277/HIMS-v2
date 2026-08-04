@@ -130,8 +130,26 @@ return [
             // ],
         ],
 
-        'resend' => [
-            'transport' => 'resend',
+        /*
+        |----------------------------------------------------------------------
+        | Brevo (Sendinblue) — HTTPS API transport (works on Railway)
+        |----------------------------------------------------------------------
+        | Brevo sends via HTTPS (api.brevo.com on port 443), not SMTP, so it
+        | bypasses the port blocks that Railway imposes on non-Pro plans.
+        |
+        | Single Sender advantage: Brevo allows verifying a single personal or
+        | work email address (e.g. yourname@gmail.com) via an inbox link,
+        | without requiring full DNS domain verification.
+        |
+        | Setup: composer require symfony/brevo-mailer (installed)
+        |        MAIL_MAILER=brevo
+        |        BREVO_API_KEY=xkeysib-xxxxxxxxx
+        |        MAIL_FROM_ADDRESS=verified-single-sender@example.com
+        */
+
+        'brevo' => [
+            'transport' => 'brevo',
+            'key' => env('BREVO_API_KEY'),
         ],
 
         'sendmail' => [
