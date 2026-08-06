@@ -1,7 +1,9 @@
 # HIMS User Guide
 ## Hospital Information Management System — Performance & Development Module
 
-Welcome to the **HIMS Performance & Development Module**! This guide will help you understand what the system can do and how to use each feature. No technical knowledge required.
+Welcome to the **HIMS Performance & Development Module**! This guide describes what the system does today and how to use each screen. No technical knowledge required.
+
+> **This guide describes only what is actually in the system.** If a capability is not described here, it is not available — please do not assume a feature exists because a similar system has it.
 
 ---
 
@@ -11,7 +13,7 @@ Welcome to the **HIMS Performance & Development Module**! This guide will help y
 2. [Your Dashboard](#2-your-dashboard)
 3. [Performance Management](#3-performance-management)
 4. [Competency Management](#4-competency-management)
-5. [AI-Powered Gap Analysis](#5-ai-powered-gap-analysis)
+5. [AI-Assisted Gap Analysis](#5-ai-assisted-gap-analysis)
 6. [Learning Management](#6-learning-management)
 7. [Training Management](#7-training-management)
 8. [Succession Planning](#8-succession-planning)
@@ -33,287 +35,325 @@ Welcome to the **HIMS Performance & Development Module**! This guide will help y
 
 If you forgot your password, click **"Forgot your password?"** on the login page. You will receive an email with a link to reset it.
 
+There is no self-registration — accounts are created for you by an Administrator.
+
 ### Navigation
 
 Once logged in, you will see:
 
-- **Sidebar (left side)** — The main menu. Click any item to navigate to that module.
-- **Top bar** — Shows your name, a notifications bell 🔔, a help/FAQ button ❓, and a logout option.
+- **Sidebar (left side)** — The main menu. Click any item to navigate to that module. Your name, role, and the Logout button sit at the bottom.
+- **Top bar** — A search box, a notifications bell 🔔, and a help/FAQ button ❓.
 - **Main content area** — Displays the page you selected.
+- **AI Assistant** — A floating 🤖 button at the bottom-right of every page.
+
+> **About the bell 🔔:** the notifications dropdown is in place but no part of the system sends notifications yet, so it always reads "You're all caught up."
 
 ### Your Role
 
-What you can see and do depends on your assigned role:
+What you can reach depends on your assigned role:
 
 | Role | What You Can Do |
 |---|---|
-| **Admin** | Full access to everything — manage all employees, reviews, settings, and users |
-| **HR Manager** | Manage employees, performance reviews, competencies, training, and succession planning |
-| **Supervisor** | Create and score reviews for your team, assess competencies, manage training sessions |
-| **Staff** | View your own reviews and competencies, enroll in courses, post recognitions |
+| **Admin** | Everything — all modules, plus user accounts |
+| **HR Manager** | All modules except user accounts |
+| **Supervisor** | Create and score reviews, create competency assessments and credentials, run gap analysis, schedule training sessions, view succession planning |
+| **Staff** | Dashboard, performance and competency pages, learning, training registration, and recognition |
 
-> **Note:** Some menu items may not appear in your sidebar if your role does not have access to that module.
+> **Note:** Menu items you do not have access to are hidden from your sidebar.
+>
+> **What you see within a module varies.** In **Employees**, **Performance**, and **Gap Analysis** the system limits you to what your role should see — Admins and HR Managers see everyone, Supervisors see their own department, and Staff see only themselves. In the other modules (Competency, Learning, Training, Succession, Recognition) anyone who can open the page sees every record on it.
 
 ---
 
 ## 2. Your Dashboard
 
-The **Dashboard** is the first page you see after logging in. It provides a quick overview of:
+The **Dashboard** is the first page you see after logging in, and it changes depending on your role.
 
-- **Total Employees** in the system
-- **Active Departments**
-- **Pending Reviews** that need attention
-- **Recent Activity** across all modules
+**Admins and HR Managers** see a hospital-wide view: active headcount, pending reviews, expiring and expired credentials, active enrolments, recognitions this month, critical competency gaps, upcoming training sessions, headcount by department, competency hotspots, recent reviews, at-risk critical positions, credential alerts, and recent recognitions. Admins additionally see system account totals.
 
-Think of it as your "home base" — a snapshot of what's happening across the hospital's performance and development programs.
+**Supervisors** see the same shape of information limited to their own department — team size, pending reviews, expiring credentials, critical gaps, active enrolments, and average team score. If your account is not linked to a department, the page will tell you so and show nothing else.
+
+**Staff** see a personal view of their own records.
+
+Every figure on the dashboard is calculated live from the database.
 
 ---
 
 ## 3. Performance Management
 
-**What it does:** Tracks employee performance through structured reviews, goal setting, and improvement plans.
+**What it does:** Records employee performance through review cycles and structured KPI scoring.
 
-### Sidebar: 📊 Performance
+### Sidebar: 📋 Performance
 
 #### Review Cycles
 
-A **review cycle** is a scheduled evaluation period (monthly, quarterly, semi-annual, or annual).
+A **review cycle** is an evaluation period (monthly, quarterly, semi-annual, or annual) with a status of *planned*, *active*, or *closed*.
 
 **For Admins/HR Managers:**
 1. Click **Performance** in the sidebar.
 2. Click **Create Review Cycle**.
-3. Fill in the cycle name, type (e.g., "Q3 2026 Quarterly Review"), start date, and end date.
+3. Fill in the cycle name, type, start date, and end date.
 4. Click **Save**.
+
+Cycles can also be edited after creation.
 
 #### Performance Reviews
 
-A **performance review** evaluates an employee's work during a review cycle.
+A **performance review** evaluates one employee within one review cycle. An employee can only have one review per cycle.
 
-**Creating a Review (Supervisors/HR):**
+**Creating a Review (Admins/HR/Supervisors):**
 1. Go to **Performance** → click **Create Review**.
-2. Select the **employee** and the **review cycle**.
-3. Fill in ratings (1–5 scale), strengths, and areas for improvement.
-4. Click **Save** (as draft) or **Submit**.
+2. Select the **employee**, the **review cycle**, the review type, and the **KPIs** to score.
+3. Click **Create & Score** — you are taken straight to the scoring form with the chosen KPIs already listed.
+4. Enter a score for each KPI and save.
 
-**Viewing Your Own Review (Staff):**
-1. Go to **Performance** in the sidebar.
-2. Your reviews will be listed with their status (Draft, Submitted, Approved, etc.).
-3. Click any review to see the details — your ratings, goals, and supervisor comments.
+The review's status (Draft, Self Assessment, Supervisor Review, Calibration, Completed) is a field you set on the scoring form. There is **no submit-and-approve workflow** — nothing routes a review to another person for sign-off, and there is no digital signature.
+
+**Viewing a Review:**
+Open **Performance** and click any review in the list to see its details, KPI scores, goals, and any linked improvement plan. Admins and HR Managers see all reviews, Supervisors see their department's, and Staff see only their own.
 
 #### Goals
 
-Goals are set during or alongside a performance review.
+Goals attached to a review are shown on the review page with their title, target date, and progress percentage.
 
-- Each goal has a **title**, **description**, **target date**, and **progress percentage** (0–100%).
-- Supervisors and HR can update goal progress throughout the review period.
+> Goals are **display only** in this version — there is no screen for adding a goal or updating its progress. Goal records must be loaded into the database directly.
 
 #### Performance Improvement Plans (PIPs)
 
-If an employee's score falls below 2.5 out of 5.0, a **PIP** may be initiated. This is a structured plan with action steps, deadlines, and supervisor oversight to help the employee improve.
+If a review has a linked improvement plan, it is shown on that review's page, and the count of active PIPs appears on the Performance page.
 
-**Statuses:** Initiated → In Progress → Resolved (or Escalated)
+> PIPs are **display only** in this version — the system does not create a PIP automatically from a low score, and there is no screen for creating or editing one.
 
 ---
 
 ## 4. Competency Management
 
-**What it does:** Tracks clinical and non-clinical skills, credentials (licenses/certifications), and identifies skill gaps across departments.
+**What it does:** Tracks clinical and non-clinical skills and credentials, and highlights skill gaps across departments.
 
 ### Sidebar: 🎯 Competency
 
 #### Competency Domains & Categories
 
-Competencies are organized into:
+Competencies are organised into:
 - **Domains** — broad areas (e.g., "Clinical", "Administrative", "Technical")
 - **Categories** — specific groups within a domain (e.g., "Emergency Response", "Infection Control")
 - **Individual Competencies** — specific skills (e.g., "Ventilator Operation", "IV Medication Administration")
 
-**For Admins/HR:** You can create and manage domains, categories, and competencies from the Competency page.
+**For Admins/HR:** You can create domains from the Competency page and open any domain to see what it contains.
 
 #### Competency Assessments
 
-Assessments evaluate an employee's proficiency level (1–5) for each competency.
+Assessments record an employee's proficiency level (1–5) for a competency. The system compares that to the level required for their role and calculates the **gap** automatically.
 
-**Creating an Assessment (Supervisors/HR):**
-1. Go to **Competency** → **Assessments**.
-2. Click **Create Assessment**.
-3. Select the employee, competency, and rate their current proficiency level.
+**Creating an Assessment (Admins/HR/Supervisors):**
+1. Go to **Competency** → **Create Assessment**.
+2. Select the employee and the competency, and rate their current proficiency level.
+3. Choose the assessment method (observation, self assessment, supervisor rating, practical test, or written exam).
 4. Add assessor notes if needed.
 5. Click **Save**.
 
 #### Credentials (Licenses & Certifications)
 
-The system tracks clinical licenses (e.g., PRC License, Board Certifications, BLS, ACLS) with color-coded statuses:
+The system records clinical licences and certifications (e.g., PRC License, Board Certifications, BLS, ACLS). Each credential's status is worked out automatically from its expiry date:
 
-| Color | Status | Meaning |
+| Colour | Status | Meaning |
 |---|---|---|
 | 🟢 Green | **Active** | Valid and current |
-| 🟡 Yellow | **Expiring Soon** | Expires within 30 days — renewal reminder |
-| 🔴 Red | **Expired** | Past expiry date — escalation alert sent to HR |
+| 🟡 Yellow | **Expiring Soon** | Expires within 30 days |
+| 🔴 Red | **Expired** | Past the expiry date |
+| ⚪ Grey | **Revoked** | Marked as revoked |
 
-**Adding a Credential (Supervisors/HR):**
-1. Go to **Competency** → **Credentials**.
-2. Click **Add Credential**.
-3. Enter the credential name, type, license number, issue date, and expiry date.
-4. Click **Save**.
+**Adding a Credential (Admins/HR/Supervisors):**
+1. Go to **Competency** → **Add Credential**.
+2. Enter the credential name, type, licence number, issue date, and expiry date.
+3. Click **Save**.
 
-#### Skills Matrix
+> **These statuses are shown on screen only.** The system does **not** send renewal reminders or escalation emails, and nothing alerts HR when a credential expires. Someone has to look at the Credential Alerts panel on the Competency page or the Dashboard.
 
-A department-level heatmap showing which competencies are strong 💚 and which have gaps 🔴 across your team. This helps managers see at a glance if a ward is missing critical skills (e.g., only one nurse certified in ventilator operation).
+#### Department Skills Gap Matrix
+
+The Competency page shows a department-level matrix of where proficiency falls short of the required level, so managers can see at a glance if a ward is missing a critical skill.
 
 ---
 
-## 5. AI-Powered Gap Analysis
+## 5. AI-Assisted Gap Analysis
 
-**What it does:** Uses artificial intelligence to analyze competency data and generate personalized development recommendations.
+**What it does:** Combines competency assessments, performance results, and training records to show where skills fall short of what a role requires, with AI-written commentary.
 
-### Sidebar: 🤖 Gap Analysis
+### Sidebar: 🤖 AI Gap Analysis
 
-#### Running a Gap Analysis
+> **Who can use this:** Admins, HR Managers, and Supervisors.
 
-1. Click **Gap Analysis** in the sidebar.
-2. Select a **department** or **individual employee**.
-3. Click **Run Analysis**.
-4. The AI will analyze current competency scores vs. required levels and generate:
-   - A **summary** of the biggest skill gaps
-   - **Development recommendations** for closing those gaps
-   - **Priority areas** that need immediate attention
+#### Using It
 
-> **Who can use this:** Admins and HR Managers only.
+1. Click **AI Gap Analysis** in the sidebar.
+2. Optionally pick a **department** from the dropdown and click **Filter**. Leaving it blank analyses the whole organisation.
+3. The page lists the **weakest competencies** for that scope, with average proficiency and average gap.
+4. Click **View Department Analysis** for the full departmental breakdown.
+5. To analyse one person, find them in the **Analyse an Individual** list and click through to their report.
+
+The analysis runs when you open the page — there is no separate "Run Analysis" button.
+
+> **If the AI service is unavailable**, the numbers and tables still work; only the AI-written commentary is replaced with a ⚠️ message.
 
 ---
 
 ## 6. Learning Management
 
-**What it does:** Manages online courses, learning pathways, and professional development tracking.
+**What it does:** A catalogue of courses and learning pathways that employees can enrol in, plus a record of CPD hours.
 
 ### Sidebar: 📚 Learning
 
 #### Course Catalog
 
-Browse available courses organized by category:
+Browse available courses organised by category:
 - **Compliance** — mandatory training (Infection Control, Fire Safety, etc.)
 - **Clinical** — clinical skills development
 - **Soft Skills** — communication, leadership, teamwork
 
-#### Enrolling in a Course (Staff)
+Each course record carries CPD hours, difficulty, duration, passing score, and retake limit.
+
+#### Enrolling in a Course (all roles)
 
 1. Go to **Learning** in the sidebar.
-2. Browse the available courses.
-3. Click **Enroll** on any course you want to take.
-4. Complete the course modules at your own pace.
+2. Browse the available courses and open one.
+3. Click **Enroll**.
+
+> **Course content is not delivered inside HIMS.** There is no lesson player and no quiz engine — enrolling records that you are taking the course; the learning itself happens elsewhere. Progress percentage is a stored field, not something the system advances for you.
 
 #### Creating a Course (Admins/HR)
 
 1. Go to **Learning** → **Create Course**.
 2. Fill in the course title, description, category, and CPD points.
-3. Add **modules** (lessons) to the course.
-4. Click **Save**.
+3. Click **Save**.
 
-#### CPD (Continuing Professional Development) Tracking
+#### Learning Pathways
 
-The system automatically tracks your CPD hours/points as you complete courses. These are important for maintaining your professional license.
+Pathways group several courses into an ordered curriculum (e.g., "Critical Care Nurse Pathway"). Admins and HR Managers can create them from the Learning page.
+
+#### CPD (Continuing Professional Development) Records
+
+The **CPD** page lists recorded CPD hours per employee, and your yearly total appears on the dashboard.
+
+> CPD records are **display only** in this version — completing a course does not add CPD hours automatically, and there is no form for entering them. The records must be loaded into the database directly.
 
 #### Certificates
 
-After completing a course, a **certificate of completion** is automatically generated. You can view and download your certificates from the Learning page.
+The Learning page shows a count of certificates on record.
+
+> **The system does not issue certificates.** Nothing generates a certificate when you finish a course, and there is no download or QR verification.
 
 ---
 
 ## 7. Training Management
 
-**What it does:** Manages instructor-led training sessions — scheduling, attendance, venue booking, and post-training feedback.
+**What it does:** Schedules instructor-led training sessions, manages venues, and takes registrations.
 
-### Sidebar: 📅 Training
+### Sidebar: 🎓 Training
 
 #### Viewing Training Sessions
 
-The training page shows a **calendar view** of all upcoming and past training sessions (workshops, seminars, drills).
+The Training page lists **upcoming sessions** (workshops, seminars, drills) with their date, venue, instructor, and how many people have registered. It is a list, not an interactive calendar.
 
-#### Registering for Training (Staff)
+#### Registering for Training (all roles)
 
 1. Go to **Training** in the sidebar.
-2. Find an upcoming session you want to attend.
+2. Find an upcoming session and open it.
 3. Click **Register**.
+
+The system refuses the registration if the session is already at capacity, if you have already registered, or if your login is not linked to an employee profile.
+
+> **Registrations cannot be cancelled from the system.** Ask an Administrator if you need one removed.
 
 #### Creating a Training Session (Admins/HR/Supervisors)
 
 1. Go to **Training** → **Create Session**.
-2. Fill in the session title, date/time, venue, instructor, and maximum capacity.
+2. Fill in the session title, date, start and end time, venue, instructor, and maximum capacity.
 3. Click **Save**.
+
+The system prevents two sessions being booked into the same venue at the same date and time.
+
+#### Venues (Admins/HR)
+
+Go to **Training** → **Venues** to add classrooms, simulator rooms, and other spaces with their capacity.
 
 #### Attendance & Feedback
 
-After a training session:
-- **Attendance** is tracked (present, absent, late).
-- **Feedback forms** let participants rate the session.
-- **Pre-test/Post-test** scores measure knowledge gained.
+> **Attendance is not recorded.** There is no check-in of any kind, and no way to mark someone present, absent, or late — so the "Avg Attendance" figure on the Training page will read 0%.
+>
+> **There is no feedback form.** The page shows average ratings and comments if feedback rows exist in the database, but the system provides no way to submit them.
+>
+> There are no pre-tests or post-tests.
 
 ---
 
 ## 8. Succession Planning
 
-**What it does:** Identifies critical hospital roles and develops future leaders to fill them.
+**What it does:** Identifies critical hospital roles and tracks the people being developed to fill them.
 
-### Sidebar: 👥 Succession Planning
+### Sidebar: 🏆 Succession
 
-> **Access:** Admins, HR Managers, and Supervisors (read-only for Supervisors).
+> **Access:** Admins, HR Managers, and Supervisors. Supervisors can view; only Admins and HR Managers can add or change positions and candidates. **Staff have no access to this module at all.**
 
 #### Critical Positions
 
 These are key roles that would cause significant operational risk if left vacant (e.g., Chief of Surgery, ICU Head Nurse, Emergency Department Director).
 
 **Adding a Critical Position (Admins/HR):**
-1. Go to **Succession Planning**.
+1. Go to **Succession**.
 2. Click **Add Critical Position**.
 3. Select the department, role, and current holder.
-4. Assess the vacancy risk level.
+4. Choose the vacancy risk level — **low**, **medium**, **high**, or **critical**. This is your own judgement; the system does not calculate it. It is used to sort and highlight the positions list and the dashboard's at-risk panel.
 
 #### Nominating a Successor
 
 1. From the critical positions list, click **Nominate Candidate**.
 2. Select an employee as a potential successor.
-3. Rate their **Performance** (1–5) and **Potential** (1–5).
-4. The system automatically places them on the **9-Box Grid**:
+3. Rate their **Performance** (1–5) and **Potential** (1–5). The form previews the resulting placement as you type.
+4. The system places them on the **9-Box Grid** automatically:
 
-| | Low Potential | Medium Potential | High Potential |
+| | Low Potential (1–2) | Medium Potential (3) | High Potential (4–5) |
 |---|---|---|---|
-| **High Performance** | Solid Performer | High Performer | ⭐ Star Talent |
-| **Medium Performance** | Average Performer | Core Contributor | High Potential |
-| **Low Performance** | Underperformer | Inconsistent | Rough Diamond |
+| **High Performance (4–5)** | Solid Performer | High Performer | ⭐ Star Talent |
+| **Medium Performance (3)** | Average Performer | Core Contributor | High Potential |
+| **Low Performance (1–2)** | Underperformer | Inconsistent | Rough Diamond |
 
 5. Set their **readiness level**: Ready Now, Ready in 1–2 Years, Ready in 2–5 Years, or Long Term.
 6. Assign a **mentor** if applicable.
 7. Click **Save**.
 
+The 9-box placement is always recalculated from the scores, so the badge can never disagree with the numbers next to it.
+
+#### Managing Nominations
+
+- **Edit** a candidate to revise scores, readiness, or mentor.
+- **Withdraw** a candidate to remove the nomination. This also deletes their development milestones and cannot be undone.
+
+> There is **no approval step**. Candidates stay in their initial status; nothing promotes a nomination from "proposed" to "approved."
+
 #### Candidate Pipeline
 
-A unified view of all nominated successors across the hospital. Filter by position, readiness, or 9-box placement.
+A single view of everyone nominated across the hospital — candidate, target role, 9-box placement, readiness, development progress, and status. Filter by position.
 
 #### Leadership Development Paths
 
-Once a candidate is nominated, you can create a **development plan** with milestones:
-- Courses to complete
-- Assignments or projects
-- Mentoring sessions
-- Job rotations
-- Certifications to obtain
+For each candidate you can add **milestones**: courses, assignments, mentoring, rotations, certifications, or projects, each with a target date.
 
-Each milestone tracks: **Not Started → In Progress → Completed**
+Each milestone moves through **Not Started → In Progress → Completed**. The completion date is stamped automatically when you mark it complete, and cleared if you move it back. The share of completed milestones drives the Dev Progress percentage in the pipeline.
 
 ---
 
 ## 9. Social Recognition
 
-**What it does:** A social-media-style recognition board where staff can publicly appreciate and celebrate each other's contributions.
+**What it does:** A recognition board where staff can publicly appreciate each other's contributions. Open to **every** role.
 
-### Sidebar: 🏆 Recognition
+### Sidebar: ⭐ Recognition
 
 #### Posting a Recognition
 
 1. Go to **Recognition** in the sidebar.
 2. Click **Create Post**.
-3. Select the **colleague** you want to recognize.
+3. Select the **colleague** you want to recognise.
 4. Choose a **badge** that best describes their contribution:
 
 | Badge | Meaning |
@@ -326,68 +366,75 @@ Each milestone tracks: **Not Started → In Progress → Completed**
 5. Write a short message about what they did.
 6. Click **Post**.
 
+You cannot recognise yourself — the database rejects it.
+
+Admins and HR Managers can create additional badge types.
+
 #### Reacting & Commenting
 
-- **React** to posts with 👍 likes to show your appreciation.
+- **React** to a post with a 👍 to show your appreciation. A reaction **cannot be taken back** once given.
 - **Comment** on posts to add your thoughts.
 
-#### Recognition Wall
+Both require your login to be linked to an employee profile.
 
-The main feed shows all recent recognitions across the hospital. It's a great way to see the positive contributions happening every day!
+#### Recognition Wall & Leaderboard
+
+The main feed shows recent recognitions across the hospital, alongside a monthly leaderboard of the most-recognised staff and departments.
+
+> Posts carry a moderation status internally, but there is no screen for moderating or removing a post. Contact an Administrator if something needs to come down.
 
 ---
 
 ## 10. AI Assistant
 
-**What it does:** An intelligent chatbot built into the system that can answer questions about performance, competencies, hospital policies, and more.
+**What it does:** A chatbot built into the system that answers questions in plain language.
 
 ### How to Use
 
-1. Look for the **AI Assistant** button (usually at the bottom-right of the screen or in the navigation).
-2. Type your question in plain language. You can ask in **English**, **Tagalog**, or **Taglish** (mixed).
-3. The AI will respond with helpful information, suggestions, or analysis.
+1. Click the floating **🤖 AI Assistant** button at the bottom-right of any page.
+2. Type your question. You can write in **English**, **Tagalog**, or **Taglish** (mixed) — it replies in the language you use.
+3. Read the response in the chat panel.
 
 ### Example Questions You Can Ask
 
-- "What is the competency gap analysis for the Nursing department?"
-- "How do I submit a self-assessment?"
 - "Ano ang PIP?" (What is a PIP?)
-- "Show me the succession pipeline for critical positions"
-- "What training sessions are coming up?"
+- "How do I record a competency assessment?"
+- "What should I look for when nominating a successor?"
+
+> **The assistant is told it works for a Philippine hospital HR system, but it cannot read your live HIMS data.** It answers from general knowledge, not from your records. For actual figures, use the Dashboard or the module pages. Always verify anything important with your supervisor or HR.
 
 ### Chat History
 
-Your conversation history is saved. You can:
-- **View** past conversations
-- **Clear** your chat history when needed
+Your conversation is saved to your own account, and you can reopen the panel to see past messages or clear your history from it. The saved history is a record for you to read — it is not sent back to the assistant, so each question is answered on its own without memory of the previous ones.
 
 ---
 
 ## 11. Administration
 
-These modules are available to **Admins** and **HR Managers** only.
+### Sidebar: 👥 Employees
 
-### Sidebar: 👤 Employees
+Available to **Admins**, **HR Managers**, and **Supervisors** (view only for Supervisors).
 
-Manage the hospital's employee directory:
-- **Add** new employees
-- **Edit** employee details (name, department, role, hire date, etc.)
-- **View** employee profiles with all their reviews, competencies, and credentials
+- **View** the employee directory and open any employee's profile
+- **Add**, **edit**, and **delete** employees *(Admins and HR Managers)*
 
 ### Sidebar: 🏢 Departments
 
-Manage hospital departments:
-- **Create** new departments
-- **Edit** department names and assign department heads
-- **View** department structure
+Available to **Admins** and **HR Managers**.
 
-### Sidebar: 🔑 Users (Admin only)
+- **View** departments with their head and headcount
+- **Add** a new department with a name and department code
 
-Manage system user accounts:
-- **Create** login accounts for employees
+> Departments cannot be edited or deleted from the system once created.
+
+### Sidebar: 🔐 Users & Access (Admin only)
+
+- **Create** login accounts and link them to an employee record
 - **Assign roles** (Admin, HR Manager, Supervisor, Staff)
-- **Reset passwords**
-- **Activate/deactivate** accounts
+- **Set a new password** for a user from the edit screen
+- **Delete** an account
+
+> There is no activate/deactivate switch and no account lockout — an account either exists or is deleted. The system will not let you remove or demote the last remaining Administrator.
 
 ---
 
@@ -396,23 +443,30 @@ Manage system user accounts:
 ### Changing Your Password
 
 1. Log in to the system.
-2. Click your **name** in the top-right corner.
-3. Select **Profile**.
-4. Enter your current password and your new password.
-5. Click **Update Password**.
+2. Click your **name** at the bottom of the sidebar to open your Profile.
+3. Enter your current password and your new password.
+4. Click **Update Password**.
 
 ### Forgot Your Password?
 
 1. On the login page, click **"Forgot your password?"**
 2. Enter your email address.
 3. Check your inbox for a password reset link.
-4. Click the link and set a new password.
+4. Click the link and set a new password. Each link works only once.
 
 > **Note:** The reset email may take a few minutes to arrive. Check your spam/junk folder if you don't see it.
 
+### How the System Protects Your Account
+
+- Passwords are stored hashed, never in readable form.
+- After 5 failed login attempts from the same email and network address, further attempts are blocked for a short period.
+- Your session ends when you log out.
+
+> **What the system does not do:** there is no two-factor authentication, and the system does not keep an activity log of who viewed or changed a record.
+
 ### Logging Out
 
-Click **Logout** at the bottom of the sidebar, or click your name in the top bar and select **Logout**.
+Click **Logout** at the bottom of the sidebar.
 
 ---
 
@@ -421,7 +475,10 @@ Click **Logout** at the bottom of the sidebar, or click your name in the top bar
 ### General
 
 **Q: I can't see a module in the sidebar. Why?**
-A: Your role may not have access to that module. Contact your HR department or system administrator to request access if needed.
+A: Your role does not have access to it. Contact your HR department or system administrator to request a role change.
+
+**Q: The bell icon never shows anything. Is it broken?**
+A: No — the system does not generate notifications yet. Check the Dashboard for anything needing your attention.
 
 **Q: The page is loading slowly. What should I do?**
 A: Try refreshing the page (press F5 or Ctrl+R). If the problem persists, check your internet connection or contact your IT department.
@@ -429,39 +486,54 @@ A: Try refreshing the page (press F5 or Ctrl+R). If the problem persists, check 
 ### Performance Reviews
 
 **Q: How do I know when my review is due?**
-A: Check the Dashboard for pending reviews, or look for a notification (bell icon 🔔) in the top bar.
+A: Check the Dashboard — pending reviews are counted there, and recent reviews are listed.
 
-**Q: Can I edit my self-assessment after submitting it?**
-A: Once submitted, a self-assessment moves to the next stage. Contact your supervisor or HR if changes are needed.
+**Q: I finished scoring a review. How do I send it for approval?**
+A: There is no approval routing in this version. Set the review's status on the scoring form and tell your HR contact directly.
+
+**Q: How do I add a goal or an improvement plan?**
+A: Goals and PIPs are shown on the review page but cannot be created from the system yet. Ask your system administrator.
 
 ### Competency & Credentials
 
-**Q: My license is showing as "Expired" but I already renewed it. What do I do?**
-A: Ask your supervisor or HR to update the credential record with the new expiry date.
+**Q: My licence is showing as "Expired" but I already renewed it. What do I do?**
+A: Ask your supervisor or HR to update the credential record with the new expiry date. The status will change by itself once the date is corrected.
+
+**Q: Will I be emailed before my licence expires?**
+A: No. Credential status is shown on screen only — check the Credential Alerts panel on the Competency page or the Dashboard.
 
 **Q: What does a competency score of 3 mean?**
 A: Scores are on a 1–5 scale: 1 = Novice, 2 = Basic, 3 = Competent, 4 = Proficient, 5 = Expert.
 
-### Training
+### Learning & Training
+
+**Q: I enrolled in a course. Where do I take it?**
+A: Not in HIMS — the system records your enrolment, but course content is delivered elsewhere. Ask your training coordinator.
+
+**Q: Where is my certificate of completion?**
+A: The system does not issue certificates.
 
 **Q: How do I cancel my training registration?**
-A: Go to **Training**, find the session you registered for, and click **Cancel Registration** (if the session hasn't started yet).
+A: You can't do this yourself. Ask an Administrator to remove your registration.
+
+**Q: How do I give feedback on a training session?**
+A: There is no feedback form in the system yet. Pass your feedback to your training coordinator.
 
 ### AI Assistant
 
 **Q: The AI gave me an incorrect answer. What should I do?**
-A: The AI assistant provides suggestions based on available data. Always verify critical information with your supervisor or HR department. You can also try rephrasing your question for a better response.
+A: The assistant does not read your live HIMS data — it answers from general knowledge. Always verify anything important against the module pages and with your supervisor or HR. Rephrasing the question often helps.
 
 **Q: Is the AI assistant available in Filipino/Tagalog?**
-A: Yes! You can type your questions in English, Tagalog, or Taglish (mixed). The assistant will respond in the language you use.
+A: Yes. Type in English, Tagalog, or Taglish and it will reply in the same language.
 
 ### Account Issues
 
 **Q: I didn't receive the password reset email. What should I do?**
 A: Wait a few minutes and check your spam/junk folder. If it still hasn't arrived, contact your system administrator.
 
-**Q: My account is locked. How do I unlock it?**
-A: Contact your system administrator (Admin) to unlock your account.
+**Q: I've been blocked after too many login attempts. What now?**
+A: Wait a short while and try again — the block clears by itself. If you have forgotten the password, use the reset link instead.
 
 ---
 
@@ -470,10 +542,10 @@ A: Contact your system administrator (Admin) to unlock your account.
 If you have questions that aren't covered in this guide:
 
 1. Click the **❓ Help** button in the top bar for quick FAQ answers.
-2. Use the **AI Assistant** to ask questions in plain language.
+2. Use the **AI Assistant** for general questions in plain language.
 3. Contact your **HR Department** or **System Administrator** for account and access issues.
 
 ---
 
-*HIMS Performance & Development Module — User Guide v2.5.0-beta.2*
-*Last updated: August 4, 2026*
+*HIMS Performance & Development Module — User Guide*
+*Last updated: August 6, 2026*

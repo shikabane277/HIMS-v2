@@ -39,7 +39,7 @@ Consequences to respect when editing:
 
 ## Module layout
 
-Seven domain modules, each a controller + a `routes/web.php` prefix group + a `resources/views/<module>/` directory: performance, competency, learning, training, succession, recognition, plus employees/departments and users. All sit behind `['auth','verified']`.
+Seven domain modules, each a controller + a `routes/web.php` prefix group + a `resources/views/<module>/` directory: performance, competency, learning, training, succession, recognition, plus employees/departments and users. All sit behind `['auth','verified']`, most with an additional `role:` middleware — see "Docs vs. implementation" below.
 
 Departments are handled by **closures inline in `routes/web.php`**, not a controller. `web.php` has a `use App\Http\Controllers\DepartmentController;` import for a class that does not exist — harmless (unused imports don't autoload) but don't be misled by it.
 
@@ -59,9 +59,11 @@ Styling is **`public/css/hims.css` (742 lines, hand-authored, served directly)**
 
 ## Docs vs. implementation
 
-`HIMS_ARCHITECTURE_AND_SECURITY.md` and `HIMS_SYSTEM_DOCUMENTATION.md` describe the intended system, not the current one. Notably specified but **not implemented in app code**: RBAC via Gates/Policies, tamper-proof audit trail observers, TOTP MFA, `Crypt` field encryption, Redis caching, and the `notifications` queue. The `permissions`, `role_permissions`, `audit_trails`, `system_users`, and `notifications` tables exist in migrations with **zero references anywhere in `app/`, `routes/`, or `resources/`**.
+`HIMS_ARCHITECTURE_AND_SECURITY.md`, `HIMS_SYSTEM_DOCUMENTATION.md`, and `HIMS_USER_GUIDE.md` were stripped to as-built state — they now describe only what the code does. Keep them that way (see the docs rule in the user's memory); anything unbuilt belongs in the patch/release notes, not in these three.
 
-Authorization today is only "logged in and verified" — `users.role` (`admin|hr_manager|supervisor|staff`) is validated on write in `UserController` but never checked to gate anything. Treat the docs as a roadmap and verify against code before assuming a control exists.
+Still **not implemented in app code**: tamper-proof audit trail observers, TOTP MFA, `Crypt` field encryption, Redis caching, the `notifications` queue, and any REST API (no `routes/api.php`, no Sanctum/Passport). Twelve migrated tables carry zero references in `app/`, `routes/`, or `resources/` — including `permissions`, `role_permissions`, `audit_trails`, `system_users`, and `notifications`.
+
+**Authorization is real but uneven.** `AppServiceProvider::registerGates()` defines 13 Gates, and `EnsureUserHasRole` is aliased as `role` in `bootstrap/app.php` and applied per-route in `web.php` — route-level RBAC works. Record-level scoping also exists, via `Controller::scopeToVisibleEmployees()` and `authorizeEmployeeAccess()` (admin/hr_manager see all, supervisor sees own department, staff sees own record) — but **only `EmployeeController`, `PerformanceController`, and `GapAnalysisController` call them**. Competency, Learning, Training, Succession, Recognition, and Dashboard have no row-level filter. Verify against code before assuming a given control covers a given module.
 
 `system_users` (the docs' account table) is dead; real auth uses Laravel's `users` table, extended with `role` and a nullable `employee_id` FK by migration `..._000095`.
 
