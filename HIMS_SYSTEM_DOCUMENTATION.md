@@ -1617,11 +1617,11 @@ mandatory reason field when one is selected. That does not survive being reduced
 | POST | `/competency/assessments` | `competency.assessments.store` | `admin,hr_manager,supervisor` |
 | GET | `/competency/credentials` | `competency.credentials.index` | `admin,hr_manager,supervisor` |
 | POST | `/competency/credentials` | `competency.credentials.store` | `admin,hr_manager,supervisor` |
-| GET | `/competency/domains/create` | `competency.domains.create` | `admin,hr_manager` |
 | POST | `/competency/domains` | `competency.domains.store` | `admin,hr_manager` |
 | GET | `/competency/domains/{id}` | `competency.domains.show` | `admin,hr_manager` |
 
-> Route order matters: the `domains/{id}` wildcard is registered **last** so it cannot swallow `domains/create`.
+> The `domains/{id}` wildcard is still registered **last** on principle, but it is now the only GET under
+> `/domains` — the create page it used to be ordered around became the `?new=domain` modal.
 
 Assessments and credentials are created in **modals on `/competency`**, and the credential modal also appears on
 the credentials register. Both POST to the `store` routes above; neither has a GET page. `?new=assessment` and
@@ -1790,16 +1790,15 @@ integrations should use the canonical `learning.*` routes above.
 | GET | `/training` | `training.index` | all authenticated |
 | GET | `/training/sessions/{id}` | `training.sessions.show` | all authenticated |
 | POST | `/training/sessions/{id}/register` | `training.register` | all authenticated |
-| GET | `/training/sessions/create` | `training.sessions.create` | `admin,hr_manager,supervisor` |
 | POST | `/training/sessions` | `training.sessions.store` | `admin,hr_manager,supervisor` |
 | GET | `/training/venues` | `training.venues.index` | all authenticated |
-| GET | `/training/venues/create` | `training.venues.create` | `admin,hr_manager` |
 | POST | `/training/venues` | `training.venues.store` | `admin,hr_manager` |
 | POST | `/training/sessions/{id}/checkin` | `training.sessions.checkin` | `admin,hr_manager,supervisor` |
-| GET | `/training/sessions/{id}/feedback` | `training.sessions.feedback` | all authenticated |
 | POST | `/training/sessions/{id}/feedback` | `training.sessions.feedback.store` | all authenticated |
 
-Sessions are scheduled, venues managed, and employees register themselves.
+Sessions are scheduled, venues managed, and employees register themselves. Scheduling a session, adding a
+venue and filing feedback are all **modals**, so this module has no `.../create` GET routes and no GET
+feedback page — `?new=session`, `?new=venue` and `?feedback=1` open them on load.
 
 **Attendance.** `training.sessions.checkin` marks a registrant present. The route sits behind
 `role:admin,hr_manager,supervisor`, and `TrainingController::checkIn()` narrows that further: a supervisor may
@@ -1807,8 +1806,9 @@ only check in attendees of a session they are the instructor for, while `admin` 
 any session. Marking attendance is what flips a registration to attended and makes the feedback form reachable;
 anyone not checked in is left as a no-show on the roster.
 
-**Feedback.** `training.sessions.feedback` renders the form and `training.sessions.feedback.store` writes
-`training_feedback`, which the session page has always displayed. Submission is restricted to the employee's own
+**Feedback.** `training.sessions.feedback.store` writes `training_feedback`, which the session page has always
+displayed; the form itself is the `feedbackModal` partial on that page, reached from the Feedback Summary button
+or `?feedback=1`. Submission is restricted to the employee's own
 attended registration — the controller resolves the registration from the session id plus the signed-in
 employee, so an employee cannot rate a session they did not attend or file feedback in someone else's name.
 

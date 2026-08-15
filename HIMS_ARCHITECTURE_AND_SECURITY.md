@@ -222,8 +222,10 @@ reassessment.
 
 **`App\Support\ReviewFeedback`** ([ReviewFeedback.php](hims-app/app/Support/ReviewFeedback.php)) is the
 one definition of that set, in the same shape as the status classes and `KpiWeighting` above — `final
-class`, static methods, no database access and no Carbon, so `Unit\ReviewFeedbackTest` (14 tests) runs
-off the DB entirely.
+class`, static methods, no Carbon — with **one deliberate exception: `promptLines()` reads the two
+`system_settings` privacy switches** (§2.11), because a prompt-builder that ignored them would be the
+leak. Every other method is pure, and that one read is wrapped in a `try`/`catch` that falls back to
+redacting, which is why `Unit\ReviewFeedbackTest` (14 tests) still runs with no schema behind it.
 
 | Method | Answers |
 |---|---|

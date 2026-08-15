@@ -66,6 +66,30 @@ documents back in line with the measured code.
     + 1 view, one remaining `x-app-layout` view, and the 21-skip total.
 *   Documented two mechanisms the guidance had never described: content-hashed asset URLs, and the search-anchor
     scoping rule above.
+*   **Removed four phantom GET routes from the §12 route tables.** `competency.domains.create`,
+    `training.sessions.create`, `training.venues.create` and `training.sessions.feedback` were all documented as
+    live endpoints; none exists in `routes/web.php` — each became a modal, and `routes/web.php` only registers the
+    `store` half. The route-order note under Competency was rewritten (the `domains/{id}` wildcard is still last
+    on principle, but there is no longer a `domains/create` for it to swallow), and §12.6's Feedback paragraph no
+    longer claims a GET route renders the form: the `feedbackModal` partial does, opened from the Feedback Summary
+    button or `?feedback=1`. A documented route that 404s is worse than an undocumented one — it reads as a
+    regression in the code.
+*   **Corrected three further as-built claims found by re-reading the code they describe.** `ReviewFeedback` was
+    still described in §2.2.3 as having "no database access" — the same claim already corrected in `CLAUDE.md`,
+    left standing in its twin; `promptLines()` reads the two `system_settings` privacy switches, which is the whole
+    point of §2.11, and the reason `Unit\ReviewFeedbackTest` still runs without a schema is the `try`/`catch` that
+    defaults to redacting, not an absence of queries. `CLAUDE.md` cited the shared alignment classes at
+    `hims.css:711-713` (the Recognition Wall block) rather than **904-906**, and still described `ZapierService` as
+    "fully written, never called" after it was deleted in `3e121d5` — `HIMS_SYSTEM_DOCUMENTATION.md` already
+    recorded the removal, so the two documents contradicted each other. Only `config/services.php:102`'s unread
+    `'zapier'` block survives.
+*   **Kept the historical framing where a count changed for the right reason.** `CLAUDE.md`'s account of the
+    `credential_name`/`credential_type` bug says "all four `EmployeeProgressionTest` cases seeded employees with
+    none"; the class now has five. Bumping the number would have erased the point — the fifth case,
+    `test_progression_view_renders_credentials()`, *is* the regression test that entered the loop. The sentence now
+    says both, resolving the apparent contradiction with the five-skip breakdown a few bullets above it. Verified
+    and deliberately left alone: `KpiWeighting`'s "no database access and no Carbon" (accurate — the class holds
+    only arithmetic) and every figure in the patch and release notes, which are historical records.
 *   Updated `README.md`, `HIMS_SYSTEM_DOCUMENTATION.md`, `HIMS_ARCHITECTURE_AND_SECURITY.md`, `CLAUDE.md`, and
     these patch notes. No migration is required for this release.
 
