@@ -29,7 +29,7 @@
                     </div>
                 @endif
                 @if(session('error'))
-                    <div class="hims-alert error mb-3">
+                    <div class="hims-alert error mb-3" data-auto-dismiss>
                         <i class="bi bi-exclamation-circle-fill"></i> {{ session('error') }}
                     </div>
                 @endif
@@ -97,13 +97,26 @@
                             <label class="hims-label">Reports To</label>
                             @php $supervisorId = old('supervisor_id', $employee->supervisor_id); @endphp
                             <select name="supervisor_id" class="hims-input hims-select">
-                                <option value="">— No supervisor —</option>
+                                <option value="" data-setup-complete="1">&mdash; No supervisor &mdash;</option>
                                 @foreach($supervisors as $supervisor)
-                                    <option value="{{ $supervisor->employee_id }}" @selected($supervisorId === $supervisor->employee_id)>
-                                        {{ $supervisor->first_name }} {{ $supervisor->last_name }}{{ $supervisor->position_title ? ' — '.$supervisor->position_title : '' }}
+                                    <option value="{{ $supervisor->employee_id }}"
+                                            data-setup-complete="{{ $supervisor->setup_complete ? '1' : '0' }}"
+                                            @selected($supervisorId === $supervisor->employee_id)>
+                                        {{ $supervisor->first_name }} {{ $supervisor->last_name }} &mdash;
+                                        {{ $supervisor->position_title ?: 'No position title' }} &mdash;
+                                        {{ $supervisor->department_name }} &mdash; {{ $supervisor->access_label }}
+                                        {{ $supervisor->setup_complete ? '' : ' — Setup incomplete' }}
                                     </option>
                                 @endforeach
                             </select>
+                            <div id="managerSetupWarning" class="hims-alert warning mt-2" style="display:none;padding:9px 12px;font-size:12px">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                Setup incomplete &mdash; this manager cannot complete HIMS reviews. The existing assignment is preserved, but this person is unavailable for new assignments.
+                            </div>
+                            <div id="noManagerWarning" class="hims-alert warning mt-2" style="display:none;padding:9px 12px;font-size:12px">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                No manager is assigned. Review authority will need an HR/Admin exception until a reporting line is set.
+                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -122,6 +135,35 @@
                             <div style="font-size:11.5px;color:#9ca3af;margin-top:5px">
                                 Only active staff are counted in workforce dashboards and gap analysis.
                             </div>
+                            @if($activeDirectReports->isNotEmpty())
+                                <div class="hims-alert warning mt-2" style="padding:9px 12px;font-size:12px">
+                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                    This status may be changed, but these active direct reports will need reassignment:
+                                    {{ $activeDirectReports->map(fn($report) => $report->first_name.' '.$report->last_name)->implode(', ') }}.
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="col-12">
+                            <label class="hims-label d-flex align-items-center gap-2">
+                                @if($directReports->isNotEmpty())
+                                    <input type="hidden" name="is_people_manager" value="1">
+                                    <input type="checkbox" checked disabled>
+                                @else
+                                    <input type="checkbox" name="is_people_manager" value="1"
+                                           @checked((bool) old('is_people_manager', $employee->is_people_manager))>
+                                @endif
+                                People Manager
+                            </label>
+                            <div style="font-size:11.5px;color:#6b7280;margin-top:2px">
+                                This employee can have other employees report to them. This setting does not grant HIMS access; the account role remains a separate decision.
+                            </div>
+                            @if($directReports->isNotEmpty())
+                                <div class="hims-alert warning mt-2" style="padding:9px 12px;font-size:12px">
+                                    <i class="bi bi-people-fill"></i>
+                                    Reassign this manager's {{ $directReports->count() }} direct report(s) before removing People Manager status.
+                                </div>
+                            @endif
                         </div>
 
                         <div class="col-12 mt-3 d-flex gap-2 justify-content-end">
@@ -137,3 +179,24 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    (() => {
+        const select = document.querySelector('select[name="supervisor_id"]');
+        const setupWarning = document.getElementById('managerSetupWarning');
+        const noManagerWarning = document.getElementById('noManagerWarning');
+        if (!select || !setupWarning || !noManagerWarning) return;
+
+        const sync = () => {
+            const option = select.options[select.selectedIndex];
+            const hasManager = Boolean(select.value);
+            noManagerWarning.style.display = hasManager ? 'none' : 'flex';
+            setupWarning.style.display = hasManager && option?.dataset.setupComplete === '0' ? 'flex' : 'none';
+        };
+
+        select.addEventListener('change', sync);
+        sync();
+    })();
+</script>
+@endpush

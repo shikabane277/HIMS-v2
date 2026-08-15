@@ -41,7 +41,7 @@
 </div>
 
 @if(session('success'))
-    <div class="hims-alert success mb-3"><i class="bi bi-check-circle-fill"></i> {{ session('success') }}</div>
+    <div class="hims-alert success mb-3" data-auto-dismiss><i class="bi bi-check-circle-fill"></i> {{ session('success') }}</div>
 @endif
 
 @if($errors->any())
@@ -53,6 +53,7 @@
     </div>
 @endif
 
+@if($canSeeConfidential)
 <div class="row g-3 mb-4">
     <div class="col-md-3 col-6">
         <div class="stat-card animate-in">
@@ -83,9 +84,10 @@
         </div>
     </div>
 </div>
+@endif
 
 <div class="row g-3">
-    <div class="col-lg-4">
+    @if($canSeeConfidential)<div class="col-lg-4">
         <div class="hims-card" style="height:100%">
             <div class="card-header"><h5><i class="bi bi-info-circle"></i> Nomination</h5></div>
             <div class="card-body">
@@ -113,7 +115,8 @@
         </div>
     </div>
 
-    <div class="col-lg-8">
+    @endif
+    <div class="{{ $canSeeConfidential ? 'col-lg-8' : 'col-12' }}">
         @php
             $doneCount = $dev_paths->where('status','completed')->count();
             $devPct    = $dev_paths->count() ? (int) round(100 * $doneCount / $dev_paths->count()) : 0;
@@ -190,6 +193,110 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+</div>
+
+{{-- Readiness evidence: what Learning and Competency actually record about this
+     person, so a promotion decision can be checked against completions rather
+     than against the readiness level somebody typed into the form above. --}}
+<div class="row g-3 mt-1">
+    <div class="col-lg-6">
+        <div class="hims-card" style="height:100%">
+            <div class="card-header">
+                <h5><i class="bi bi-mortarboard"></i> Learning Evidence</h5>
+                <span style="font-size:11.5px;color:#9ca3af">
+                    {{ $evidence['training']->completed ?? 0 }}/{{ $evidence['training']->enrolled ?? 0 }} courses
+                    &middot; {{ rtrim(rtrim(number_format($evidence['training']->cpd_hours ?? 0, 1), '0'), '.') }} CPD hrs
+                </span>
+            </div>
+            <div class="card-body">
+                @if(($evidence['training']->mandatory_outstanding ?? 0) > 0)
+                <div class="hims-alert warning mb-3">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    {{ $evidence['training']->mandatory_outstanding }} required course(s) still unfinished.
+                </div>
+                @endif
+
+                <div class="hims-label" style="margin-bottom:8px">Pathway Completion</div>
+                @forelse($evidence['pathways'] as $pathway)
+                <div style="margin-bottom:12px">
+                    <div class="d-flex justify-content-between" style="font-size:12.5px;margin-bottom:4px">
+                        <span>{{ $pathway->pathway_name }}</span>
+                        <strong>{{ $pathway->completed_courses }}/{{ $pathway->total_courses }} &middot; {{ $pathway->pct }}%</strong>
+                    </div>
+                    <div class="hims-progress"><div class="hims-progress-bar" style="width:{{ $pathway->pct }}%"></div></div>
+                </div>
+                @empty
+                <p style="color:#9ca3af;font-size:12.5px;margin:0">No learning pathways defined yet.</p>
+                @endforelse
+
+                @if($evidence['cycles']->isNotEmpty())
+                <div class="hims-label" style="margin:16px 0 8px">Renewal Standing</div>
+                @foreach($evidence['cycles']->take(4) as $cycle)
+                <div class="d-flex justify-content-between align-items-center" style="font-size:12.5px;padding:6px 0;border-top:1px solid var(--hims-border)">
+                    <span>{{ $cycle->label }}</span>
+                    @if($cycle->risk === 'met')
+                        <span class="hims-badge green">Met</span>
+                    @elseif($cycle->risk === 'shortfall')
+                        <span class="hims-badge red">Short {{ $cycle->hours_remaining }} hrs</span>
+                    @elseif($cycle->risk === 'at_risk')
+                        <span class="hims-badge yellow">{{ $cycle->hours_remaining }} hrs owed</span>
+                    @else
+                        <span class="hims-badge blue">On track</span>
+                    @endif
+                </div>
+                @endforeach
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="hims-card" style="height:100%">
+            <div class="card-header">
+                <h5><i class="bi bi-clipboard-check"></i> Competency Proficiency</h5>
+                <span style="font-size:11.5px;color:#9ca3af">
+                    {{ $evidence['at_target'] }}/{{ $evidence['competencies']->count() }} at target
+                </span>
+            </div>
+            <div class="card-body" style="padding:0">
+                <table class="hims-table">
+                    <thead><tr><th>Competency</th><th>Standard</th><th>Current</th><th>Required</th><th></th></tr></thead>
+                    <tbody>
+                        @forelse($evidence['competencies']->take(10) as $competency)
+                        <tr>
+                            <td>
+                                {{ $competency->competency_name }}
+                                <div style="font-size:11px;color:#9ca3af">
+                                    assessed {{ \Carbon\Carbon::parse($competency->assessed_date)->format('d M Y') }}
+                                </div>
+                            </td>
+                            <td style="font-size:11.5px;color:#6b7280">{{ $competency->jci_standard_code ?: '—' }}</td>
+                            <td><strong>{{ $competency->current_proficiency }}</strong></td>
+                            <td>{{ $competency->required_proficiency }}</td>
+                            <td>
+                                @if($competency->current_proficiency >= $competency->required_proficiency)
+                                    <span class="hims-badge green">✓</span>
+                                @else
+                                    <span class="hims-badge yellow">−{{ $competency->required_proficiency - $competency->current_proficiency }}</span>
+                                @endif
+                            </td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:32px">
+                            This candidate has never been assessed, so there is no proficiency evidence
+                            behind their readiness level.
+                        </td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            @if($evidence['competencies']->count() > 10)
+            <div style="padding:10px 16px;font-size:11.5px;color:#9ca3af">
+                Showing 10 of {{ $evidence['competencies']->count() }} — newest assessment per competency.
+            </div>
+            @endif
         </div>
     </div>
 </div>

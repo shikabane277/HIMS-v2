@@ -20,7 +20,7 @@ class GeminiProvider extends AbstractAiProvider
         return 'Gemini';
     }
 
-    public function ask(string $prompt): string
+    public function ask(string $prompt, array $history = [], ?string $scope = null): string
     {
         if ($this->apiKey() === '') {
             return $this->missingKey();
@@ -29,18 +29,16 @@ class GeminiProvider extends AbstractAiProvider
         $base = rtrim((string) ($this->config['base_url']
             ?? 'https://generativelanguage.googleapis.com/v1beta'), '/');
 
+        $contents = $this->buildContents($prompt, $history, $scope);
+
         foreach ($this->models() as $model) {
             try {
                 $endpoint = "{$base}/models/{$model}:generateContent";
 
                 $response = Http::timeout($this->timeout())->post("{$endpoint}?key={$this->apiKey()}", [
-                    'contents' => [
-                        ['role' => 'user', 'parts' => [
-                            ['text' => $this->systemContext() . "\n\nUser question: " . $prompt],
-                        ]],
-                    ],
+                    'contents' => $contents,
                     'generationConfig' => [
-                        'temperature'     => $this->temperature(),
+                        'temperature' => $this->temperature(),
                         'maxOutputTokens' => $this->maxTokens(),
                     ],
                 ]);
@@ -61,10 +59,42 @@ class GeminiProvider extends AbstractAiProvider
             } catch (\Throwable $e) {
                 Log::error('Gemini request failed', ['error' => $e->getMessage()]);
 
-                return '⚠️ AI service error: ' . $e->getMessage();
+                return '⚠️ AI service error: '.$e->getMessage();
             }
         }
 
         return '⚠️ Unable to reach Gemini with the configured models. Check GEMINI_MODEL / GEMINI_API_KEY in .env.';
+    }
+
+    /**
+     * Build the Gemini contents array from the prompt and prior conversation.
+     *
+     * Gemini's roles are 'user' and 'model'. systemContext() is prepended to
+     * the current user turn rather than using system_instruction, because that
+     * field is not supported by older models (gemini-1.0-pro, gemini-1.5-flash).
+     *
+     * @param  list<array{role?: string, message?: string}>|array<mixed>  $history
+     * @return list<array{role: string, parts: list<array{text: string}>}>
+     */
+    private function buildContents(string $prompt, array $history, ?string $scope = null): array
+    {
+        $turns = $this->sanitiseHistory($history);
+
+        $contents = [];
+
+        foreach ($turns as $turn) {
+            $contents[] = [
+                'role' => $turn['role'] === 'user' ? 'user' : 'model',
+                'parts' => [['text' => $turn['text']]],
+            ];
+        }
+
+        // System prompt is glued to the current question, not sent separately.
+        $contents[] = [
+            'role' => 'user',
+            'parts' => [['text' => $this->systemContext($scope)."\n\nUser question: ".$prompt]],
+        ];
+
+        return $contents;
     }
 }

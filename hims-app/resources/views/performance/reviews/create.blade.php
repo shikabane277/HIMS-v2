@@ -17,15 +17,21 @@
                     <div class="hims-alert error mb-3"><i class="bi bi-exclamation-circle-fill"></i> {{ $errors->first() }}</div>
                 @endif
                 @if(session('error'))
-                    <div class="hims-alert error mb-3"><i class="bi bi-exclamation-circle-fill"></i> {{ session('error') }}</div>
+                    <div class="hims-alert error mb-3" data-auto-dismiss><i class="bi bi-exclamation-circle-fill"></i> {{ session('error') }}</div>
                 @endif
 
-                @if($cycles->isEmpty())
+                @if($employees->isEmpty())
+                    <div class="hims-alert mb-3" style="background:#fef3c7;border-color:#fde68a;color:#92400e">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Nobody reports to you, so there is no one for you to review. Reviews follow the reporting line —
+                        ask HR to record you as the supervisor of the people you assess.
+                    </div>
+                @elseif($cycles->isEmpty())
                     <div class="hims-alert mb-3" style="background:#fef3c7;border-color:#fde68a;color:#92400e">
                         <i class="bi bi-exclamation-triangle"></i>
                         There are no planned or active review cycles. A cycle has to exist before a review can be started.
                         @can('manage-review-cycles')
-                        <div class="mt-2"><a href="{{ route('performance.cycles.create') }}" class="btn-hims btn-hims-primary btn-sm">Create a Cycle</a></div>
+                        <div class="mt-2"><a href="{{ route('performance.index', ['new' => 'cycle']) }}" class="btn-hims btn-hims-primary btn-sm">Create a Cycle</a></div>
                         @endcan
                     </div>
                 @else
@@ -34,14 +40,19 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="hims-label">Employee *</label>
-                            <select name="employee_id" class="hims-input hims-select" required>
+                            <select name="employee_id" id="reviewEmployeeSelect" class="hims-input hims-select" required>
                                 <option value="">— Select employee —</option>
                                 @foreach($employees as $employee)
-                                <option value="{{ $employee->employee_id }}" @selected(old('employee_id') === $employee->employee_id)>
-                                    {{ $employee->first_name }} {{ $employee->last_name }} — {{ $employee->position_title ?? 'No position' }} ({{ $employee->department_name }})
+                                <option value="{{ $employee->employee_id }}"
+                                    data-outside-chain="{{ $employee->outside_chain ? '1' : '0' }}"
+                                    @selected(old('employee_id') === $employee->employee_id)>
+                                    {{ $employee->first_name }} {{ $employee->last_name }} — {{ $employee->position_title ?? 'No position' }} ({{ $employee->department_name }})@if($employee->outside_chain) · reports to {{ trim($employee->supervisor_name) ?: 'nobody' }}@endif
                                 </option>
                                 @endforeach
                             </select>
+                            <div style="font-size:11.5px;color:#9ca3af;margin-top:4px">
+                                Only your direct reports are listed. You are the reviewer — a review cannot be assigned to somebody else.
+                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -57,26 +68,28 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="hims-label">Reviewer</label>
-                            <select name="reviewer_id" class="hims-input hims-select">
-                                <option value="">— Me ({{ Auth::user()->name }}) —</option>
-                                @foreach($reviewers as $reviewer)
-                                <option value="{{ $reviewer->employee_id }}" @selected(old('reviewer_id') === $reviewer->employee_id)>
-                                    {{ $reviewer->first_name }} {{ $reviewer->last_name }}
-                                </option>
-                                @endforeach
-                            </select>
-                            <div style="font-size:11.5px;color:#9ca3af;margin-top:4px">Leave blank to assign yourself as reviewer.</div>
-                        </div>
-
-                        <div class="col-md-6">
                             <label class="hims-label">Review Type *</label>
                             <select name="review_type" class="hims-input hims-select" required>
                                 <option value="standard" @selected(old('review_type','standard')==='standard')>Standard</option>
                                 <option value="probationary" @selected(old('review_type')==='probationary')>Probationary</option>
                                 <option value="promotion" @selected(old('review_type')==='promotion')>Promotion</option>
-                                <option value="360" @selected(old('review_type')==='360')>360° Feedback</option>
                             </select>
+                            <div style="font-size:11.5px;color:#9ca3af;margin-top:4px">
+                                You write one review per employee per cycle. Choosing an employee you already opened one for takes you back to it.
+                            </div>
+                        </div>
+
+                        {{-- Shown only for an employee outside your reporting line. The
+                             server decides whether the reason is required; this just
+                             stops the field being a mystery until after a rejection. --}}
+                        <div class="col-md-6" id="exceptionReasonWrap" style="display:{{ old('exception_reason') ? 'block' : 'none' }}">
+                            <label class="hims-label">Reason for reviewing outside the reporting line *</label>
+                            <textarea name="exception_reason" rows="2" maxlength="500" class="hims-input"
+                                placeholder="e.g. Ward supervisor on extended leave; covering the Q3 cycle.">{{ old('exception_reason') }}</textarea>
+                            <div style="font-size:11.5px;color:#b45309;margin-top:4px">
+                                <i class="bi bi-shield-exclamation"></i>
+                                This employee does not report to you. The review will be flagged as an exception and recorded in the audit trail.
+                            </div>
                         </div>
 
                         <div class="col-12">
@@ -127,3 +140,24 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+// Reveal the exception reason as soon as an out-of-chain employee is picked, so
+// the requirement is visible before submitting rather than after a rejection.
+(function () {
+    var select = document.getElementById('reviewEmployeeSelect');
+    var wrap = document.getElementById('exceptionReasonWrap');
+    if (!select || !wrap) return;
+
+    function sync() {
+        var option = select.options[select.selectedIndex];
+        var outside = option && option.getAttribute('data-outside-chain') === '1';
+        wrap.style.display = outside ? 'block' : 'none';
+    }
+
+    select.addEventListener('change', sync);
+    sync();
+})();
+</script>
+@endpush

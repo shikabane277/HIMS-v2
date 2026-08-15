@@ -59,7 +59,7 @@
     <div class="card-body" style="padding:0">
         <table class="hims-table">
             <thead>
-                <tr>
+                <tr id="competency-{{ $competency->competency_id }}" style="scroll-margin-top:84px">
                     <th>Competency</th>
                     <th style="width:110px">Code</th>
                     <th style="width:130px">Required Level</th>

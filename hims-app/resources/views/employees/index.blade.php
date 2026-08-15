@@ -16,9 +16,14 @@
         </p>
     </div>
     @can('manage-employees')
-    <a href="{{ route('employees.create') }}" class="btn-hims btn-hims-primary">
-        <i class="bi bi-person-plus-fill"></i> Add Employee
-    </a>
+    <div class="d-flex gap-2">
+        <a href="{{ route('employees.manager-setup') }}" class="btn-hims btn-hims-outline">
+            <i class="bi bi-person-check-fill"></i> Manager Setup
+        </a>
+        <a href="{{ route('employees.create') }}" class="btn-hims btn-hims-primary">
+            <i class="bi bi-person-plus-fill"></i> Add Employee
+        </a>
+    </div>
     @endcan
 </div>
 
@@ -143,7 +148,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" style="text-align:center;color:#9ca3af;padding:48px">
+                    <td colspan="7" class="text-center" style="color:#9ca3af;padding:48px">
                         <div style="font-size:40px;margin-bottom:10px">👥</div>
                         @if(($filters['q'] ?? '') !== '' || ($filters['department'] ?? null))
                             No employees match that filter.

@@ -30,7 +30,7 @@
         <h2 style="font-size:20px;font-weight:700;margin:0">{{ $position->position_title }}</h2>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">
             {{ $position->department_name }} ·
-            <span class="hims-badge {{ $riskColour }}">{{ ucfirst($risk ?: 'unknown') }} vacancy risk</span>
+            @if($canSeeConfidential)<span class="hims-badge {{ $riskColour }}">{{ ucfirst($risk ?: 'unknown') }} vacancy risk</span>@endif
         </p>
     </div>
     <div class="d-flex gap-2">
@@ -42,7 +42,7 @@
 </div>
 
 @if(session('success'))
-    <div class="hims-alert success mb-3"><i class="bi bi-check-circle-fill"></i> {{ session('success') }}</div>
+    <div class="hims-alert success mb-3" data-auto-dismiss><i class="bi bi-check-circle-fill"></i> {{ session('success') }}</div>
 @endif
 
 <div class="row g-3 mb-4">
@@ -63,8 +63,8 @@
     <div class="col-md-3 col-6">
         <div class="stat-card animate-in">
             <div class="stat-icon" style="background:#e0f2fe;color:#0284c7"><i class="bi bi-lightning-charge"></i></div>
-            <div class="stat-value">{{ $candidates->where('readiness_level','ready_now')->count() }}</div>
-            <div class="stat-label">Ready Now</div>
+            <div class="stat-value">{{ $canSeeConfidential ? $candidates->where('readiness_level','ready_now')->count() : $candidates->count() }}</div>
+            <div class="stat-label">{{ $canSeeConfidential ? 'Ready Now' : 'Direct-Report Plans' }}</div>
         </div>
     </div>
     <div class="col-md-3 col-6">
@@ -85,6 +85,37 @@
 </div>
 @endif
 
+@if($canSeeConfidential)
+<div class="hims-card mb-3">
+    <div class="card-header">
+        <h5><i class="bi bi-calendar-check"></i> Quarterly Position Review</h5>
+        @if($position->last_reviewed_at)
+            @php($reviewDue = \Carbon\Carbon::parse($position->last_reviewed_at)->addMonths(3))
+            <span class="hims-badge {{ $reviewDue->isPast() ? 'red' : 'green' }}">{{ $reviewDue->isPast() ? 'Review due' : 'On schedule' }}</span>
+        @else
+            <span class="hims-badge yellow">Not reviewed</span>
+        @endif
+    </div>
+    <div class="card-body">
+        <div style="font-size:12.5px;color:#6b7280;margin-bottom:10px">
+            Last reviewed: {{ $position->last_reviewed_at ? \Carbon\Carbon::parse($position->last_reviewed_at)->format('d M Y') : 'Never' }}
+            @if(trim((string) ($position->last_reviewer_name ?? ''))) by {{ trim($position->last_reviewer_name) }}@endif
+        </div>
+        @if($position->quarterly_review_notes)
+            <p style="white-space:pre-line;font-size:13px;color:#374151">{{ $position->quarterly_review_notes }}</p>
+        @endif
+        @can('manage-succession')
+        <form method="POST" action="{{ route('succession.positions.review', $position->position_id) }}">
+            @csrf
+            <label class="hims-label" for="quarterly_review_notes">Review notes</label>
+            <textarea id="quarterly_review_notes" name="quarterly_review_notes" class="hims-input" rows="3" maxlength="2000" placeholder="Coverage, risk, and next-quarter actions">{{ old('quarterly_review_notes') }}</textarea>
+            <button type="submit" class="btn-hims btn-hims-primary btn-sm mt-2"><i class="bi bi-check2"></i> Record quarterly review</button>
+        </form>
+        @endcan
+    </div>
+</div>
+@endif
+
 <div class="hims-card">
     <div class="card-header">
         <h5><i class="bi bi-people-fill"></i> Succession Pipeline</h5>
@@ -95,11 +126,11 @@
             <thead>
                 <tr>
                     <th>Candidate</th>
-                    <th>Readiness</th>
+                    @if($canSeeConfidential)<th>Readiness</th>
                     <th>Performance</th>
                     <th>Potential</th>
                     <th>9-Box</th>
-                    <th>Status</th>
+                    <th>Status</th>@endif
                     <th style="width:90px"></th>
                 </tr>
             </thead>
@@ -107,7 +138,7 @@
                 @forelse($candidates as $candidate)
                 <tr>
                     <td><strong>{{ $candidate->employee_name }}</strong></td>
-                    <td>
+                    @if($canSeeConfidential)<td>
                         <span class="hims-badge {{ $candidate->readiness_level === 'ready_now' ? 'green' : 'blue' }}">
                             {{ $readinessLabels[$candidate->readiness_level] ?? ucfirst(str_replace('_',' ', (string) $candidate->readiness_level)) }}
                         </span>
@@ -115,7 +146,7 @@
                     <td><span class="gap-chip {{ (int) $candidate->performance_score >= 4 ? 'positive' : 'negative' }}">{{ $candidate->performance_score }}/5</span></td>
                     <td><span class="gap-chip {{ (int) $candidate->potential_score >= 4 ? 'positive' : 'negative' }}">{{ $candidate->potential_score }}/5</span></td>
                     <td>{{ $nineBoxLabels[$candidate->nine_box_label] ?? ($candidate->nine_box_label ?? '—') }}</td>
-                    <td><span class="hims-badge gray">{{ ucfirst(str_replace('_',' ', (string) $candidate->status)) }}</span></td>
+                    <td><span class="hims-badge gray">{{ ucfirst(str_replace('_',' ', (string) $candidate->status)) }}</span></td>@endif
                     <td>
                         <a href="{{ route('succession.candidates.show', $candidate->candidate_id) }}" class="btn-hims btn-hims-outline btn-sm">View</a>
                     </td>

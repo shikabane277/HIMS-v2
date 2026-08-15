@@ -41,12 +41,12 @@ class GapAnalysisController extends Controller
         $department = $this->analysis->analyseDepartment($departmentId, withAi: false);
 
         return view('competency.gap-analysis.index', [
-            'employees'    => $employees,
-            'departments'  => $user->seesWholeOrganisation()
+            'employees' => $employees,
+            'departments' => $user->seesWholeOrganisation()
                                 ? DB::table('departments')->orderBy('name')->get()
                                 : collect(),
             'departmentId' => $departmentId,
-            'department'   => $department,
+            'department' => $department,
         ]);
     }
 
@@ -101,7 +101,7 @@ class GapAnalysisController extends Controller
 
         return response()->json([
             'summary' => $result['summary'],
-            'ai'      => $result['ai'],
+            'ai' => $result['ai'],
         ]);
     }
 }

@@ -22,6 +22,12 @@
     --hims-info:          #0891b2;
     --hims-sidebar-w:     260px;
     --hims-topbar-h:      64px;
+    /* AI assistant rail. --hims-ai-w is the docked width, overwritten inline
+       by the resize handle; --hims-ai-offset is how much room the page
+       actually gives up, which is 0 whenever the rail is closed or is
+       overlaying rather than pushing. Both are set from JS. */
+    --hims-ai-w:          340px;
+    --hims-ai-offset:     0px;
     --hims-radius:        12px;
     --hims-radius-sm:     8px;
     --hims-shadow:        0 1px 3px rgba(22,163,74,.08), 0 4px 16px rgba(22,163,74,.06);
@@ -166,7 +172,7 @@ body {
     position: fixed;
     top: 0;
     left: var(--hims-sidebar-w);
-    right: 0;
+    right: var(--hims-ai-offset);
     height: var(--hims-topbar-h);
     background: var(--hims-white);
     border-bottom: 1px solid var(--hims-border);
@@ -176,6 +182,7 @@ body {
     padding: 0 28px;
     z-index: 99;
     box-shadow: 0 1px 0 var(--hims-border);
+    transition: right .18s cubic-bezier(.4,0,.2,1);
 }
 .topbar-left { display: flex; align-items: center; gap: 12px; }
 .hims-menu-toggle {
@@ -218,13 +225,20 @@ body {
     position: relative;
 }
 .topbar-btn:hover { background: var(--hims-primary-xlight); transform: scale(1.05); }
-.topbar-btn .notif-dot {
+.topbar-btn .notif-count {
     position: absolute;
-    top: 6px; right: 7px;
-    width: 8px; height: 8px;
+    top: -4px; right: -5px;
+    min-width: 19px; height: 19px;
+    padding: 0 5px;
     background: var(--hims-danger);
-    border-radius: 50%;
+    color: #fff;
+    border-radius: 999px;
     border: 2px solid #fff;
+    font-size: 9px;
+    line-height: 15px;
+    font-weight: 800;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(220,38,38,.35);
 }
 
 /* ── Topbar dropdowns (notifications + help) ── */
@@ -281,6 +295,177 @@ body {
     padding: 28px 16px; color: var(--hims-text-muted); font-size: 13px;
 }
 .topbar-dropdown-empty i { font-size: 24px; color: var(--hims-primary-light); }
+
+/* Facebook-style notification feed: recent activity stays in the panel after
+   being read, while unread rows carry a tinted background and a small marker. */
+.notif-dropdown { width: 390px; border-color: #e5e7eb; border-radius: 16px; }
+.notif-dropdown-header { padding: 15px 16px 12px; border-bottom-color: #eef2f7; }
+.notif-heading { font-size: 18px; line-height: 1.2; font-weight: 800; color: #111827; }
+.notif-heading-count { margin-top: 2px; font-size: 11px; font-weight: 500; color: #6b7280; }
+.notif-list { max-height: min(560px, calc(100vh - 110px)); padding: 6px 8px 10px; }
+.notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    position: relative;
+    padding: 10px 30px 10px 8px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: inherit;
+    transition: background .14s ease;
+}
+.notif-item:hover { background: #f3f4f6; }
+.notif-item.unread { background: #eff6ff; }
+.notif-item.unread:hover { background: #e0edff; }
+.notif-item-icon {
+    width: 44px; height: 44px;
+    flex: 0 0 44px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    color: #fff;
+    background: #64748b;
+    font-size: 18px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.16);
+}
+.notif-item-icon.celebration { background: #7c3aed; }
+.notif-item-icon.success { background: #16a34a; }
+.notif-item-icon.warning { background: #d97706; }
+.notif-item-icon.danger { background: #dc2626; }
+.notif-item-icon.info { background: #0284c7; }
+.notif-item-content { min-width: 0; display: block; flex: 1; }
+.notif-item-title {
+    display: block;
+    color: #111827;
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 650;
+}
+.notif-item.read .notif-item-title { font-weight: 550; }
+.notif-item-message {
+    display: -webkit-box;
+    margin-top: 2px;
+    color: #4b5563;
+    font-size: 12px;
+    line-height: 1.35;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+.notif-item-time { display: block; margin-top: 4px; color: #1877f2; font-size: 11px; font-weight: 650; }
+.notif-item.read .notif-item-time { color: #6b7280; font-weight: 500; }
+.notif-unread-marker {
+    position: absolute;
+    top: 50%; right: 10px;
+    width: 9px; height: 9px;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background: #1877f2;
+}
+
+/* Permission-aware global search panel. */
+.search-dropdown { width: 520px; border-color: #e5e7eb; }
+.global-search-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    background: #f9fafb;
+    color: #6b7280;
+}
+.global-search-box:focus-within {
+    border-color: #1877f2;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(24,119,242,.12);
+}
+.global-search-box input {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #111827;
+    font: inherit;
+    font-size: 14px;
+}
+.global-search-box input::-webkit-search-cancel-button { cursor: pointer; }
+.global-search-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 100px;
+    padding: 20px 24px;
+    color: #6b7280;
+    font-size: 12.5px;
+    line-height: 1.5;
+    text-align: center;
+}
+.global-search-status.empty { color: #4b5563; }
+.global-search-results { max-height: min(590px, calc(100vh - 120px)); overflow-y: auto; padding: 0 8px 10px; }
+.global-search-group {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 9px 10px 5px;
+    background: rgba(255,255,255,.96);
+    color: #6b7280;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.global-search-result {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    color: inherit;
+    text-decoration: none;
+    transition: background .12s ease;
+}
+.global-search-result:hover,
+.global-search-result.active { background: #eff6ff; }
+.global-search-icon {
+    width: 36px; height: 36px;
+    flex: 0 0 36px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 9px;
+    background: #e8f0fe;
+    color: #1877f2;
+    font-size: 15px;
+}
+.global-search-copy { min-width: 0; display: block; flex: 1; }
+.global-search-title {
+    display: block;
+    overflow: hidden;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.global-search-subtitle {
+    display: block;
+    overflow: hidden;
+    margin-top: 2px;
+    color: #6b7280;
+    font-size: 11.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.global-search-arrow { flex: 0 0 auto; color: #9ca3af; font-size: 12px; }
+.global-search-spinner {
+    width: 16px; height: 16px;
+    border: 2px solid #dbeafe;
+    border-top-color: #1877f2;
+    border-radius: 50%;
+    animation: searchSpin .7s linear infinite;
+}
+@keyframes searchSpin { to { transform: rotate(360deg); } }
 .help-faq {
     padding: 8px 10px;
     border-radius: 8px;
@@ -313,9 +498,17 @@ body {
 .hims-main {
     margin-left: var(--hims-sidebar-w);
     margin-top: var(--hims-topbar-h);
+    margin-right: var(--hims-ai-offset);
     padding: 28px;
     min-height: calc(100vh - var(--hims-topbar-h));
+    transition: margin-right .18s cubic-bezier(.4,0,.2,1);
 }
+/* Suppress both transitions mid-drag: animating the reflow on every
+   pointermove makes the resize lag behind the cursor. */
+body.ai-resizing .hims-main,
+body.ai-resizing .hims-topbar,
+body.ai-resizing #ai-rail { transition: none; }
+body.ai-resizing { cursor: col-resize; user-select: none; }
 
 /* ═══════════════ STAT CARDS ═══════════════ */
 .stat-card {
@@ -382,6 +575,14 @@ body {
     background: var(--hims-primary-pale);
     color: var(--hims-primary-dark);
     font-size: 12px; font-weight: 600;
+    /* A header labels the column under it, so it has to start where that column
+       starts. Browsers default `th` to `text-align: center` and `td` to left;
+       Bootstrap's reboot papers over it with `th { text-align: inherit }`, and
+       HIMS loads no Bootstrap CSS — only the icon font — so every header in the
+       app sat centred above left-aligned data. Declared here rather than left to
+       the user agent. A column whose data is not left (see .text-center /
+       .text-end below) must carry the same class on its th. */
+    text-align: left;
     text-transform: uppercase; letter-spacing: .05em;
     padding: 12px 16px;
     border-bottom: 2px solid var(--hims-border);
@@ -518,6 +719,21 @@ body {
     box-shadow: var(--hims-shadow);
 }
 .recognition-post:hover { box-shadow: var(--hims-shadow-md); transform: translateY(-1px); }
+.recognition-visibility {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    max-width: 320px;
+}
+.recognition-visibility label {
+    justify-content: center;
+    min-height: 38px;
+}
+.recognition-visibility label:has(input:checked) {
+    background: var(--hims-primary-pale);
+    border-color: var(--hims-primary);
+    color: var(--hims-primary-dark);
+}
 .recognition-badge-pill {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 4px 12px;
@@ -563,11 +779,18 @@ body {
 .auth-logo p  { font-size: 13px; color: var(--hims-gray); margin: 0; }
 
 /* ═══════════════ ALERTS ═══════════════ */
+/* An alert is prose, so it lays out as prose. It used to be display:flex —
+   which made every child its own flex item, so a <strong> mid-sentence became
+   its own column ("mark it | finished | when you are done") and a nested <ul>
+   or <div> sat beside the text instead of under it. Every alert in the app
+   opens with an <i> icon, so an inline icon with a right margin reproduces the
+   icon-left look without blockifying the sentence around it. */
 .hims-alert {
     padding: 12px 16px; border-radius: var(--hims-radius-sm);
-    font-size: 13.5px; display: flex; align-items: center; gap: 9px;
+    font-size: 13.5px; line-height: 1.55;
     margin-bottom: 16px;
 }
+.hims-alert > i:first-child { margin-right: 9px; }
 .hims-alert.success { background: var(--hims-primary-xlight); color: var(--hims-primary-dark); border-left: 4px solid var(--hims-primary); }
 .hims-alert.error   { background: #fee2e2; color: #991b1b; border-left: 4px solid var(--hims-danger); }
 .hims-alert.warning { background: #fef3c7; color: #92400e; border-left: 4px solid var(--hims-warning); }
@@ -752,6 +975,290 @@ body {
     .col-xl-1  { flex: 0 0 8.333333%; max-width: 8.333333%; }
 }
 
+/* ═══════════════ AI ASSISTANT RAIL ═══════════════ */
+/* A docked secondary sidebar in the VSCode sense: it owns a column of the
+   viewport and the page reflows around it (see --hims-ai-offset on .hims-main
+   and .hims-topbar), rather than floating on top of the content the way the
+   old chat bubble did.
+
+   z-index 98 puts it under the topbar (99) and the topbar dropdowns (1100),
+   so the notification and help menus still open over it instead of being
+   clipped behind it. */
+#ai-rail {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--hims-ai-w);
+    max-width: 100vw;
+    background: var(--hims-white);
+    border-left: 1px solid var(--hims-border);
+    display: flex;
+    flex-direction: column;
+    z-index: 98;
+    /* Kept out of the layout entirely when closed: visibility (not just the
+       transform) stops it trapping focus, and a transform alone would leave a
+       horizontal scrollbar on the body. */
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: transform .18s cubic-bezier(.4,0,.2,1), visibility 0s .18s;
+}
+#ai-rail.open {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform .18s cubic-bezier(.4,0,.2,1), visibility 0s 0s;
+    box-shadow: -8px 0 32px rgba(5,46,22,.06);
+}
+
+/* ── Drag handle on the left edge ── */
+#ai-rail-resizer {
+    position: absolute;
+    top: 0; bottom: 0; left: -3px;
+    width: 7px;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 2;
+}
+#ai-rail-resizer:hover,
+#ai-rail-resizer:focus-visible { background: var(--hims-primary-light); outline: none; }
+
+/* ── Header ── */
+#ai-rail-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: var(--hims-topbar-h);
+    flex-shrink: 0;
+    padding: 0 8px 0 16px;
+    border-bottom: 1px solid var(--hims-border);
+    background: var(--hims-primary-pale);
+}
+#ai-rail-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--hims-primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* Titles are the user's first question, so they can be any length. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ai-rail-icon {
+    width: 30px; height: 30px;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: var(--hims-primary-dark);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: var(--hims-transition);
+}
+.ai-rail-icon:hover  { background: var(--hims-primary-xlight); }
+.ai-rail-icon.active { background: var(--hims-primary); color: #fff; }
+
+/* ── Conversation list ── */
+#ai-sessions {
+    flex-shrink: 0;
+    max-height: 40%;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--hims-border);
+    background: #fbfefc;
+}
+#ai-sessions[hidden] { display: none; }
+.ai-sessions-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--hims-gray);
+}
+.ai-sessions-clear {
+    border: none;
+    background: none;
+    color: var(--hims-danger);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+.ai-sessions-clear:hover { background: #fee2e2; }
+.ai-sessions-empty { padding: 4px 14px 14px; font-size: 12px; color: var(--hims-gray); }
+
+.ai-session {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 8px 2px 14px;
+}
+.ai-session:hover        { background: var(--hims-primary-pale); }
+.ai-session.active       { background: var(--hims-primary-xlight); }
+.ai-session-name {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    border: none;
+    background: none;
+    padding: 7px 0;
+    font: inherit;
+    font-size: 13px;
+    color: var(--hims-text-dark);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ai-session.active .ai-session-name { font-weight: 600; color: var(--hims-primary-dark); }
+.ai-session-act {
+    width: 24px; height: 24px;
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    color: var(--hims-gray);
+    font-size: 12px;
+    cursor: pointer;
+    /* Hidden until hover so the list stays readable, but always present for
+       keyboard users, who reach them by tab. */
+    opacity: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity .12s, background .12s, color .12s;
+}
+.ai-session:hover .ai-session-act,
+.ai-session-act:focus-visible { opacity: 1; }
+.ai-session-act:hover { background: var(--hims-primary-xlight); color: var(--hims-primary-dark); }
+
+/* ── Transcript ── */
+#ai-messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    background: #f8fdf9;
+}
+.ai-msg {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    max-width: 92%;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+.ai-msg.user {
+    align-self: flex-end;
+    background: var(--hims-primary-xlight);
+    color: var(--hims-text);
+    border: 1px solid var(--hims-border);
+}
+.ai-msg.ai {
+    align-self: flex-start;
+    background: var(--hims-white);
+    color: #374151;
+    border: 1px solid #e5e7eb;
+}
+.ai-msg.thinking {
+    align-self: flex-start;
+    background: var(--hims-white);
+    color: var(--hims-gray);
+    font-style: italic;
+    border: 1px solid #e5e7eb;
+}
+/* An action the assistant actually carried out reads differently from an
+   answer about one, so it borrows the banner palette above. .pending is the
+   destructive offer still waiting on "confirm". */
+.ai-msg.ai.did-ok      { background: var(--hims-primary-xlight); color: var(--hims-primary-dark); border-color: var(--hims-primary); }
+.ai-msg.ai.did-error   { background: #fee2e2; color: #991b1b; border-color: var(--hims-danger); }
+.ai-msg.ai.did-pending { background: #fef3c7; color: #92400e; border-color: var(--hims-warning); }
+
+/* ── Composer ── */
+#ai-input-row {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 12px 14px;
+    background: var(--hims-white);
+    border-top: 1px solid var(--hims-border);
+}
+#ai-input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.45;
+    resize: none;
+    max-height: 120px;
+    transition: border-color .15s;
+}
+#ai-input:focus { outline: none; border-color: var(--hims-primary); }
+#ai-send-btn {
+    width: 36px; height: 36px;
+    flex-shrink: 0;
+    align-self: flex-end;
+    border: none;
+    border-radius: 8px;
+    background: var(--hims-primary);
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+}
+#ai-send-btn:hover    { background: var(--hims-primary-dark); }
+#ai-send-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+
+/* Marks the topbar button while the rail is docked, the way VSCode keeps its
+   sidebar toggles lit. */
+.topbar-btn#ai-toggle.active { background: var(--hims-primary); color: #fff; }
+
+/* ── Overlay mode ──
+   Below this width there is not enough room to give a 280px+ column away and
+   still show a table, so the rail stops pushing and floats over the page with
+   a backdrop instead. JS keeps --hims-ai-offset at 0 here; the media query is
+   what styles the backdrop and widens the rail on phones. */
+#ai-rail-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5,46,22,.45);
+    z-index: 97;
+}
+@media (max-width: 1099px) {
+    #ai-rail-backdrop.open { display: block; }
+    #ai-rail-backdrop { top: var(--hims-topbar-h); }
+    #ai-rail {
+        top: var(--hims-topbar-h);
+        z-index: 100;
+        box-shadow: -8px 0 40px rgba(0,0,0,.18);
+    }
+    #ai-rail-resizer { display: none; }
+}
+@media (max-width: 480px) {
+    #ai-rail { width: 100vw; }
+}
+
+/* Docking the rail narrows the main column enough that a wide table would be
+   clipped by .hims-card's overflow:hidden. Let the card scroll horizontally
+   for as long as the rail is taking up space. */
+body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
+
 /* ═══════════════ MOBILE RESPONSIVE ═══════════════ */
 @media (max-width: 1024px) {
     .hims-main { padding: 20px; }
@@ -775,6 +1282,8 @@ body {
     .topbar-left .page-breadcrumb { display: none; }
     .topbar-left .page-title { font-size: 16px; }
     .topbar-right { gap: 8px; }
+    .notif-dropdown { position: fixed; top: var(--hims-topbar-h); right: 8px; width: calc(100vw - 16px); }
+    .search-dropdown { position: fixed; top: var(--hims-topbar-h); right: 8px; width: calc(100vw - 16px); }
     .stat-card { padding: 16px 18px; }
     .stat-card .stat-value { font-size: 24px; }
     .stat-card .stat-label { font-size: 12px; }
@@ -782,13 +1291,6 @@ body {
     .hims-table th, .hims-table td { padding: 8px 10px; }
     .hims-card .card-body { overflow-x: auto; }
     .hims-table { min-width: 520px; }
-    #ai-panel {
-        width: calc(100vw - 24px);
-        right: 12px;
-        left: 12px;
-        max-height: 70vh;
-    }
-    #ai-bubble { bottom: 20px; right: 20px; }
 }
 
 @media (max-width: 480px) {
@@ -816,6 +1318,186 @@ body {
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
     border-radius: 6px;
+}
+
+/* ═══════════════════════════════════════════════
+   MODAL
+   Used by the review-cycle editor. z-index clears the topbar (99) and its
+   dropdowns (1100) so a modal is never half-covered by the shell. Hidden by
+   default; JS adds .open to display it, then .shown on the next frame so the
+   fade and slide actually animate rather than snapping.
+
+   The backdrop is deliberately transparent — it exists only as a full-viewport
+   click target for dismissal, not as a scrim. Without a dim behind it the panel
+   has to carry its own separation, which is what the heavier shadow and the
+   solid border below are for.
+═══════════════════════════════════════════════ */
+.hims-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    z-index: 1200;
+    opacity: 0;
+    transition: opacity .2s ease;
+    padding: 20px;
+    overflow-y: auto;
+}
+.hims-modal-backdrop.open  { display: flex; align-items: flex-start; justify-content: center; }
+.hims-modal-backdrop.shown { opacity: 1; }
+
+.hims-modal {
+    background: var(--hims-white);
+    border: 1px solid var(--hims-primary);
+    border-radius: var(--hims-radius);
+    box-shadow: 0 18px 50px rgba(5, 46, 22, .28);
+    width: 100%;
+    max-width: 620px;
+    margin: auto;
+    transform: translateY(-12px);
+    transition: transform .2s cubic-bezier(.4,0,.2,1);
+}
+.hims-modal-backdrop.shown .hims-modal { transform: translateY(0); }
+
+.hims-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--hims-border);
+}
+.hims-modal-header h5 {
+    margin: 0;
+    font-size: 15px; font-weight: 700;
+    color: var(--hims-text-dark);
+    display: flex; align-items: center; gap: 8px;
+}
+.hims-modal-close {
+    background: none; border: none;
+    font-size: 20px; line-height: 1;
+    color: var(--hims-gray);
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: var(--hims-radius-sm);
+    transition: var(--hims-transition);
+}
+.hims-modal-close:hover { background: var(--hims-gray-light); color: var(--hims-text-dark); }
+
+.hims-modal-body { padding: 20px; }
+.hims-modal-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--hims-border);
+}
+
+@media (max-width: 576px) {
+    .hims-modal-backdrop { padding: 12px; }
+    .hims-modal-footer   { flex-direction: column-reverse; }
+    .hims-modal-footer .btn-hims { width: 100%; justify-content: center; }
+}
+
+/* ═══════════════════════════════════════════════
+   CHECKLIST
+   Stands in for <select multiple>, which hides "you may pick more than one"
+   behind Ctrl/Cmd-click and gives no hit target taller than a line of text.
+   Scrolls internally so a hundred competencies cannot stretch a modal.
+═══════════════════════════════════════════════ */
+.hims-checklist {
+    border: 1px solid var(--hims-border);
+    border-radius: var(--hims-radius-sm);
+    background: var(--hims-white);
+    max-height: 196px;
+    overflow-y: auto;
+    padding: 4px;
+}
+.hims-checklist label {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin: 0;
+    padding: 7px 9px;
+    border-radius: var(--hims-radius-sm);
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--hims-text-dark);
+    cursor: pointer;
+    transition: var(--hims-transition);
+}
+.hims-checklist label:hover { background: var(--hims-primary-pale); }
+.hims-checklist input[type="checkbox"] {
+    width: 15px; height: 15px;
+    margin-top: 1px;
+    flex-shrink: 0;
+    accent-color: var(--hims-primary);
+    cursor: pointer;
+}
+.hims-checklist .checklist-meta { color: var(--hims-gray); font-size: 11.5px; }
+.hims-checklist-empty { padding: 10px 9px; font-size: 12px; color: var(--hims-gray); }
+.hims-checklist-filter { margin-bottom: 6px; }
+
+/* A <button> that has to read as the inline link it replaced — used where an
+   empty-state sentence opens a modal instead of navigating to a create page. */
+.hims-link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════
+   TABS
+   Sub-navigation inside a module whose halves answer different questions —
+   Learning's individual-facing pages versus its institutional ones. Each tab is
+   a real <a>, so it bookmarks, refreshes and back-buttons like any other page;
+   nothing here switches panels client-side.
+   The strip scrolls horizontally rather than wrapping, because a wrapped second
+   row of tabs reads as a second navigation bar.
+═══════════════════════════════════════════════ */
+.hims-tabs {
+    display: flex;
+    gap: 4px;
+    align-items: stretch;
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--hims-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+.hims-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    padding: 10px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--hims-gray);
+    text-decoration: none;
+    white-space: nowrap;
+    border: 0;
+    /* Sits on the strip's own border so the active tab can paint over it. */
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    border-radius: var(--hims-radius-sm) var(--hims-radius-sm) 0 0;
+    transition: var(--hims-transition);
+}
+.hims-tab:hover {
+    color: var(--hims-primary);
+    background: var(--hims-primary-pale);
+}
+.hims-tab.active {
+    color: var(--hims-primary);
+    border-bottom-color: var(--hims-primary);
+    background: var(--hims-white);
+}
+.hims-tab i { font-size: 14px; }
+
+@media (max-width: 576px) {
+    /* Icons alone would be a guessing game, so the label stays and the padding
+       gives way instead. */
+    .hims-tab { padding: 9px 11px; font-size: 12.5px; }
 }
 
 /* Utility overrides */

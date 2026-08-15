@@ -132,6 +132,28 @@
                     <div style="font-size:12px;color:var(--hims-primary);margin-top:5px;font-weight:600">
                         {{ $demand['suggested_format'] }}
                     </div>
+
+                    {{-- What the catalogue already offers against this competency --}}
+                    @if(!empty($demand['catalogue']))
+                    <div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--hims-border)">
+                        <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Available now</div>
+                        @foreach($demand['catalogue'] as $item)
+                        <div style="font-size:12px;margin-bottom:3px">
+                            <i class="bi {{ $item['type'] === 'course' ? 'bi-journal-bookmark' : 'bi-calendar-event' }}" style="color:var(--hims-primary)"></i>
+                            @if($item['type'] === 'course')
+                                <a href="{{ route('learning.courses.show', $item['id']) }}" style="color:var(--hims-text-dark)">{{ $item['title'] }}</a>
+                            @else
+                                <a href="{{ route('training.sessions.show', $item['id']) }}" style="color:var(--hims-text-dark)">{{ $item['title'] }}</a>
+                            @endif
+                            <span style="color:#9ca3af">· {{ $item['detail'] }}</span>
+                        </div>
+                        @endforeach
+                    </div>
+                    @else
+                    <div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--hims-border);font-size:11.5px;color:#b45309">
+                        <i class="bi bi-exclamation-triangle"></i> Nothing in the catalogue is tagged to this competency yet.
+                    </div>
+                    @endif
                 </div>
                 @empty
                 <div style="text-align:center;color:#9ca3af;padding:20px">No training demand identified.</div>

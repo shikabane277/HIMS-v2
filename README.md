@@ -26,37 +26,51 @@
 
 ## Features
 
-Eight domain modules, each with its own route group, controller and views.
+The application provides eight primary operational modules. Learning contains the
+compliance and oversight tabs rather than exposing a second Compliance module.
 
 - **Performance appraisal** — review cycles, a weighted KPI library, and supervisor
   reviews. Review authority follows the *reporting line* (`employees.supervisor_id`),
   not job title: there is no self-review and no peer review, and even admin/HR must
   use a logged exception path with a typed reason to review outside the chain.
+  **People Manager controls who may appear in Reports To. Account role controls what
+  they may do inside HIMS.** New assignments require an active People Manager with a
+  linked Supervisor, HR Manager, or Admin account; the flag never promotes an account.
 - **Competency management** — a seeded framework of domains, categories and
   competencies; per-employee assessments; department-level skills-gap matrix; and
   credential tracking with expiry and reassessment windows.
-- **Learning & CPD** — courses, self-enrolment, learning pathways, and CPD logging
-  with a separate verification step. Completing a course credits verified CPD hours.
+- **Learning & CPD** — a course catalogue, required-training assignment, learning
+  pathways, renewal oversight, accreditation reporting, and CPD logging with a
+  separate verification step. Course enrolment is assignment-only; completing a
+  course credits verified CPD hours.
 - **Training administration** — sessions, venues, registration, attendance check-in
   and post-session feedback.
-- **Succession planning** — key positions, a candidate pipeline with readiness
-  evidence, and development milestones.
-- **Recognition** — peer badges, posts, comments, reactions and a leaderboard.
-- **Compliance & accreditation** — assign mandatory training to an employee,
-  department, role or the whole hospital and chase completion; define credential
-  renewal rules and flag who will fall short; compile a JCI-tagged accreditation
-  report.
+- **Succession planning** — key positions, named candidates, confidential readiness
+  data, vacancy risk, quarterly position reviews, evidence and development milestones.
+- **Recognition** — named public or private badges/posts, audience-limited comments and
+  reactions, moderation and a public-only leaderboard.
+- **Compliance & accreditation inside Learning** — one Learning sidebar entry and
+  tab strip joins the catalogue with Required Training, Renewals, CPD, Pathways,
+  and Reports. Assign multiple courses or sessions at once to an employee,
+  department, role, or the whole hospital and chase completion from modal rosters.
 - **AI assistant** — provider-agnostic (Gemini, OpenAI, Anthropic, or any
   OpenAI-compatible host). It answers questions about the app *and* executes actions
   on request, gated by the signed-in user's role and written to an audit trail.
-  Destructive actions require an explicit in-chat confirmation.
+  Destructive actions require an explicit in-chat confirmation. Conversations are
+  saved per account, shown in the assistant history panel, and searchable by their owner.
 
-Also included: an in-app notification bell, and a schedulable command that emails
-employees and supervisors about expiring credentials and due reassessments.
+Also included: a Facebook-style in-app notification feed with unread/read state and
+deep links, a permission-aware global search that opens the relevant module/tab, and
+a schedulable command that emails employees and supervisors about expiring credentials
+and due reassessments.
 
-**Role-based access** is enforced at the route level (16 gates plus a `role:`
+**Role-based access** is enforced at the route level (20 gates plus a `role:`
 middleware) and, in the modules that handle personal records, at the row level — a
-supervisor sees their own direct reports, HR and admin see everyone.
+supervisor sees only their direct reports where that module applies the reporting-line
+rule, while HR and admin see the organisation-wide records permitted to their role.
+
+See [HIMS Access and Visibility Rules](HIMS_ACCESS_AND_VISIBILITY.md) for the
+recognition, review, succession and audit boundaries.
 
 ---
 
@@ -164,7 +178,7 @@ php artisan hims:mail-test you@example.com
 ### Tests and formatting
 
 ```bash
-composer test                                    # full suite (299 tests)
+composer test                                    # full suite (341 tests; 21 sqlite skips)
 php artisan test --filter=test_profile_page_is_displayed
 vendor/bin/pint                                  # code formatter
 ```

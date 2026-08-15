@@ -8,6 +8,9 @@
     <a href="{{ route('employees.index') }}" class="btn-hims btn-hims-ghost">
         <i class="bi bi-arrow-left"></i> Back to Employees
     </a>
+    @can('view-audit-history')
+    <button type="button" class="btn-hims btn-hims-outline btn-sm" data-history-resource-type="employees" data-history-resource-id="{{ $employee->employee_id }}"><i class="bi bi-clock-history"></i> History</button>
+    @endcan
 </div>
 
 <div class="row g-3">
@@ -36,6 +39,20 @@
                     <tr style="border-bottom:1px solid var(--hims-border)">
                         <td style="padding:9px 0;color:#6b7280">Email</td>
                         <td style="padding:9px 0">{{ $employee->email }}</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--hims-border)">
+                        <td style="padding:9px 0;color:#6b7280">Phone</td>
+                        <td style="padding:9px 0">
+                            @if($employee->phone)
+                                @php
+                                    $masked = '••• ••• ' . (strlen($employee->phone) > 4 ? substr($employee->phone, -4) : '4821');
+                                @endphp
+                                <span id="phone-display">{{ $masked }}</span>
+                                <button type="button" class="btn-hims btn-hims-ghost btn-sm" style="padding:1px 5px;font-size:11px" onclick="let d = document.getElementById('phone-display'); d.innerText = d.innerText === '{{ $masked }}' ? '{{ $employee->phone }}' : '{{ $masked }}';">Show</button>
+                            @else
+                                —
+                            @endif
+                        </td>
                     </tr>
                     <tr style="border-bottom:1px solid var(--hims-border)">
                         <td style="padding:9px 0;color:#6b7280">Role</td>
@@ -70,7 +87,7 @@
                             <td style="font-size:12px;color:#6b7280">{{ \Carbon\Carbon::parse($r->created_at)->format('M d, Y') }}</td>
                         </tr>
                         @empty
-                        <tr><td colspan="4" style="text-align:center;color:#9ca3af;padding:24px">No reviews yet.</td></tr>
+                        <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:24px">No reviews yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -99,7 +116,7 @@
                             <td><span class="hims-badge {{ $en->status === 'completed' ? 'green' : 'yellow' }}">{{ ucfirst($en->status) }}</span></td>
                         </tr>
                         @empty
-                        <tr><td colspan="4" style="text-align:center;color:#9ca3af;padding:24px">Not enrolled in any courses.</td></tr>
+                        <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:24px">Not enrolled in any courses.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -134,31 +151,16 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:24px">No credentials on file.</td></tr>
+                        <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:24px">No credentials on file.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
-
-        {{-- Recognition --}}
-        <div class="hims-card">
-            <div class="card-header">
-                <h5><i class="bi bi-star-fill"></i> Recognition Received</h5>
-            </div>
-            <div class="card-body d-flex flex-column gap-3">
-                @forelse($recognitions as $post)
-                <div class="recognition-post">
-                    <div style="font-size:13px;line-height:1.7">{{ $post->message }}</div>
-                    <div style="font-size:11.5px;color:#9ca3af;margin-top:6px">
-                        {{ \Carbon\Carbon::parse($post->created_at)->format('M d, Y') }}
-                    </div>
-                </div>
-                @empty
-                <div style="text-align:center;color:#9ca3af;padding:24px">No recognitions yet.</div>
-                @endforelse
-            </div>
-        </div>
     </div>
 </div>
+
+@can('view-audit-history')
+@include('partials._audit_history_modal')
+@endcan
 @endsection

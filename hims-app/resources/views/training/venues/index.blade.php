@@ -3,17 +3,20 @@
 @section('page-title','Training Management')
 @section('breadcrumb','HIMS / Training / Venues')
 @section('content')
+@include('partials.learning-tabs')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 style="font-size:20px;font-weight:700;margin:0">Training Venues</h2>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Manage rooms and facilities used for training sessions.</p>
     </div>
-    <a href="{{ route('training.venues.create') }}" class="btn-hims btn-hims-primary"><i class="bi bi-plus-circle"></i> Add Venue</a>
+    @can('manage-venues')
+    <button type="button" class="btn-hims btn-hims-primary" data-modal-open="venueCreateModal"><i class="bi bi-plus-circle"></i> Add Venue</button>
+    @endcan
 </div>
 <div class="row g-3">
     @forelse($venues as $venue)
     <div class="col-md-4">
-        <div class="hims-card">
+        <div class="hims-card" id="venue-{{ $venue->venue_id }}" style="scroll-margin-top:84px">
             <div class="card-header">
                 <h5 style="font-size:14px"><i class="bi bi-building"></i> {{ $venue->venue_name }}</h5>
                 <span class="hims-badge {{ $venue->is_active ? 'green' : 'gray' }}">{{ $venue->is_active ? 'Active' : 'Offline' }}</span>
@@ -42,7 +45,7 @@
             <div class="card-body" style="text-align:center;padding:60px;color:#9ca3af">
                 <div style="font-size:48px;margin-bottom:12px">🏛️</div>
                 <div style="font-size:16px;font-weight:600;color:var(--hims-text-dark);margin-bottom:6px">No venues yet</div>
-                <a href="{{ route('training.venues.create') }}" class="btn-hims btn-hims-primary mt-2">Add First Venue</a>
+                <a href="{{ route('training.venues.index') }}" class="btn-hims btn-hims-primary mt-2">Add First Venue</a>
             </div>
         </div>
     </div>

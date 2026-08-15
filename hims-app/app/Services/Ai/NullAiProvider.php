@@ -20,12 +20,13 @@ class NullAiProvider implements AiProvider
         private array $available = [],
     ) {}
 
-    public function ask(string $prompt): string
+    /** @param list<array{role: string, message: string}> $history ignored — nothing is sent anywhere */
+    public function ask(string $prompt, array $history = [], ?string $scope = null): string
     {
         $known = $this->available === [] ? 'none' : implode(', ', $this->available);
 
         return "⚠️ AI is not configured: AI_PROVIDER is set to [{$this->configured}], "
-            . "which is not a known provider. Set AI_PROVIDER in .env to one of: {$known}. "
-            . 'Then run: php artisan config:clear';
+            ."which is not a known provider. Set AI_PROVIDER in .env to one of: {$known}. "
+            .'Then run: php artisan config:clear';
     }
 }

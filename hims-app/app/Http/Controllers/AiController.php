@@ -3,71 +3,520 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\AiProvider;
+use App\Services\Ai\AiAccessPolicy;
+use App\Services\Ai\AiActionExecutor;
+use App\Services\Ai\AiActionPlanner;
+use App\Services\Ai\AiActionRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+/**
+ * Backs the AI assistant sidebar.
+ *
+ * Chat is organised into sessions (ai_chat_sessions), each holding an ordered
+ * list of messages (ai_chat_messages). The sidebar lists a user's sessions,
+ * starts new ones, and reopens old ones; query() replays the current session's
+ * earlier turns to the model so follow-up questions carry context.
+ *
+ * OWNERSHIP: ai_chat_messages.session_id deliberately carries no foreign key
+ * (see the 2026_08_06_000120 migration for why), so this controller is the only
+ * thing standing between a user and someone else's conversation. Every session
+ * lookup goes through ownedSession(), which scopes by auth()->id() and 404s
+ * otherwise; no query may take a session id from the request without it.
+ *
+ * SUBJECT-MATTER RBAC: the AI routes carry no role: middleware — every signed-in
+ * user gets the assistant — so the per-role boundary is applied here instead, by
+ * AiAccessPolicy in query(). A question about a topic the asker's role cannot
+ * reach is refused before the provider is called; everything else is sent with a
+ * role-scoped instruction attached. See AiAccessPolicy for why it is two layers.
+ *
+ * ACTIONS: the assistant can also perform writes, not just describe them —
+ * "create a 2027 annual review cycle" creates one. resolveAction() runs the
+ * pipeline: AiActionPlanner classifies the message, AiEntityResolver turns the
+ * names in it into ids, and AiActionExecutor calls the same controller method
+ * the web form would have called. Permission comes from AiActionRegistry, which
+ * reads the `role:` middleware off the real route, so an action the person could
+ * not perform through the UI is refused here too. Destructive actions are not
+ * executed on the spot: the target is resolved, named back, and parked in
+ * ai_chat_sessions.pending_action until the next message confirms it.
+ */
 class AiController extends Controller
 {
-    public function __construct(private AiProvider $ai) {}
+    /** Hard ceiling on messages read back for one session. */
+    private const HISTORY_LIMIT = 200;
 
-    /** Load last 50 messages for the current user (called by the bubble on open) */
-    public function history(Request $request)
+    /**
+     * Only a message that reads like an instruction is worth classifying. A
+     * question ("how do I enrol?") skips the planner entirely and costs one AI
+     * call as it always did; a command costs two.
+     */
+    private const ACTION_VERBS = '/\b(create|creating|add|adding|new|delete|deleting|remove|removing|'
+        .'update|updating|change|changing|edit|editing|set|assign|nominate|withdraw|verify|approve|'
+        .'enrol|enroll|register|log|record|post|schedule|check ?in|score|rate|submit|rename|close|open|'
+        .'reactivate|reactivating|activate|activating|deactivate|deactivating|restore|restoring|'
+        .'reinstate|suspend|suspending|terminate|terminating|promote|transfer|move|mark|make)\b/i';
+
+    /** How long a pending destructive action stays confirmable. */
+    private const CONFIRM_TTL_MINUTES = 5;
+
+    public function __construct(
+        private AiProvider $ai,
+        private AiAccessPolicy $policy,
+        private AiActionPlanner $planner,
+        private AiActionExecutor $executor,
+    ) {}
+
+    /* ───────────────────────────── sessions ───────────────────────────── */
+
+    /** The current user's conversations, most recently used first. */
+    public function sessions(Request $request)
     {
-        $messages = DB::table('ai_chat_messages')
+        $sessions = DB::table('ai_chat_sessions')
             ->where('user_id', auth()->id())
-            ->orderBy('created_at', 'asc')
-            ->limit(50)
-            ->get(['role', 'message', 'created_at']);
+            ->orderByDesc('updated_at')
+            ->limit(100)
+            ->get(['id', 'title', 'created_at', 'updated_at']);
 
-        return response()->json(['messages' => $messages]);
+        return response()->json(['sessions' => $sessions]);
     }
 
-    /** Handle a new query — save both sides, return AI reply */
+    /**
+     * Start a new conversation.
+     *
+     * Created empty and untitled — the title is derived from the first question
+     * in query(), so an abandoned "New chat" never gets a misleading name.
+     */
+    public function storeSession(Request $request)
+    {
+        $session = $this->createSession(auth()->id());
+
+        return response()->json(['session' => $session], 201);
+    }
+
+    /** Messages of one conversation, oldest first, for rendering the transcript. */
+    public function sessionMessages(Request $request, string $session)
+    {
+        $owned = $this->ownedSession($session);
+
+        return response()->json([
+            'session' => $owned,
+            'messages' => $this->transcript($owned->id),
+        ]);
+    }
+
+    /** Rename a conversation from the sidebar. */
+    public function updateSession(Request $request, string $session)
+    {
+        $owned = $this->ownedSession($session);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:120',
+        ]);
+
+        DB::table('ai_chat_sessions')
+            ->where('id', $owned->id)
+            ->update([
+                'title' => trim($validated['title']),
+                'updated_at' => now(),
+            ]);
+
+        return response()->json(['ok' => true, 'title' => trim($validated['title'])]);
+    }
+
+    /**
+     * Delete a conversation and its messages.
+     *
+     * The messages are removed explicitly because session_id has no FK, so
+     * there is no ON DELETE CASCADE to rely on. Wrapped in a transaction so a
+     * failure halfway cannot strand messages pointing at a session that is gone.
+     */
+    public function destroySession(Request $request, string $session)
+    {
+        $owned = $this->ownedSession($session);
+
+        DB::transaction(function () use ($owned) {
+            DB::table('ai_chat_messages')
+                ->where('user_id', auth()->id())
+                ->where('session_id', $owned->id)
+                ->delete();
+
+            DB::table('ai_chat_sessions')
+                ->where('id', $owned->id)
+                ->where('user_id', auth()->id())
+                ->delete();
+        });
+
+        return response()->json(['ok' => true]);
+    }
+
+    /* ───────────────────────────── messages ───────────────────────────── */
+
+    /**
+     * Transcript of the most recent conversation.
+     *
+     * Kept for the plain /ai/history route the sidebar falls back to when it
+     * has no session selected yet.
+     */
+    public function history(Request $request)
+    {
+        $latest = DB::table('ai_chat_sessions')
+            ->where('user_id', auth()->id())
+            ->orderByDesc('updated_at')
+            ->first(['id', 'title']);
+
+        return response()->json([
+            'session' => $latest,
+            'messages' => $latest ? $this->transcript($latest->id) : [],
+        ]);
+    }
+
+    /**
+     * Handle a new question: save it, answer it with the conversation so far,
+     * save the reply.
+     *
+     * A question outside the asker's role is refused here, before any provider
+     * call. The refusal is stored like any other reply so the transcript stays
+     * an honest record of the exchange — and so a reload does not make the
+     * question look unanswered.
+     */
     public function query(Request $request)
     {
-        $request->validate(['query' => 'required|string|max:1000']);
+        $validated = $request->validate([
+            'query' => 'required|string|max:1000',
+            'session_id' => 'nullable|string|max:36',
+        ]);
 
-        $prompt = $request->input('query');
+        $prompt = $validated['query'];
+        $user = auth()->user();
         $userId = auth()->id();
-        $now    = now();
 
-        // Save user message
+        // An unknown or someone else's session id must not silently open a new
+        // chat under this user — ownedSession() 404s instead.
+        $session = isset($validated['session_id']) && $validated['session_id'] !== ''
+            ? $this->ownedSession($validated['session_id'])
+            : $this->createSession($userId);
+
+        // Read the prior turns BEFORE inserting this question, so the prompt is
+        // not also present in the replayed history.
+        $history = $this->transcript($session->id);
+
+        $seq = (int) DB::table('ai_chat_messages')
+            ->where('session_id', $session->id)
+            ->max('seq');
+
         DB::table('ai_chat_messages')->insert([
-            'id'         => Str::uuid(),
-            'user_id'    => $userId,
-            'role'       => 'user',
-            'message'    => $prompt,
-            'created_at' => $now,
-            'updated_at' => $now,
+            'id' => Str::uuid(),
+            'user_id' => $userId,
+            'session_id' => $session->id,
+            'role' => 'user',
+            'message' => $prompt,
+            'seq' => ++$seq,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
-        // Get AI response
-        $response = $this->ai->ask($prompt);
+        // The hard RBAC gate. Deliberately ahead of ask(): a refusal must not
+        // depend on the model choosing to comply, and a blocked question should
+        // cost nothing. It also stands ahead of the action pipeline — a topic
+        // this role cannot discuss is one it certainly cannot act on.
+        $denied = $this->policy->deniedTopic($user, $prompt);
 
-        // Save AI reply
+        $action = null;
+
+        if ($denied !== null) {
+            $response = $this->policy->refusal($denied);
+        } else {
+            $action = $this->resolveAction($request, $session, $user, $prompt);
+
+            $response = $action
+                ? $action['message']
+                : $this->ai->ask($prompt, $history, $this->policy->scopeFor($user));
+        }
+
         DB::table('ai_chat_messages')->insert([
-            'id'         => Str::uuid(),
-            'user_id'    => $userId,
-            'role'       => 'ai',
-            'message'    => $response,
-            'created_at' => $now,
-            'updated_at' => $now,
+            'id' => Str::uuid(),
+            'user_id' => $userId,
+            'session_id' => $session->id,
+            'role' => 'ai',
+            'message' => $response,
+            'seq' => ++$seq,
+            // now() again, not the question's timestamp: the reply genuinely
+            // arrives later, and the two must not tie.
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
-        // AJAX / fetch — return JSON
+        $title = $session->title ?: $this->deriveTitle($prompt);
+
+        DB::table('ai_chat_sessions')
+            ->where('id', $session->id)
+            ->update(['title' => $title, 'updated_at' => now()]);
+
         if ($request->expectsJson() || $request->ajax()) {
-            return response()->json(['response' => $response]);
+            return response()->json([
+                'response' => $response,
+                'session_id' => $session->id,
+                'title' => $title,
+                // Lets the rail tint the bubble and hint at the confirm step.
+                // Null on a conversational answer, so the UI is unchanged there.
+                'action_status' => $action['status'] ?? null,
+                'pending_confirm' => (bool) ($action['pending'] ?? false),
+            ]);
         }
 
         // Normal form POST fallback
         return back()->with('ai_response', $response);
     }
 
-    /** Clear the current user's chat history */
+    /**
+     * Clear chat history.
+     *
+     * With a session id, empties that one conversation and removes it. Without
+     * one, wipes every conversation this user has — which is what the old
+     * "Clear chat" button did, and what the sidebar's "Clear all" still does.
+     */
     public function clearHistory(Request $request)
     {
-        DB::table('ai_chat_messages')->where('user_id', auth()->id())->delete();
+        $userId = auth()->id();
+        $sessionId = $request->input('session_id');
+
+        if ($sessionId) {
+            $this->destroySession($request, (string) $sessionId);
+
+            return response()->json(['ok' => true]);
+        }
+
+        DB::transaction(function () use ($userId) {
+            DB::table('ai_chat_messages')->where('user_id', $userId)->delete();
+            DB::table('ai_chat_sessions')->where('user_id', $userId)->delete();
+        });
+
         return response()->json(['ok' => true]);
+    }
+
+    /* ────────────────────────────── actions ───────────────────────────── */
+
+    /**
+     * Decide whether this message performs an action, and perform it.
+     *
+     * Returns null when the message is not a command, which is the signal to
+     * answer it conversationally instead. Every branch that returns non-null has
+     * already produced the exact text the user should see.
+     *
+     * @return array{message: string, status: ?string, pending: bool}|null
+     */
+    private function resolveAction(Request $request, object $session, $user, string $prompt): ?array
+    {
+        // A destructive action already offered and awaiting a yes/no takes
+        // priority: "confirm" means that, not a fresh instruction.
+        if ($pending = $this->pendingAction($session)) {
+            $this->clearPending($session);
+
+            if (! preg_match('/^\s*(confirm|confirmed|yes|proceed|do it|go ahead)\b/i', $prompt)) {
+                return $this->reply('Cancelled — nothing was changed.', null);
+            }
+
+            $result = $this->executor->execute($pending, $user, $request);
+
+            return $this->reply($result['message'], $result['ok'] ? 'ok' : 'error');
+        }
+
+        if (! preg_match(self::ACTION_VERBS, $prompt)) {
+            return null;
+        }
+
+        $plan = $this->planner->plan($prompt, $user);
+
+        if (! $plan) {
+            return null;
+        }
+
+        // The model was asked to report anything it could not fill rather than
+        // invent it. Ask, do not guess.
+        if ($plan['missing']) {
+            return $this->reply(
+                'I can do that, but I need '.$this->listWords($plan['missing']).' first.',
+                null
+            );
+        }
+
+        $plan['prompt'] = $prompt;
+        $plan['session_id'] = $session->id;
+
+        $spec = AiActionRegistry::get($plan['action'], $user);
+
+        if (! $spec) {
+            return null;
+        }
+
+        // Destructive: resolve the target now so the confirmation names the real
+        // record, then stop and wait. Resolving first also means an ambiguous or
+        // missing target is reported before anyone is asked to confirm anything.
+        if ($spec['destructive'] ?? false) {
+            $prepared = $this->executor->prepare($spec, $plan, $user);
+
+            if (! $prepared['ok']) {
+                return $this->reply($prepared['message'], 'error');
+            }
+
+            $this->storePending($session, $plan);
+
+            return $this->reply(
+                "⚠️ {$spec['label']}: **{$prepared['label']}**. This cannot be undone. "
+                .'Reply **confirm** to proceed, or anything else to cancel.',
+                null,
+                true
+            );
+        }
+
+        $result = $this->executor->execute($plan, $user, $request);
+
+        return $this->reply($result['message'], $result['ok'] ? 'ok' : 'error');
+    }
+
+    /** @return array{message: string, status: ?string, pending: bool} */
+    private function reply(string $message, ?string $status, bool $pending = false): array
+    {
+        return ['message' => $message, 'status' => $status, 'pending' => $pending];
+    }
+
+    /**
+     * The stored plan awaiting confirmation, or null if there is none or it has
+     * gone stale. An expired offer must not fire against a "yes" that was
+     * answering some later question.
+     */
+    private function pendingAction(object $session): ?array
+    {
+        $row = DB::table('ai_chat_sessions')
+            ->where('id', $session->id)
+            ->first(['pending_action', 'pending_action_at']);
+
+        if (! $row || ! $row->pending_action) {
+            return null;
+        }
+
+        if (! $row->pending_action_at
+            || now()->diffInMinutes($row->pending_action_at, true) > self::CONFIRM_TTL_MINUTES) {
+            $this->clearPending($session);
+
+            return null;
+        }
+
+        $plan = json_decode((string) $row->pending_action, true);
+
+        return is_array($plan) ? $plan : null;
+    }
+
+    private function storePending(object $session, array $plan): void
+    {
+        DB::table('ai_chat_sessions')->where('id', $session->id)->update([
+            'pending_action' => json_encode($plan),
+            'pending_action_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function clearPending(object $session): void
+    {
+        DB::table('ai_chat_sessions')->where('id', $session->id)->update([
+            'pending_action' => null,
+            'pending_action_at' => null,
+        ]);
+    }
+
+    /** "a name, a date and an email" — reads better than a bare list. */
+    private function listWords(array $items): string
+    {
+        $items = array_map(fn ($i) => str_replace('_', ' ', (string) $i), $items);
+
+        if (count($items) === 1) {
+            return 'the '.$items[0];
+        }
+
+        $last = array_pop($items);
+
+        return 'the '.implode(', ', $items).' and '.$last;
+    }
+
+    /* ───────────────────────────── internals ──────────────────────────── */
+
+    /**
+     * Fetch a session that belongs to the signed-in user, or 404.
+     *
+     * The user_id predicate is the access control for the whole chat feature:
+     * without it a guessed or leaked uuid would read and write another user's
+     * conversation. 404 rather than 403 so the response does not confirm that
+     * an id exists.
+     */
+    private function ownedSession(string $sessionId): object
+    {
+        $session = DB::table('ai_chat_sessions')
+            ->where('id', $sessionId)
+            ->where('user_id', auth()->id())
+            ->first(['id', 'title', 'created_at', 'updated_at']);
+
+        abort_if($session === null, 404);
+
+        return $session;
+    }
+
+    /** Create and return an empty conversation for a user. */
+    private function createSession(int $userId): object
+    {
+        $session = [
+            'id' => (string) Str::uuid(),
+            'user_id' => $userId,
+            'title' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        DB::table('ai_chat_sessions')->insert($session);
+
+        return (object) [
+            'id' => $session['id'],
+            'title' => null,
+            'created_at' => $session['created_at'],
+            'updated_at' => $session['updated_at'],
+        ];
+    }
+
+    /**
+     * One conversation's messages, oldest first.
+     *
+     * Ordered by seq, with created_at as the tiebreaker for messages written
+     * before seq existed (the migration backfills session_id but leaves their
+     * seq null, since nothing recorded their true order at the time).
+     *
+     * The limit takes the NEWEST messages, not the oldest: this feeds both the
+     * transcript and the model's memory, and a conversation past the limit must
+     * carry its recent context, not its opening.
+     *
+     * @return list<array{role: string, message: string, created_at: mixed}>
+     */
+    private function transcript(string $sessionId): array
+    {
+        $rows = DB::table('ai_chat_messages')
+            ->where('user_id', auth()->id())
+            ->where('session_id', $sessionId)
+            ->orderByDesc('seq')
+            ->orderByDesc('created_at')
+            ->limit(self::HISTORY_LIMIT)
+            ->get(['role', 'message', 'created_at']);
+
+        return array_values(array_reverse($rows->map(fn ($row) => [
+            'role' => $row->role,
+            'message' => $row->message,
+            'created_at' => $row->created_at,
+        ])->all()));
+    }
+
+    /** First line of the opening question, trimmed to fit the sidebar list. */
+    private function deriveTitle(string $prompt): string
+    {
+        $firstLine = trim(strtok(trim($prompt), "\n") ?: $prompt);
+
+        return Str::limit($firstLine, 60, '…') ?: 'New chat';
     }
 }

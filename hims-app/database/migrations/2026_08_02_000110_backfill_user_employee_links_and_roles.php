@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Every login account needs a linked employees row: a dozen write paths
      * route auth()->user()->employee_id into NOT NULL char(36) FK columns
@@ -36,7 +37,7 @@ return new class extends Migration {
             if ($employeeId && ! $this->employeeIsTaken($employeeId)) {
                 DB::table('users')->where('id', $user->id)->update([
                     'employee_id' => $employeeId,
-                    'updated_at'  => now(),
+                    'updated_at' => now(),
                 ]);
             }
         }
@@ -56,7 +57,7 @@ return new class extends Migration {
         }
 
         $departmentId = $this->ensureDepartment('Hospital Administration', 'ADM');
-        $roleId       = $this->ensureRole('System Administrator', 'system_admin', $departmentId);
+        $roleId = $this->ensureRole('System Administrator', 'system_admin', $departmentId);
 
         foreach ($remaining as $user) {
             [$first, $last] = $this->splitName($user->name);
@@ -64,23 +65,23 @@ return new class extends Migration {
             $employeeId = (string) Str::uuid();
 
             DB::table('employees')->insert([
-                'employee_id'       => $employeeId,
-                'employee_code'     => $this->nextEmployeeCode(),
-                'first_name'        => $first,
-                'last_name'         => $last,
-                'email'             => $user->email,
-                'department_id'     => $departmentId,
-                'role_id'           => $roleId,
-                'position_title'    => 'System Administrator',
-                'hire_date'         => $user->created_at ? substr((string) $user->created_at, 0, 10) : now()->toDateString(),
+                'employee_id' => $employeeId,
+                'employee_code' => $this->nextEmployeeCode(),
+                'first_name' => $first,
+                'last_name' => $last,
+                'email' => $user->email,
+                'department_id' => $departmentId,
+                'role_id' => $roleId,
+                'position_title' => 'System Administrator',
+                'hire_date' => $user->created_at ? substr((string) $user->created_at, 0, 10) : now()->toDateString(),
                 'employment_status' => 'active',
-                'created_at'        => now(),
-                'updated_at'        => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             DB::table('users')->where('id', $user->id)->update([
                 'employee_id' => $employeeId,
-                'updated_at'  => now(),
+                'updated_at' => now(),
             ]);
         }
     }
@@ -92,7 +93,7 @@ return new class extends Migration {
     private function ensureAnAdminExists(): void
     {
         DB::table('users')->where('email', 'admin@hospital.ph')->update([
-            'role'       => 'admin',
+            'role' => 'admin',
             'updated_at' => now(),
         ]);
 
@@ -104,7 +105,7 @@ return new class extends Migration {
 
         if ($oldest) {
             DB::table('users')->where('id', $oldest)->update([
-                'role'       => 'admin',
+                'role' => 'admin',
                 'updated_at' => now(),
             ]);
         }
@@ -126,12 +127,12 @@ return new class extends Migration {
         $id = (string) Str::uuid();
 
         DB::table('departments')->insert([
-            'department_id'   => $id,
-            'name'            => $name,
+            'department_id' => $id,
+            'name' => $name,
             'department_code' => DB::table('departments')->where('department_code', $code)->exists() ? null : $code,
-            'is_clinical'     => false,
-            'created_at'      => now(),
-            'updated_at'      => now(),
+            'is_clinical' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         return $id;
@@ -148,13 +149,13 @@ return new class extends Migration {
         $id = (string) Str::uuid();
 
         DB::table('roles')->insert([
-            'role_id'       => $id,
-            'role_name'     => $name,
-            'role_slug'     => $slug,
+            'role_id' => $id,
+            'role_name' => $name,
+            'role_slug' => $slug,
             'department_id' => $departmentId,
-            'is_clinical'   => false,
-            'created_at'    => now(),
-            'updated_at'    => now(),
+            'is_clinical' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         return $id;
@@ -168,7 +169,7 @@ return new class extends Migration {
         $n = DB::table('employees')->count() + 1;
 
         do {
-            $code = 'EMP-' . str_pad((string) $n, 4, '0', STR_PAD_LEFT);
+            $code = 'EMP-'.str_pad((string) $n, 4, '0', STR_PAD_LEFT);
             $n++;
         } while (DB::table('employees')->where('employee_code', $code)->exists());
 

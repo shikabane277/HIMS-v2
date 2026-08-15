@@ -3,6 +3,7 @@
 @section('page-title','Training Management')
 @section('breadcrumb','HIMS / Training')
 @section('content')
+@include('partials.learning-tabs')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 style="font-size:20px;font-weight:700;margin:0">Training Calendar & Sessions</h2>
@@ -10,7 +11,9 @@
     </div>
     <div class="d-flex gap-2">
         <a href="{{ route('training.venues.index') }}" class="btn-hims btn-hims-outline"><i class="bi bi-building"></i> Venues</a>
-        <a href="{{ route('training.sessions.create') }}" class="btn-hims btn-hims-primary"><i class="bi bi-plus-circle"></i> New Session</a>
+        @can('manage-training')
+        <button type="button" class="btn-hims btn-hims-primary" data-modal-open="sessionCreateModal"><i class="bi bi-plus-circle"></i> New Session</button>
+        @endcan
     </div>
 </div>
 
@@ -28,12 +31,14 @@
             <div class="card-header">
                 <h5><i class="bi bi-calendar-event"></i> Upcoming Sessions</h5>
                 <div class="d-flex gap-2">
-                    <select class="hims-input hims-select" style="width:140px;padding:6px 12px;font-size:13px">
-                        <option>All Categories</option>
-                        <option>Clinical</option>
-                        <option>Fire Safety</option>
-                        <option>Leadership</option>
-                    </select>
+                    <form method="GET" action="{{ route('training.index') }}">
+                        <select name="category" class="hims-input hims-select" style="width:160px;padding:6px 12px;font-size:13px" onchange="this.form.submit()">
+                            <option value="">All Categories</option>
+                            @foreach($categories ?? [] as $cat)
+                                <option value="{{ $cat }}" @selected(($category ?? '') === $cat)>{{ ucwords(str_replace('_',' ',$cat)) }}</option>
+                            @endforeach
+                        </select>
+                    </form>
                 </div>
             </div>
             <div class="card-body" style="padding:0">
@@ -67,7 +72,16 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="6" class="text-center" style="color:#9ca3af;padding:32px">No upcoming sessions. <a href="{{ route('training.sessions.create') }}" class="text-primary-hims">Schedule one</a>.</td></tr>
+                        <tr><td colspan="6" class="text-center" style="color:#9ca3af;padding:32px">
+                            @if($category ?? null)
+                                No upcoming sessions in this category.
+                            @else
+                                No upcoming sessions.
+                                @can('manage-training')
+                                    <button type="button" class="hims-link-button" data-modal-open="sessionCreateModal">Schedule one</button>.
+                                @endcan
+                            @endif
+                        </td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -80,7 +94,11 @@
         <div class="hims-card">
             <div class="card-header">
                 <h5><i class="bi bi-building-fill"></i> Venue Availability</h5>
-                <a href="{{ route('training.venues.create') }}" class="btn-hims btn-hims-primary btn-sm"><i class="bi bi-plus"></i></a>
+                @can('manage-venues')
+                {{-- Cross-page: the venue modal lives on the Venues page, and a
+                     button here cannot open a modal there. --}}
+                <a href="{{ route('training.venues.index', ['new' => 'venue']) }}" class="btn-hims btn-hims-primary btn-sm" title="Add a venue"><i class="bi bi-plus"></i></a>
+                @endcan
             </div>
             <div class="card-body d-flex flex-column gap-3">
                 @forelse($venues ?? [] as $venue)
@@ -140,4 +158,8 @@
         </table>
     </div>
 </div>
+
+@can('manage-training')
+    @include('training.sessions._create-modal')
+@endcan
 @endsection

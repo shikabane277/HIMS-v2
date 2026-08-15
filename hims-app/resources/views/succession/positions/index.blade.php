@@ -18,7 +18,7 @@
 </div>
 
 @if(session('success'))
-    <div class="hims-alert success mb-3"><i class="bi bi-check-circle-fill"></i> {{ session('success') }}</div>
+    <div class="hims-alert success mb-3" data-auto-dismiss><i class="bi bi-check-circle-fill"></i> {{ session('success') }}</div>
 @endif
 
 <div class="hims-card">
@@ -30,8 +30,8 @@
                     <th>Position</th>
                     <th>Department</th>
                     <th>Current Holder</th>
-                    <th>Vacancy Risk</th>
-                    <th>Est. Vacancy</th>
+                    @if($canSeeConfidential)<th>Vacancy Risk</th>
+                    <th>Est. Vacancy</th>@endif
                     <th style="width:90px"></th>
                 </tr>
             </thead>
@@ -59,14 +59,14 @@
                     </td>
                     <td>{{ $position->department_name }}</td>
                     <td>{{ trim((string) $position->current_holder_name) ?: '— vacant —' }}</td>
-                    <td><span class="hims-badge {{ $riskColour }}">{{ ucfirst($risk ?: 'unknown') }}</span></td>
+                    @if($canSeeConfidential)<td><span class="hims-badge {{ $riskColour }}">{{ ucfirst($risk ?: 'unknown') }}</span></td>
                     <td>
                         @if($position->estimated_vacancy_date)
                             {{ \Carbon\Carbon::parse($position->estimated_vacancy_date)->format('d M Y') }}
                         @else
                             <span style="color:#9ca3af">—</span>
                         @endif
-                    </td>
+                    </td>@endif
                     <td>
                         <a href="{{ route('succession.positions.show', $position->position_id) }}" class="btn-hims btn-hims-outline btn-sm">View</a>
                     </td>

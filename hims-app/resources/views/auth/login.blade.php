@@ -47,7 +47,7 @@
         </div>
 
         @if(session('status'))
-            <div class="hims-alert success"><i class="bi bi-check-circle-fill"></i> {{ session('status') }}</div>
+            <div class="hims-alert success" data-auto-dismiss><i class="bi bi-check-circle-fill"></i> {{ session('status') }}</div>
         @endif
         @if($errors->any())
             <div class="hims-alert error"><i class="bi bi-exclamation-circle-fill"></i> {{ $errors->first() }}</div>

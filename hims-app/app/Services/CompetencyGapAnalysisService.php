@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\AiProvider;
+use App\Support\ReviewFeedback;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -38,39 +39,40 @@ class CompetencyGapAnalysisService
         }
 
         $requirements = $this->roleRequirements($employee);
-        $assessments  = $this->assessments($employeeId);
-        $performance  = $this->performanceSignal($employeeId);
-        $training     = $this->trainingReceived($employeeId);
-        $credentials  = $this->credentialRisks($employeeId);
+        $assessments = $this->assessments($employeeId);
+        $performance = $this->performanceSignal($employeeId);
+        $training = $this->trainingReceived($employeeId);
+        $credentials = $this->credentialRisks($employeeId);
 
         $gaps = $this->computeGaps($requirements, $assessments, $training);
 
         $recommendations = $this->recommendedCourses($gaps, $employee, $training);
 
         $summary = [
-            'competencies_required'  => $requirements->count(),
-            'competencies_assessed'  => $assessments->count(),
-            'unassessed'             => $gaps->where('status', 'unassessed')->count(),
-            'critical_gaps'          => $gaps->where('severity', 'critical')->count(),
-            'moderate_gaps'          => $gaps->where('severity', 'moderate')->count(),
-            'met'                    => $gaps->where('status', 'met')->count(),
-            'readiness_pct'          => $this->readinessPercentage($gaps),
-            'cpd_hours_last_year'    => $training['cpd_hours_last_year'],
-            'trainings_attended'     => $training['sessions_attended'],
-            'courses_completed'      => $training['courses_completed'],
-            'latest_overall_score'   => $performance['latest_overall_score'],
+            'competencies_required' => $requirements->count(),
+            'competencies_assessed' => $assessments->count(),
+            'unassessed' => $gaps->where('status', 'unassessed')->count(),
+            'critical_gaps' => $gaps->where('severity', 'critical')->count(),
+            'moderate_gaps' => $gaps->where('severity', 'moderate')->count(),
+            'met' => $gaps->where('status', 'met')->count(),
+            'readiness_pct' => $this->readinessPercentage($gaps),
+            'cpd_hours_last_year' => $training['cpd_hours_last_year'],
+            'trainings_attended' => $training['sessions_attended'],
+            'courses_completed' => $training['courses_completed'],
+            'latest_overall_score' => $performance['latest_overall_score'],
+            'written_feedback' => $performance['feedback_count'],
         ];
 
         $result = [
-            'employee'        => $employee,
-            'summary'         => $summary,
-            'gaps'            => $gaps->values()->all(),
-            'performance'     => $performance,
-            'training'        => $training,
-            'credentials'     => $credentials,
+            'employee' => $employee,
+            'summary' => $summary,
+            'gaps' => $gaps->values()->all(),
+            'performance' => $performance,
+            'training' => $training,
+            'credentials' => $credentials,
             'recommendations' => $recommendations,
-            'ai'              => null,
-            'generated_at'    => now(),
+            'ai' => null,
+            'generated_at' => now(),
         ];
 
         if ($withAi) {
@@ -119,13 +121,24 @@ class CompetencyGapAnalysisService
             ? DB::table('departments')->where('department_id', $departmentId)->first()
             : null;
 
+        $performance = DB::table('performance_reviews as pr')
+            ->join('employees as e', 'pr.employee_id', '=', 'e.employee_id')
+            ->when($departmentId, fn ($q) => $q->where('e.department_id', $departmentId))
+            ->where('pr.status', 'finished')
+            ->select(
+                DB::raw('ROUND(AVG(pr.overall_score), 2) as avg_score'),
+                DB::raw('COUNT(pr.review_id) as review_count')
+            )
+            ->first();
+
         $result = [
-            'department'      => $department,
-            'headcount'       => $employees->count(),
-            'weakest'         => $weakest,
+            'department' => $department,
+            'headcount' => $employees->count(),
+            'weakest' => $weakest,
+            'performance' => $performance,
             'training_demand' => $this->trainingDemand($weakest),
-            'ai'              => null,
-            'generated_at'    => now(),
+            'ai' => null,
+            'generated_at' => now(),
         ];
 
         if ($withAi) {
@@ -209,14 +222,34 @@ class CompetencyGapAnalysisService
             ->keyBy('competency_id');
     }
 
+    /**
+     * What the performance reviews say about this employee — the numbers and,
+     * just as importantly, the words.
+     *
+     * The written feedback is the only part of a review that states a *cause*.
+     * A 2.50 on "Medication Administration" says something is wrong; the
+     * supervisor's note beside it saying the problem is the new infusion pump
+     * interface rather than dosing knowledge is what decides whether the answer
+     * is training, equipment familiarisation or reassessment. So every comment
+     * on every KPI is collected here, not only the ones attached to a failing
+     * score: praise on a strong KPI is evidence too, and the analysis is asked
+     * to report strengths as well as gaps.
+     *
+     * `strengths_text` and `improvements_text` are selected but deliberately not
+     * returned as keys of their own: ReviewFeedback::group() reads them off the
+     * review rows and carries them per cycle, so a top-level copy would be a
+     * second, latest-cycle-only definition of the same fact. Keep them in the
+     * select — dropping them there empties the narrative silently.
+     */
     private function performanceSignal(string $employeeId): array
     {
         $reviews = DB::table('performance_reviews as pr')
             ->join('review_cycles as rc', 'pr.cycle_id', '=', 'rc.cycle_id')
             ->where('pr.employee_id', $employeeId)
-            ->select('pr.review_id', 'pr.status', 'pr.overall_score', 'pr.self_rating',
-                     'pr.supervisor_rating', 'pr.peer_rating', 'pr.strengths_text',
-                     'pr.improvements_text', 'rc.cycle_name', 'rc.end_date')
+            ->where('pr.status', 'finished')
+            ->select('pr.review_id', 'pr.status', 'pr.overall_score',
+                'pr.supervisor_rating', 'pr.strengths_text',
+                'pr.improvements_text', 'rc.cycle_name', 'rc.end_date')
             ->orderByDesc('rc.end_date')
             ->limit(3)
             ->get();
@@ -229,18 +262,35 @@ class CompetencyGapAnalysisService
                 ->where('rks.review_id', $latest->review_id)
                 ->whereNotNull('rks.weighted_score')
                 ->where('rks.weighted_score', '<', 3.5)
-                ->select('k.kpi_name', 'k.kpi_category', 'rks.weighted_score', 'rks.comments')
+                ->select('k.kpi_name', 'k.kpi_category', 'rks.weighted_score')
                 ->orderBy('rks.weighted_score')
                 ->get()
             : collect();
 
+        // Every written note across the same three cycles. Scored off
+        // supervisor_score rather than weighted_score because this line quotes
+        // what the reviewer rated, and weighted_score is a straight copy of it
+        // written under a name that promises arithmetic it never performed.
+        $kpiComments = $reviews->isEmpty()
+            ? collect()
+            : DB::table('review_kpi_scores as rks')
+                ->join('kpi_library as k', 'rks.kpi_id', '=', 'k.kpi_id')
+                ->whereIn('rks.review_id', $reviews->pluck('review_id')->all())
+                ->whereNotNull('rks.comments')
+                ->where('rks.comments', '!=', '')
+                ->select('rks.review_id', 'k.kpi_name', 'k.kpi_category',
+                    'rks.supervisor_score', 'rks.comments')
+                ->orderBy('k.kpi_name')
+                ->get();
+
+        $feedback = ReviewFeedback::group($reviews, $kpiComments);
+
         return [
-            'reviews'              => $reviews,
             'latest_overall_score' => $latest->overall_score ?? null,
-            'latest_cycle'         => $latest->cycle_name ?? null,
-            'weak_kpis'            => $weakKpis,
-            'strengths_text'       => $latest->strengths_text ?? null,
-            'improvements_text'    => $latest->improvements_text ?? null,
+            'latest_cycle' => $latest->cycle_name ?? null,
+            'weak_kpis' => $weakKpis,
+            'feedback' => $feedback,
+            'feedback_count' => ReviewFeedback::count($feedback),
         ];
     }
 
@@ -254,7 +304,7 @@ class CompetencyGapAnalysisService
             ->join('courses as c', 'ce.course_id', '=', 'c.course_id')
             ->where('ce.employee_id', $employeeId)
             ->select('c.course_id', 'c.title', 'c.category', 'c.cpd_hours',
-                     'ce.status', 'ce.progress_pct', 'ce.completed_at', 'ce.cpd_hours_earned')
+                'ce.status', 'ce.progress_pct', 'ce.completed_at', 'ce.cpd_hours_earned')
             ->orderByDesc('ce.completed_at')
             ->get();
 
@@ -262,7 +312,7 @@ class CompetencyGapAnalysisService
             ->join('training_sessions as ts', 'tr.session_id', '=', 'ts.session_id')
             ->where('tr.employee_id', $employeeId)
             ->select('ts.session_id', 'ts.title', 'ts.category', 'ts.session_date',
-                     'ts.cpd_hours', 'ts.linked_competencies', 'ts.linked_course_id', 'tr.status')
+                'ts.cpd_hours', 'ts.linked_competencies', 'ts.linked_course_id', 'tr.status')
             ->orderByDesc('ts.session_date')
             ->get();
 
@@ -280,13 +330,13 @@ class CompetencyGapAnalysisService
         }
 
         return [
-            'courses'               => $courses,
-            'sessions'              => $sessions,
-            'courses_completed'     => $courses->where('status', 'completed')->count(),
-            'courses_in_progress'   => $courses->whereIn('status', ['enrolled', 'in_progress'])->count(),
-            'sessions_attended'     => $sessions->where('status', 'attended')->count(),
-            'cpd_hours_last_year'   => round($cpdLastYear, 1),
-            'competencies_trained'  => $competenciesTrained,
+            'courses' => $courses,
+            'sessions' => $sessions,
+            'courses_completed' => $courses->where('status', 'completed')->count(),
+            'courses_in_progress' => $courses->whereIn('status', ['enrolled', 'in_progress'])->count(),
+            'sessions_attended' => $sessions->where('status', 'attended')->count(),
+            'cpd_hours_last_year' => round($cpdLastYear, 1),
+            'competencies_trained' => $competenciesTrained,
         ];
     }
 
@@ -297,7 +347,7 @@ class CompetencyGapAnalysisService
             ->whereNotNull('expiry_date')
             ->whereDate('expiry_date', '<=', now()->addDays(90)->toDateString())
             ->select('credential_id', 'credential_type', 'credential_number',
-                     'issuing_body', 'expiry_date', 'verified_at')
+                'issuing_body', 'expiry_date', 'verified_at')
             ->orderBy('expiry_date')
             ->get();
     }
@@ -311,38 +361,38 @@ class CompetencyGapAnalysisService
     {
         return $requirements->map(function ($req) use ($assessments, $training) {
             $assessment = $assessments->get($req->competency_id);
-            $required   = (int) $req->required_proficiency;
+            $required = (int) $req->required_proficiency;
 
             if (! $assessment) {
                 return [
-                    'competency_id'    => $req->competency_id,
-                    'competency_name'  => $req->competency_name,
-                    'competency_code'  => $req->competency_code,
-                    'domain'           => $req->domain_name,
-                    'category'         => $req->category_name,
-                    'required'         => $required,
-                    'current'          => null,
-                    'gap'              => null,
-                    'status'           => 'unassessed',
-                    'severity'         => $req->is_critical || $req->is_mandatory ? 'critical' : 'moderate',
-                    'is_critical'      => (bool) $req->is_critical,
-                    'is_mandatory'     => (bool) $req->is_mandatory,
-                    'trained_by'       => $training['competencies_trained'][$req->competency_id] ?? null,
-                    'assessed_date'    => null,
-                    'priority'         => $req->is_critical || $req->is_mandatory ? 90 : 60,
-                    'note'             => 'No assessment on record — proficiency is unknown.',
+                    'competency_id' => $req->competency_id,
+                    'competency_name' => $req->competency_name,
+                    'competency_code' => $req->competency_code,
+                    'domain' => $req->domain_name,
+                    'category' => $req->category_name,
+                    'required' => $required,
+                    'current' => null,
+                    'gap' => null,
+                    'status' => 'unassessed',
+                    'severity' => $req->is_critical || $req->is_mandatory ? 'critical' : 'moderate',
+                    'is_critical' => (bool) $req->is_critical,
+                    'is_mandatory' => (bool) $req->is_mandatory,
+                    'trained_by' => $training['competencies_trained'][$req->competency_id] ?? null,
+                    'assessed_date' => null,
+                    'priority' => $req->is_critical || $req->is_mandatory ? 90 : 60,
+                    'note' => 'No assessment on record — proficiency is unknown.',
                 ];
             }
 
             $current = (int) $assessment->current_proficiency;
-            $gap     = $current - $required;
+            $gap = $current - $required;
 
-            $status   = $gap >= 0 ? 'met' : 'below';
+            $status = $gap >= 0 ? 'met' : 'below';
             $severity = match (true) {
-                $gap >= 0                            => 'none',
-                $gap <= -2                           => 'critical',
+                $gap >= 0 => 'none',
+                $gap <= -2 => 'critical',
                 ($req->is_critical || $req->is_mandatory) => 'critical',
-                default                              => 'moderate',
+                default => 'moderate',
             };
 
             // A gap that persists despite training is a stronger signal than an
@@ -357,29 +407,29 @@ class CompetencyGapAnalysisService
             }
 
             return [
-                'competency_id'    => $req->competency_id,
-                'competency_name'  => $req->competency_name,
-                'competency_code'  => $req->competency_code,
-                'domain'           => $req->domain_name,
-                'category'         => $req->category_name,
-                'required'         => $required,
-                'current'          => $current,
-                'gap'              => $gap,
-                'status'           => $status,
-                'severity'         => $severity,
-                'is_critical'      => (bool) $req->is_critical,
-                'is_mandatory'     => (bool) $req->is_mandatory,
-                'trained_by'       => $trainedBy,
-                'assessed_date'    => $assessment->assessed_date,
-                'priority'         => $priority,
-                'note'             => $gap >= 0
+                'competency_id' => $req->competency_id,
+                'competency_name' => $req->competency_name,
+                'competency_code' => $req->competency_code,
+                'domain' => $req->domain_name,
+                'category' => $req->category_name,
+                'required' => $required,
+                'current' => $current,
+                'gap' => $gap,
+                'status' => $status,
+                'severity' => $severity,
+                'is_critical' => (bool) $req->is_critical,
+                'is_mandatory' => (bool) $req->is_mandatory,
+                'trained_by' => $trainedBy,
+                'assessed_date' => $assessment->assessed_date,
+                'priority' => $priority,
+                'note' => $gap >= 0
                     ? 'Meets requirement.'
                     : ($trainedBy
                         ? "Still below requirement after attending \"{$trainedBy}\" — consider a different intervention."
                         : 'Below requirement, no related training recorded.'),
             ];
         })
-        ->sortByDesc('priority');
+            ->sortByDesc('priority');
     }
 
     private function readinessPercentage(Collection $gaps): int
@@ -410,6 +460,40 @@ class CompetencyGapAnalysisService
         // Sessions explicitly tagged with a gap competency are the best match.
         $gapCompetencyIds = $openGaps->pluck('competency_id')->all();
 
+        // Competency name lookup, so a recommendation can say which gap it closes
+        // rather than just asserting it is relevant.
+        $gapNames = $openGaps->pluck('competency_name', 'competency_id');
+
+        // The strongest signal available: a course the catalogue explicitly tags
+        // as remediating one of the open competencies (course_competencies).
+        $taggedCourses = DB::table('course_competencies as cc')
+            ->join('courses as c', 'cc.course_id', '=', 'c.course_id')
+            ->whereIn('cc.competency_id', $gapCompetencyIds ?: [''])
+            ->where('c.is_active', true)
+            ->whereNotIn('c.course_id', $completedCourseIds ?: [''])
+            ->select('c.course_id', 'c.title', 'c.category', 'c.cpd_hours', 'cc.competency_id')
+            ->get()
+            ->groupBy('course_id')
+            ->map(function (Collection $rows) use ($gapNames) {
+                $course = $rows->first();
+                $addresses = $rows->pluck('competency_id')
+                    ->map(fn ($id) => $gapNames[$id] ?? null)
+                    ->filter()->unique()->values()->all();
+
+                return [
+                    'type' => 'course',
+                    'id' => $course->course_id,
+                    'title' => $course->title,
+                    'detail' => 'Tagged to '.count($addresses).' open competenc'.(count($addresses) === 1 ? 'y' : 'ies'),
+                    'cpd_hours' => $course->cpd_hours,
+                    'reason' => 'Course is mapped to '.implode(', ', $addresses).'.',
+                    'addresses_gaps' => $addresses,
+                ];
+            })
+            // Most gaps closed first.
+            ->sortByDesc(fn ($row) => count($row['addresses_gaps']))
+            ->values();
+
         $sessions = DB::table('training_sessions')
             ->whereNotNull('linked_competencies')
             ->whereDate('session_date', '>=', now()->toDateString())
@@ -419,14 +503,21 @@ class CompetencyGapAnalysisService
             ->filter(function ($session) use ($gapCompetencyIds) {
                 return array_intersect($this->decodeJsonList($session->linked_competencies), $gapCompetencyIds) !== [];
             })
-            ->map(fn ($s) => [
-                'type'       => 'training_session',
-                'id'         => $s->session_id,
-                'title'      => $s->title,
-                'detail'     => 'Scheduled '.$s->session_date,
-                'cpd_hours'  => $s->cpd_hours,
-                'reason'     => 'Session is tagged to one of the open gap competencies.',
-            ]);
+            ->map(function ($s) use ($gapNames) {
+                $addresses = collect($this->decodeJsonList($s->linked_competencies))
+                    ->map(fn ($id) => $gapNames[$id] ?? null)
+                    ->filter()->unique()->values()->all();
+
+                return [
+                    'type' => 'training_session',
+                    'id' => $s->session_id,
+                    'title' => $s->title,
+                    'detail' => 'Scheduled '.$s->session_date,
+                    'cpd_hours' => $s->cpd_hours,
+                    'reason' => 'Session is tagged to '.implode(', ', $addresses).'.',
+                    'addresses_gaps' => $addresses,
+                ];
+            });
 
         // Then pathways aimed at this employee's role.
         $pathwayCourses = DB::table('learning_pathways as lp')
@@ -435,7 +526,7 @@ class CompetencyGapAnalysisService
             ->where('c.is_active', true)
             ->whereNotIn('c.course_id', $completedCourseIds ?: [''])
             ->select('c.course_id', 'c.title', 'c.category', 'c.cpd_hours',
-                     'lp.pathway_name', 'lp.target_roles', 'pc.sequence_order')
+                'lp.pathway_name', 'lp.target_roles', 'pc.sequence_order')
             ->orderBy('pc.sequence_order')
             ->get()
             ->filter(function ($row) use ($employee) {
@@ -444,12 +535,13 @@ class CompetencyGapAnalysisService
                 return $targets === [] || in_array($employee->role_id, $targets, true);
             })
             ->map(fn ($row) => [
-                'type'      => 'course',
-                'id'        => $row->course_id,
-                'title'     => $row->title,
-                'detail'    => 'From pathway: '.$row->pathway_name,
+                'type' => 'course',
+                'id' => $row->course_id,
+                'title' => $row->title,
+                'detail' => 'From pathway: '.$row->pathway_name,
                 'cpd_hours' => $row->cpd_hours,
-                'reason'    => 'Part of a learning pathway targeting this role.',
+                'reason' => 'Part of a learning pathway targeting this role.',
+                'addresses_gaps' => [],
             ]);
 
         // Finally, uncompleted mandatory courses.
@@ -460,19 +552,31 @@ class CompetencyGapAnalysisService
             ->select('course_id', 'title', 'category', 'cpd_hours')
             ->get()
             ->map(fn ($c) => [
-                'type'      => 'course',
-                'id'        => $c->course_id,
-                'title'     => $c->title,
-                'detail'    => 'Mandatory course, not yet completed',
+                'type' => 'course',
+                'id' => $c->course_id,
+                'title' => $c->title,
+                'detail' => 'Mandatory course, not yet completed',
                 'cpd_hours' => $c->cpd_hours,
-                'reason'    => 'Hospital-wide mandatory training still outstanding.',
+                'reason' => 'Hospital-wide mandatory training still outstanding.',
+                'addresses_gaps' => [],
             ]);
 
-        return $sessions->concat($pathwayCourses)->concat($mandatory)->unique('id')->take(10)->values();
+        // Explicit course tagging first — it is the only source that can name the
+        // competency it closes. Scheduled sessions next (they carry a date), then
+        // the softer role/mandatory signals.
+        return $taggedCourses
+            ->concat($sessions)
+            ->concat($pathwayCourses)
+            ->concat($mandatory)
+            ->unique('id')
+            ->take(10)
+            ->values();
     }
 
     /**
-     * Aggregate training need across a department's weakest competencies.
+     * Aggregate training need across a department's weakest competencies, with
+     * the catalogue items already tagged to each one (course_competencies /
+     * training_sessions.linked_competencies) so the suggestion is actionable.
      */
     private function trainingDemand(Collection $weakest): Collection
     {
@@ -480,14 +584,56 @@ class CompetencyGapAnalysisService
             return collect();
         }
 
-        return $weakest->take(5)->map(fn ($row) => [
-            'competency_name'  => $row->competency_name,
-            'employees_below'  => (int) $row->employees_below,
-            'avg_gap'          => (float) $row->avg_gap,
-            'suggested_format' => abs((float) $row->avg_gap) >= 2
-                ? 'Instructor-led workshop with supervised practice'
-                : 'Short refresher module plus reassessment',
-        ]);
+        $top = $weakest->take(5);
+        $competencyIds = $top->pluck('competency_id')->all();
+
+        // Courses explicitly mapped to these competencies.
+        $coursesByCompetency = DB::table('course_competencies as cc')
+            ->join('courses as c', 'cc.course_id', '=', 'c.course_id')
+            ->whereIn('cc.competency_id', $competencyIds ?: [''])
+            ->where('c.is_active', true)
+            ->select('cc.competency_id', 'c.course_id', 'c.title', 'c.cpd_hours')
+            ->get()
+            ->groupBy('competency_id');
+
+        // Scheduled sessions tagged to these competencies. linked_competencies is
+        // a JSON list, so the match happens in PHP rather than SQL.
+        $sessions = DB::table('training_sessions')
+            ->whereNotNull('linked_competencies')
+            ->whereDate('session_date', '>=', now()->toDateString())
+            ->where('status', 'scheduled')
+            ->select('session_id', 'title', 'session_date', 'linked_competencies')
+            ->get();
+
+        return $top->map(function ($row) use ($coursesByCompetency, $sessions) {
+            $courses = ($coursesByCompetency[$row->competency_id] ?? collect())
+                ->map(fn ($c) => [
+                    'type' => 'course',
+                    'id' => $c->course_id,
+                    'title' => $c->title,
+                    'detail' => (float) $c->cpd_hours.' CPD hrs',
+                ])->values();
+
+            $matchingSessions = $sessions
+                ->filter(fn ($s) => in_array($row->competency_id, $this->decodeJsonList($s->linked_competencies), true))
+                ->map(fn ($s) => [
+                    'type' => 'training_session',
+                    'id' => $s->session_id,
+                    'title' => $s->title,
+                    'detail' => 'Scheduled '.$s->session_date,
+                ])->values();
+
+            return [
+                'competency_id' => $row->competency_id,
+                'competency_name' => $row->competency_name,
+                'employees_below' => (int) $row->employees_below,
+                'avg_gap' => (float) $row->avg_gap,
+                'suggested_format' => abs((float) $row->avg_gap) >= 2
+                    ? 'Instructor-led workshop with supervised practice'
+                    : 'Short refresher module plus reassessment',
+                'catalogue' => $courses->concat($matchingSessions)->take(4)->values()->all(),
+            ];
+        });
     }
 
     /* ───────────────────────────── the AI layer ───────────────────────────── */
@@ -499,7 +645,7 @@ class CompetencyGapAnalysisService
     private function aiNarrative(array $analysis): ?array
     {
         $prompt = $this->buildEmployeePrompt($analysis);
-        $raw    = $this->ai->ask($prompt);
+        $raw = $this->ai->ask($prompt);
 
         return $this->parseAiJson($raw);
     }
@@ -550,9 +696,9 @@ PROMPT;
      */
     private function buildEmployeePrompt(array $analysis): string
     {
-        $e       = $analysis['employee'];
+        $e = $analysis['employee'];
         $summary = $analysis['summary'];
-        $gaps    = collect($analysis['gaps']);
+        $gaps = collect($analysis['gaps']);
 
         $gapLines = $gaps->whereIn('status', ['below', 'unassessed'])->take(12)->map(function ($g) {
             if ($g['status'] === 'unassessed') {
@@ -569,7 +715,8 @@ PROMPT;
         $gapLines = $gapLines ?: '- No open competency gaps.';
 
         $weakKpis = collect($analysis['performance']['weak_kpis'])
-            ->map(fn ($k) => sprintf('- %s (%s): %.2f/5', $k->kpi_name, $k->kpi_category, (float) $k->weighted_score))
+            ->map(fn ($k) => sprintf('- %s (%s): %s', $k->kpi_name, $k->kpi_category,
+                ReviewFeedback::formatScore((float) $k->weighted_score)))
             ->implode("\n") ?: '- No weak KPIs recorded.';
 
         $trainingLines = collect($analysis['training']['courses'])
@@ -584,6 +731,12 @@ PROMPT;
         $score = $summary['latest_overall_score'] !== null
             ? number_format((float) $summary['latest_overall_score'], 2).'/5'
             : 'no completed review';
+
+        // The supervisor's own words, which are the only evidence in the whole
+        // prompt that states a reason rather than a measurement.
+        $feedbackLines = ReviewFeedback::promptLines($analysis['performance']['feedback'], $e->first_name.' '.$e->last_name);
+        $feedbackCount = $summary['written_feedback'];
+        $cycleCount = count($analysis['performance']['feedback']);
 
         return <<<PROMPT
 You are a hospital competency development advisor for a Philippine hospital.
@@ -601,6 +754,11 @@ PERFORMANCE
 Latest overall review score: {$score} (cycle: {$analysis['performance']['latest_cycle']})
 Weakest KPIs:
 {$weakKpis}
+
+WRITTEN REVIEW FEEDBACK — {$feedbackCount} comment(s) across {$cycleCount} review cycle(s), newest first
+These are the supervisor's own words, transcribed verbatim. They are the only
+evidence here that gives a reason rather than a number, so weigh them heavily.
+{$feedbackLines}
 
 COMPETENCY POSITION VS JOB REQUIREMENTS
 Required competencies: {$summary['competencies_required']}
@@ -621,6 +779,14 @@ CREDENTIALS AT RISK
 Return ONLY a JSON object, no markdown fences, with this exact shape:
 {
   "headline": "one sentence overall assessment",
+  "feedback_summary": {
+    "overview": "3-4 sentences summarising everything supervisors have written about this employee, newest cycle first, in plain language a ward manager would use",
+    "recurring_themes": [
+      {"theme": "short label", "detail": "what was said and in which cycle", "direction": "improving|persistent|new|resolved"}
+    ],
+    "praised": ["short phrase drawn from the feedback", "..."],
+    "concerns": ["short phrase drawn from the feedback", "..."]
+  },
   "missing_skills": [
     {"skill": "name", "evidence": "which data point shows this", "impact": "consequence if unaddressed", "severity": "critical|moderate|low"}
   ],
@@ -631,8 +797,12 @@ Return ONLY a JSON object, no markdown fences, with this exact shape:
   "training_already_tried": "note any gap that persisted despite training, or null",
   "strengths_to_leverage": ["short phrase", "..."]
 }
-Where a competency was never assessed, say assessment is the first step rather
-than assuming weakness. Keep the whole response under 500 words.
+Build "feedback_summary" only from the WRITTEN REVIEW FEEDBACK section. If that
+section says no comment is recorded, return null for "feedback_summary" — never
+restate a rating as though somebody had written it. Where the same point appears
+in more than one cycle say so, and say whether it improved. Where a competency
+was never assessed, say assessment is the first step rather than assuming
+weakness. Keep the whole response under 700 words.
 PROMPT;
     }
 

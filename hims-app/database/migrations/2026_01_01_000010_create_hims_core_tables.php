@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('departments', function (Blueprint $table) {
@@ -96,9 +97,9 @@ return new class extends Migration {
     public function down(): void
     {
         Schema::dropIfExists('notifications');
-        Schema::table('system_users', fn($t) => $t->dropForeign(['employee_id']));
+        Schema::table('system_users', fn ($t) => $t->dropForeign(['employee_id']));
         Schema::dropIfExists('system_users');
-        Schema::table('departments', fn($t) => $t->dropForeign(['head_employee_id']));
+        Schema::table('departments', fn ($t) => $t->dropForeign(['head_employee_id']));
         Schema::dropIfExists('employees');
         Schema::dropIfExists('roles');
         Schema::dropIfExists('departments');

@@ -9,8 +9,10 @@
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Monitor skills gaps, clinical credentials, and JCI competency compliance.</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="{{ route('competency.assessments.create') }}" class="btn-hims btn-hims-outline"><i class="bi bi-clipboard-check"></i> New Assessment</a>
-        <a href="{{ route('competency.credentials.create') }}" class="btn-hims btn-hims-primary"><i class="bi bi-patch-check"></i> Add Credential</a>
+        @can('manage-competency')
+            <button type="button" class="btn-hims btn-hims-outline" data-modal-open="assessmentCreateModal"><i class="bi bi-clipboard-check"></i> New Assessment</button>
+            <button type="button" class="btn-hims btn-hims-primary" data-modal-open="credentialCreateModal"><i class="bi bi-patch-check"></i> Add Credential</button>
+        @endcan
     </div>
 </div>
 
@@ -27,12 +29,21 @@
         <div class="hims-card">
             <div class="card-header">
                 <h5><i class="bi bi-grid-3x3"></i> Department Skills Gap Matrix</h5>
-                <select class="hims-input hims-select" style="width:160px;padding:6px 12px;font-size:13px">
-                    <option>All Departments</option>
-                    @foreach($departments ?? [] as $dept)
-                    <option>{{ $dept->name }}</option>
-                    @endforeach
-                </select>
+                {{-- GET so the filter is shareable/bookmarkable and survives a
+                     refresh, and onchange-submit so picking a department applies
+                     it — there is no Apply button to hunt for. Same shape as the
+                     position filter on succession/index. --}}
+                <form method="GET" action="{{ route('competency.index') }}">
+                    <select name="department_id" onchange="this.form.submit()"
+                            class="hims-input hims-select" style="width:190px;padding:6px 12px;font-size:13px">
+                        <option value="">All Departments</option>
+                        @foreach($departments ?? [] as $dept)
+                        <option value="{{ $dept->department_id }}" @selected(($filterDepartmentId ?? null) === $dept->department_id)>
+                            {{ $dept->name }}
+                        </option>
+                        @endforeach
+                    </select>
+                </form>
             </div>
             <div class="card-body" style="padding:0">
                 <table class="hims-table">
@@ -55,7 +66,9 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:32px">No assessment data yet.</td></tr>
+                        <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:32px">
+                            {{ ($filterDepartmentId ?? null) ? 'No assessments recorded for this department yet.' : 'No assessment data yet.' }}
+                        </td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -94,7 +107,9 @@
 <div class="hims-card">
     <div class="card-header">
         <h5><i class="bi bi-diagram-3"></i> Competency Domains</h5>
-        <a href="{{ route('competency.domains.create') }}" class="btn-hims btn-hims-primary btn-sm"><i class="bi bi-plus"></i> Add Domain</a>
+        @can('manage-competency-framework')
+        <button type="button" class="btn-hims btn-hims-primary btn-sm" data-modal-open="domainCreateModal"><i class="bi bi-plus"></i> Add Domain</button>
+        @endcan
     </div>
     <div class="card-body" style="padding:0">
         <table class="hims-table">
@@ -115,4 +130,11 @@
         </table>
     </div>
 </div>
+@can('manage-competency')
+    @include('competency.assessments._create-modal')
+    @include('competency.credentials._create-modal')
+@endcan
+@can('manage-competency-framework')
+    @include('competency.domains._create-modal')
+@endcan
 @endsection

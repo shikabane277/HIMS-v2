@@ -85,6 +85,68 @@
             <p style="font-size:14.5px;font-weight:600;line-height:1.6;margin-bottom:16px">{{ $ai['headline'] }}</p>
             @endif
 
+            @php
+                // The model is asked for an object, but a flattened string is a
+                // plausible thing for it to return and is still worth showing.
+                $fb = $ai['feedback_summary'] ?? null;
+                $fb = is_string($fb) && trim($fb) !== '' ? ['overview' => $fb] : (is_array($fb) ? $fb : null);
+            @endphp
+            @if($fb)
+            <div class="mb-3" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:13px 15px">
+                <div class="hims-label" style="margin-bottom:8px">
+                    <i class="bi bi-chat-quote"></i> Summary of Supervisor Feedback
+                </div>
+
+                @if(!empty($fb['overview']))
+                <p style="font-size:13px;color:#374151;line-height:1.65;margin:0 0 11px">{{ $fb['overview'] }}</p>
+                @endif
+
+                @if(!empty($fb['recurring_themes']))
+                <div class="d-flex flex-column gap-2 mb-2">
+                    @foreach((array) $fb['recurring_themes'] as $theme)
+                    @php
+                        $theme = is_array($theme) ? $theme : ['theme' => (string) $theme];
+                        $dir = strtolower((string) ($theme['direction'] ?? ''));
+                        $dirBadge = match($dir) {
+                            'improving', 'resolved' => 'green',
+                            'persistent' => 'red',
+                            'new' => 'yellow',
+                            default => 'gray',
+                        };
+                    @endphp
+                    <div style="padding:9px 11px;background:#fff;border:1px solid #e5e7eb;border-radius:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                            <strong style="font-size:12.5px">{{ $theme['theme'] ?? '—' }}</strong>
+                            <span class="hims-badge {{ $dirBadge }}">{{ ucfirst($dir ?: 'noted') }}</span>
+                        </div>
+                        @if(!empty($theme['detail']))
+                        <div style="font-size:12px;color:#4b5563;margin-top:4px;line-height:1.55">{{ $theme['detail'] }}</div>
+                        @endif
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                <div class="row g-3">
+                    @foreach(['praised' => 'Praised For', 'concerns' => 'Concerns Raised'] as $fbKey => $fbLabel)
+                    @if(!empty($fb[$fbKey]))
+                    <div class="col-md-6">
+                        <div class="hims-label" style="margin-bottom:6px">{{ $fbLabel }}</div>
+                        <ul style="font-size:12.5px;color:#4b5563;padding-left:18px;margin:0;line-height:1.8">
+                            @foreach((array) $fb[$fbKey] as $item)<li>{{ is_array($item) ? reset($item) : $item }}</li>@endforeach
+                        </ul>
+                    </div>
+                    @endif
+                    @endforeach
+                </div>
+
+                <div style="font-size:11px;color:#9ca3af;margin-top:10px">
+                    Summarised from the {{ $s['written_feedback'] }} written comment{{ $s['written_feedback'] === 1 ? '' : 's' }}
+                    reproduced in full under “Written Feedback on Record” below.
+                </div>
+            </div>
+            @endif
+
             @if(!empty($ai['missing_skills']))
             <div class="mb-3">
                 <div class="hims-label" style="margin-bottom:8px">Missing Skills Identified</div>
@@ -211,6 +273,67 @@
     </div>
 </div>
 
+{{-- ── Written feedback on record (deterministic — this is what the AI summarised) ── --}}
+<div class="hims-card mb-4">
+    <div class="card-header">
+        <h5><i class="bi bi-chat-left-text"></i> Written Feedback on Record</h5>
+        <span class="hims-badge {{ $s['written_feedback'] ? 'blue' : 'gray' }}">
+            {{ $s['written_feedback'] }} comment{{ $s['written_feedback'] === 1 ? '' : 's' }}
+        </span>
+    </div>
+    <div class="card-body d-flex flex-column gap-3">
+        @forelse($analysis['performance']['feedback'] as $cycle)
+        <div style="border-left:3px solid var(--hims-primary);padding-left:13px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+                <strong style="font-size:13.5px">
+                    {{ $cycle['cycle_name'] }}
+                    @if($cycle['is_draft'])<span class="hims-badge gray">Draft</span>@endif
+                </strong>
+                <span style="font-size:11.5px;color:#9ca3af">
+                    @if($cycle['end_date'])Cycle ended {{ $cycle['end_date'] }} · @endif
+                    Rating {{ \App\Support\ReviewFeedback::formatScore($cycle['supervisor_rating']) }}
+                </span>
+            </div>
+
+            @if($cycle['comment_count'] === 0)
+            <div style="font-size:12px;color:#9ca3af;margin-top:6px">
+                No written comment was recorded in this cycle — only scores.
+            </div>
+            @else
+                @if($cycle['strengths'])
+                <div style="font-size:12.5px;color:#374151;line-height:1.6;margin-top:8px;padding:8px 11px;background:#f0fdf4;border-radius:8px">
+                    <strong style="font-size:11.5px;color:#166534;text-transform:uppercase;letter-spacing:.03em">Strengths</strong>
+                    <div style="margin-top:3px">{{ $cycle['strengths'] }}</div>
+                </div>
+                @endif
+
+                @if($cycle['improvements'])
+                <div style="font-size:12.5px;color:#374151;line-height:1.6;margin-top:6px;padding:8px 11px;background:#fef3c7;border-radius:8px">
+                    <strong style="font-size:11.5px;color:#92400e;text-transform:uppercase;letter-spacing:.03em">Areas to Improve</strong>
+                    <div style="margin-top:3px">{{ $cycle['improvements'] }}</div>
+                </div>
+                @endif
+
+                @foreach($cycle['kpi_comments'] as $comment)
+                <div style="font-size:12.5px;color:#374151;line-height:1.6;margin-top:6px">
+                    <span class="hims-badge blue">{{ $comment['kpi_name'] }}</span>
+                    <span style="font-size:11.5px;color:#6b7280">
+                        {{ $comment['kpi_category'] ? ucfirst($comment['kpi_category']).' · ' : '' }}
+                        {{ $comment['score'] !== null ? 'rated '.\App\Support\ReviewFeedback::formatScore($comment['score']) : 'not scored' }}
+                    </span>
+                    <div style="margin-top:2px">{{ $comment['comment'] }}</div>
+                </div>
+                @endforeach
+            @endif
+        </div>
+        @empty
+        <div style="text-align:center;color:#9ca3af;padding:24px;font-size:13px">
+            No performance reviews on record for this employee yet, so there is no written feedback to summarise.
+        </div>
+        @endforelse
+    </div>
+</div>
+
 <div class="row g-3">
     {{-- Recommended interventions from the hospital's own catalogue --}}
     <div class="col-lg-7">
@@ -223,8 +346,19 @@
                         @forelse($analysis['recommendations'] as $rec)
                         <tr>
                             <td>
-                                <strong>{{ $rec['title'] }}</strong>
+                                @if($rec['type'] === 'course')
+                                    <a href="{{ route('learning.courses.show', $rec['id']) }}" style="font-weight:700;color:var(--hims-primary)">{{ $rec['title'] }}</a>
+                                @else
+                                    <a href="{{ route('training.sessions.show', $rec['id']) }}" style="font-weight:700;color:var(--hims-primary)">{{ $rec['title'] }}</a>
+                                @endif
                                 <div style="font-size:11px;color:#9ca3af">{{ $rec['detail'] }}</div>
+                                @if(!empty($rec['addresses_gaps']))
+                                <div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap">
+                                    @foreach($rec['addresses_gaps'] as $gapName)
+                                    <span class="hims-badge yellow">{{ $gapName }}</span>
+                                    @endforeach
+                                </div>
+                                @endif
                             </td>
                             <td><span class="hims-badge blue">{{ $rec['type'] === 'course' ? 'Course' : 'Session' }}</span></td>
                             <td>{{ $rec['cpd_hours'] ?? '—' }}</td>

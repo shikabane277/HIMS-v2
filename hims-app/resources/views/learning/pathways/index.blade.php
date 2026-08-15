@@ -8,12 +8,14 @@
         <h2 style="font-size:20px;font-weight:700;margin:0">Learning Pathways</h2>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Structured course sequences for role-based development.</p>
     </div>
-    <a href="{{ route('learning.pathways.create') }}" class="btn-hims btn-hims-primary"><i class="bi bi-plus-circle"></i> New Pathway</a>
+    @can('manage-learning')
+        <button type="button" class="btn-hims btn-hims-primary" data-modal-open="pathwayCreateModal"><i class="bi bi-plus-circle"></i> New Pathway</button>
+    @endcan
 </div>
 <div class="row g-3">
     @forelse($pathways ?? [] as $pathway)
     <div class="col-md-6 col-lg-4">
-        <div class="hims-card" style="transition:.2s" onmouseover="this.style.boxShadow='var(--hims-shadow-md)'" onmouseout="this.style.boxShadow='var(--hims-shadow)'">
+        <div class="hims-card" id="pathway-{{ $pathway->pathway_id }}" style="transition:.2s;scroll-margin-top:84px" onmouseover="this.style.boxShadow='var(--hims-shadow-md)'" onmouseout="this.style.boxShadow='var(--hims-shadow)'">
             <div class="card-header">
                 <h5 style="font-size:14px"><i class="bi bi-signpost-split"></i> {{ $pathway->pathway_name }}</h5>
                 @if($pathway->is_mandatory)<span class="hims-badge red">Mandatory</span>@endif
@@ -48,10 +50,16 @@
             <div class="card-body" style="text-align:center;padding:60px;color:#9ca3af">
                 <div style="font-size:48px;margin-bottom:12px">🗺️</div>
                 <div style="font-size:16px;font-weight:600;color:var(--hims-text-dark);margin-bottom:6px">No pathways yet</div>
-                <a href="{{ route('learning.pathways.create') }}" class="btn-hims btn-hims-primary mt-2">Create First Pathway</a>
+                @can('manage-learning')
+                    <button type="button" class="btn-hims btn-hims-primary mt-2" data-modal-open="pathwayCreateModal">Create First Pathway</button>
+                @endcan
             </div>
         </div>
     </div>
     @endforelse
 </div>
+
+@can('manage-learning')
+    @include('learning.pathways._create-modal')
+@endcan
 @endsection

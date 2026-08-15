@@ -5,7 +5,7 @@
     <div class="card-body" style="text-align:center;padding:60px;color:#9ca3af">
         <div style="font-size:48px;margin-bottom:12px">🔗</div>
         <div style="font-size:16px;font-weight:600;color:var(--hims-text-dark);margin-bottom:6px">No employee profile linked</div>
-        <p style="font-size:13px;max-width:440px;margin:0 auto">Your login is not linked to an employee record yet, so your performance, training and recognition history cannot be shown. Ask HR to link your account.</p>
+        <p style="font-size:13px;max-width:440px;margin:0 auto">Your login is not linked to an employee record yet, so your performance, training and learning history cannot be shown. Ask HR to link your account.</p>
     </div>
 </div>
 @else
@@ -99,7 +99,7 @@
 </div>
 
 <div class="row g-3">
-    <div class="col-lg-4">
+    <div class="col-lg-6">
         <div class="hims-card animate-in">
             <div class="card-header"><h5><i class="bi bi-clipboard-data"></i> My Reviews</h5></div>
             <div class="card-body" style="padding:0">
@@ -111,7 +111,8 @@
                             <td>
                                 <a href="{{ route('performance.show', $review->review_id) }}" style="font-weight:600;color:var(--hims-primary);text-decoration:none">{{ $review->cycle_name }}</a>
                             </td>
-                            <td><span class="hims-badge {{ $review->status === 'completed' ? 'green' : 'yellow' }}">{{ ucfirst(str_replace('_',' ',$review->status)) }}</span></td>
+                            @php $rs = \App\Support\ReviewStatus::of($review->status, $review->end_date); @endphp
+                            <td><span class="hims-badge {{ \App\Support\ReviewStatus::badgeClass($rs) }}">{{ \App\Support\ReviewStatus::label($rs) }}</span></td>
                             <td>{{ $review->overall_score ? number_format($review->overall_score,2) : '—' }}</td>
                         </tr>
                         @empty
@@ -123,7 +124,7 @@
         </div>
     </div>
 
-    <div class="col-lg-4">
+    <div class="col-lg-6">
         <div class="hims-card animate-in" style="animation-delay:.06s">
             <div class="card-header"><h5>🪪 My Credentials</h5></div>
             <div class="card-body d-flex flex-column gap-2">
@@ -144,29 +145,6 @@
                 </div>
                 @empty
                 <div style="text-align:center;color:#9ca3af;padding:20px">No credentials on record.</div>
-                @endforelse
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4">
-        <div class="hims-card animate-in" style="animation-delay:.12s">
-            <div class="card-header">
-                <h5>❤️ My Recognition</h5>
-                <a href="{{ route('recognition.index') }}" class="btn-hims btn-hims-ghost btn-sm">Wall</a>
-            </div>
-            <div class="card-body d-flex flex-column gap-3">
-                @forelse($my_recognition ?? [] as $post)
-                <div style="display:flex;gap:11px;align-items:flex-start">
-                    <div style="width:34px;height:34px;background:var(--hims-primary-xlight);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">{{ $post->badge_icon ?? '⭐' }}</div>
-                    <div>
-                        <div style="font-size:12.5px;font-weight:600">From {{ $post->author_name }}</div>
-                        <div style="font-size:12px;color:#6b7280;margin-top:2px">{{ Str::limit($post->message, 80) }}</div>
-                        @if($post->badge_name)<span class="recognition-badge-pill mt-1">{{ $post->badge_name }}</span>@endif
-                    </div>
-                </div>
-                @empty
-                <div style="text-align:center;color:#9ca3af;padding:20px">No recognition received yet.</div>
                 @endforelse
             </div>
         </div>

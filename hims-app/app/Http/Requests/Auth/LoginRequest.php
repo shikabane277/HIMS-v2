@@ -6,6 +6,7 @@ use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -40,13 +41,46 @@ class LoginRequest extends FormRequest
      */
     public function authenticate(): void
     {
+        $user = DB::table('users')->where('email', $this->string('email'))->first();
+
+        if ($user && isset($user->locked_until) && $user->locked_until && now()->lt($user->locked_until)) {
+            throw ValidationException::withMessages([
+                'email' => 'This account is locked due to multiple failed login attempts. Please contact an administrator to unlock your account.',
+            ]);
+        }
+
         $this->ensureIsNotRateLimited();
 
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
+            if ($user) {
+                $attempts = (int) ($user->failed_login_attempts ?? 0) + 1;
+                $updateData = ['updated_at' => now()];
+
+                // Only write columns if they exist in the schema
+                if (isset($user->failed_login_attempts)) {
+                    $updateData['failed_login_attempts'] = $attempts;
+                }
+                if (isset($user->locked_until) && $attempts >= 5) {
+                    $updateData['locked_until'] = now()->addMinutes(15);
+                }
+
+                if (count($updateData) > 1) {
+                    DB::table('users')->where('id', $user->id)->update($updateData);
+                }
+            }
+
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
+            ]);
+        }
+
+        if ($user && isset($user->failed_login_attempts)) {
+            DB::table('users')->where('id', $user->id)->update([
+                'failed_login_attempts' => 0,
+                'locked_until' => null,
+                'updated_at' => now(),
             ]);
         }
 

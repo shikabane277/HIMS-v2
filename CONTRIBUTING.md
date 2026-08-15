@@ -78,6 +78,11 @@ add a table to a view, seed at least one row of it in the test.
   `partials/modal-js.blade.php` is the only modal controller — don't write per-page
   open/close JS.
 - Multi-select is a `.hims-checklist` of checkboxes, never `<select multiple>`.
+- Learning and compliance are one navigation module. New UI and links use canonical
+  `learning.*` routes and `resources/views/learning/`; the `/compliance/...` routes
+  exist only for backward compatibility. Course enrolment is assignment-only, and
+  Required Training submits searchable `subjects[]` checkbox lists that may mix
+  courses and sessions.
 
 ### Timezone
 

@@ -2,3 +2,6 @@
 # Local AI tooling config (personal, not project code)
 .claude/
 .clinerules
+
+# Browser-automation scratch output (snapshots, console logs, screenshots)
+.playwright-mcp/

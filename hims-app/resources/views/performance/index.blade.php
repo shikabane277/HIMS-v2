@@ -2,15 +2,20 @@
 @section('title','Performance Management')
 @section('page-title','Performance Management')
 @section('breadcrumb','HIMS / Performance')
+
+@php use App\Support\ReviewStatus; @endphp
+
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 style="font-size:20px;font-weight:700;margin:0">Review Cycles</h2>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Manage employee evaluation cycles and appraisal forms.</p>
     </div>
-    <a href="{{ route('performance.cycles.create') }}" class="btn-hims btn-hims-primary">
-        <i class="bi bi-plus-circle"></i> New Cycle
-    </a>
+    @can('manage-review-cycles')
+        <button type="button" class="btn-hims btn-hims-primary" data-modal-open="cycleCreateModal">
+            <i class="bi bi-plus-circle"></i> New Cycle
+        </button>
+    @endcan
 </div>
 
 <div class="row g-3 mb-4">
@@ -49,19 +54,29 @@
                     <td><span class="hims-badge blue">{{ ucfirst(str_replace('_',' ',$cycle->cycle_type)) }}</span></td>
                     <td style="font-size:12px;color:#6b7280">{{ \Carbon\Carbon::parse($cycle->start_date)->format('M d, Y') }} – {{ \Carbon\Carbon::parse($cycle->end_date)->format('M d, Y') }}</td>
                     <td>
-                        <span class="hims-badge {{ $cycle->status === 'active' ? 'green' : ($cycle->status === 'closed' ? 'gray' : 'yellow') }}">
-                            <span class="status-dot {{ $cycle->status === 'active' ? 'active' : 'inactive' }}"></span>
-                            {{ ucfirst($cycle->status) }}
+                        @php($cycleStatus = $cycle->effective_status ?? \App\Support\CycleStatus::of($cycle->status, $cycle->end_date))
+                        <span class="hims-badge {{ \App\Support\CycleStatus::badgeClass($cycleStatus) }}">
+                            <span class="status-dot {{ \App\Support\CycleStatus::isLive($cycleStatus) ? 'active' : 'inactive' }}"></span>
+                            {{ \App\Support\CycleStatus::label($cycleStatus) }}
                         </span>
                     </td>
                     <td>{{ $cycle->reviews_count ?? 0 }} reviews</td>
                     <td>
                         <a href="{{ route('performance.cycles.show', $cycle->cycle_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
-                        <a href="{{ route('performance.cycles.edit', $cycle->cycle_id) }}" class="btn-hims btn-hims-outline btn-sm">Edit</a>
+                        @can('manage-review-cycles')
+                        <button type="button" class="btn-hims btn-hims-outline btn-sm"
+                                data-modal-open="cycleModal" data-cycle-edit
+                                data-action="{{ route('performance.cycles.update', $cycle->cycle_id) }}"
+                                data-cycle_name="{{ $cycle->cycle_name }}"
+                                data-cycle_type="{{ $cycle->cycle_type }}"
+                                data-status="{{ $cycle->status }}"
+                                data-start_date="{{ \Illuminate\Support\Str::substr((string) $cycle->start_date, 0, 10) }}"
+                                data-end_date="{{ \Illuminate\Support\Str::substr((string) $cycle->end_date, 0, 10) }}">Edit</button>
+                        @endcan
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="6" class="text-center" style="color:#9ca3af;padding:40px">No review cycles yet. <a href="{{ route('performance.cycles.create') }}" class="text-primary-hims">Create your first cycle</a>.</td></tr>
+                <tr><td colspan="6" class="text-center" style="color:#9ca3af;padding:40px">No review cycles yet.@can('manage-review-cycles') <button type="button" class="hims-link-button text-primary-hims" data-modal-open="cycleCreateModal">Create your first cycle</button>.@endcan</td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -71,7 +86,10 @@
 <div class="hims-card">
     <div class="card-header">
         <h5><i class="bi bi-list-check"></i> Recent Reviews</h5>
-        <a href="{{ route('performance.reviews.index') }}" class="btn-hims btn-hims-ghost btn-sm">All Reviews</a>
+        <div class="d-flex align-items-center gap-2">
+            <span style="font-size:11.5px;color:#9ca3af">Yours, the ones you wrote, and your direct reports'</span>
+            <a href="{{ route('performance.reviews.index') }}" class="btn-hims btn-hims-ghost btn-sm">All Reviews</a>
+        </div>
     </div>
     <div class="card-body" style="padding:0">
         <table class="hims-table">
@@ -89,21 +107,19 @@
                             <div>
                                 <div style="font-weight:600;font-size:13.5px">{{ ($review->employee_first ?? '') . ' ' . ($review->employee_last ?? '') }}</div>
                                 <div style="font-size:11px;color:#9ca3af">{{ $review->position_title ?? '' }}</div>
+                                <div style="font-size:11px;color:#6b7280">Reviewer: {{ trim($review->reviewer_name ?? '') ?: '—' }}</div>
                             </div>
                         </div>
                     </td>
                     <td style="font-size:13px">{{ $review->cycle_name ?? '—' }}</td>
                     <td><span class="hims-badge gray">{{ ucfirst($review->review_type ?? 'standard') }}</span></td>
                     <td>
-                        @php
-                            $statusColor = match($review->status ?? '') {
-                                'approved','archived' => 'green',
-                                'draft','self_assessment' => 'gray',
-                                'ai_audit','pending_approval' => 'blue',
-                                default => 'yellow'
-                            };
-                        @endphp
-                        <span class="hims-badge {{ $statusColor }}">{{ ucfirst(str_replace('_',' ',$review->status ?? 'draft')) }}</span>
+                        <span class="hims-badge {{ ReviewStatus::badgeClass($review->effective_status) }}">{{ ReviewStatus::label($review->effective_status) }}</span>
+                        @if($review->is_exception_review)
+                        <span class="hims-badge yellow" style="margin-left:4px" title="{{ $review->exception_reason }}">
+                            <i class="bi bi-shield-exclamation"></i> {{ str_replace('_',' ',$review->exception_basis) }}
+                        </span>
+                        @endif
                     </td>
                     <td>
                         @if($review->overall_score)
@@ -116,13 +132,23 @@
                     </td>
                     <td>
                         <a href="{{ route('performance.show', $review->review_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
+                        @if($review->can_score)
+                        <a href="{{ route('performance.reviews.score', $review->review_id) }}" class="btn-hims btn-hims-outline btn-sm">Score</a>
+                        @endif
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="6" class="text-center" style="color:#9ca3af;padding:32px">No reviews found.</td></tr>
+                <tr><td colspan="6" class="text-center" style="color:#9ca3af;padding:32px">
+                    No reviews involve you yet. Reviews follow the reporting line.
+                </td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 </div>
+
+@can('manage-review-cycles')
+    @include('performance.cycles._create-modal')
+    @include('performance.cycles._edit-modal')
+@endcan
 @endsection

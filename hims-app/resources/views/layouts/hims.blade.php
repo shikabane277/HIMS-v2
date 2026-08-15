@@ -42,6 +42,11 @@
         <a href="{{ route('dashboard') }}" class="sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <span class="nav-icon">📊</span> Dashboard
         </a>
+        {{-- Every role, including staff who have no directory access at all.
+             The route resolves the signed-in user's own employee_id. --}}
+        <a href="{{ route('employees.progression.mine') }}" class="sidebar-link {{ request()->routeIs('employees.progression*') ? 'active' : '' }}">
+            <span class="nav-icon">📈</span> My Development
+        </a>
 
         <div class="sidebar-section-label">HR Modules</div>
         <a href="{{ route('performance.index') }}" class="sidebar-link {{ request()->routeIs('performance.*') ? 'active' : '' }}">
@@ -55,25 +60,28 @@
             <span class="nav-icon">🤖</span> AI Gap Analysis
         </a>
         @endcan
-        <a href="{{ route('learning.index') }}" class="sidebar-link {{ request()->routeIs('learning.*') ? 'active' : '' }}">
+        {{-- One entry for the whole Learning module, both halves. The
+             institutional pages (what the hospital requires, who is short of it,
+             the accreditation report) used to be a second "Compliance" sidebar
+             entry; they are now tabs inside Learning, gated individually by
+             partials/learning-tabs.blade.php. `learning.*` covers all of them. --}}
+        <a href="{{ route('learning.index') }}" class="sidebar-link {{ request()->routeIs('learning.*') || request()->routeIs('training.*') ? 'active' : '' }}">
             <span class="nav-icon">📚</span> Learning
         </a>
-        <a href="{{ route('training.index') }}" class="sidebar-link {{ request()->routeIs('training.*') ? 'active' : '' }}">
-            <span class="nav-icon">🎓</span> Training
+        <a href="{{ route('recognition.index') }}" class="sidebar-link {{ request()->routeIs('recognition.*') ? 'active' : '' }}">
+            <span class="nav-icon"><i class="bi bi-stars"></i></span> Recognition
         </a>
         @can('view-succession')
         <a href="{{ route('succession.index') }}" class="sidebar-link {{ request()->routeIs('succession.*') ? 'active' : '' }}">
             <span class="nav-icon">🏆</span> Succession
         </a>
         @endcan
-        <a href="{{ route('recognition.index') }}" class="sidebar-link {{ request()->routeIs('recognition.*') ? 'active' : '' }}">
-            <span class="nav-icon">⭐</span> Recognition
-        </a>
 
         @canany(['view-employees','manage-departments','manage-users'])
         <div class="sidebar-section-label">Admin</div>
         @can('view-employees')
-        <a href="{{ route('employees.index') }}" class="sidebar-link {{ request()->routeIs('employees.*') ? 'active' : '' }}">
+        {{-- Excludes employees.progression*, which has its own entry above. --}}
+        <a href="{{ route('employees.index') }}" class="sidebar-link {{ request()->routeIs('employees.*') && ! request()->routeIs('employees.progression*') ? 'active' : '' }}">
             <span class="nav-icon">👥</span> Employees
         </a>
         @endcan
@@ -125,18 +133,48 @@
         <div class="topbar-menu-wrap">
             <button class="topbar-btn" id="notif-btn" title="Notifications" aria-haspopup="true" aria-expanded="false">
                 <i class="bi bi-bell"></i>
-                <span class="notif-dot" id="notif-dot"></span>
+                <span class="notif-count" id="notif-count" @if(empty($himsUnreadCount)) style="display:none" @endif>
+                    {{ ($himsUnreadCount ?? 0) > 99 ? '99+' : ($himsUnreadCount ?? 0) }}
+                </span>
             </button>
-            <div class="topbar-dropdown" id="notif-dropdown" role="menu">
-                <div class="topbar-dropdown-header">
-                    <span>Notifications</span>
-                    <button type="button" id="notif-clear" class="topbar-dropdown-action">Mark all read</button>
-                </div>
-                <div class="topbar-dropdown-body" id="notif-list">
-                    <div class="topbar-dropdown-empty" id="notif-empty">
-                        <i class="bi bi-bell-slash"></i>
-                        <span>You're all caught up.</span>
+            <div class="topbar-dropdown notif-dropdown" id="notif-dropdown" role="menu" aria-label="Notifications">
+                <div class="topbar-dropdown-header notif-dropdown-header">
+                    <div>
+                        <div class="notif-heading">Notifications</div>
+                        <div class="notif-heading-count" id="notif-heading-count">
+                            {{ ($himsUnreadCount ?? 0) > 0 ? $himsUnreadCount.' unread' : 'All caught up' }}
+                        </div>
                     </div>
+                    <button type="button" id="notif-clear" class="topbar-dropdown-action"
+                            @if(empty($himsUnreadCount)) style="display:none" @endif>Mark all as read</button>
+                </div>
+                <div class="topbar-dropdown-body notif-list" id="notif-list">
+                    @forelse($himsNotifications ?? [] as $note)
+                        <a href="{{ $note->destination_url }}"
+                           class="notif-item {{ $note->is_read ? 'read' : 'unread' }}"
+                           role="menuitem"
+                           data-notification-id="{{ $note->notification_id }}"
+                           data-read-url="{{ route('notifications.read', $note->notification_id) }}">
+                            <span class="notif-item-icon {{ $note->tone }}" aria-hidden="true">
+                                <i class="bi {{ $note->icon }}"></i>
+                            </span>
+                            <span class="notif-item-content">
+                                <span class="notif-item-title">{{ $note->title }}</span>
+                                @if($note->message)
+                                    <span class="notif-item-message">{{ $note->message }}</span>
+                                @endif
+                                <span class="notif-item-time">{{ \Illuminate\Support\Carbon::parse($note->created_at)->diffForHumans() }}</span>
+                            </span>
+                            @unless($note->is_read)
+                                <span class="notif-unread-marker" aria-label="Unread"></span>
+                            @endunless
+                        </a>
+                    @empty
+                        <div class="topbar-dropdown-empty" id="notif-empty">
+                            <i class="bi bi-bell-slash"></i>
+                            <span>No notifications yet.</span>
+                        </div>
+                    @endforelse
                 </div>
             </div>
         </div>
@@ -174,22 +212,52 @@
             </div>
         </div>
 
-        <button class="topbar-btn" title="Search">
-            <i class="bi bi-search"></i>
+        <div class="topbar-menu-wrap search-menu-wrap">
+            <button class="topbar-btn" id="search-btn" title="Search HIMS"
+                    aria-haspopup="dialog" aria-expanded="false" aria-controls="global-search-panel">
+                <i class="bi bi-search"></i>
+            </button>
+            <div class="topbar-dropdown search-dropdown" id="global-search-panel" role="dialog"
+                 aria-label="Search HIMS" aria-modal="false">
+                <div class="global-search-box">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input type="search" id="global-search-input" autocomplete="off"
+                           placeholder="Search HIMS" aria-label="Search HIMS"
+                           aria-controls="global-search-results" aria-autocomplete="list">
+                </div>
+                <div class="global-search-status" id="global-search-status" aria-live="polite" style="display:none"></div>
+                <div class="global-search-results" id="global-search-results" role="listbox"></div>
+            </div>
+        </div>
+
+        {{-- Docks/undocks the AI rail, the way VSCode's secondary-sidebar
+             button does. Replaces the old floating bubble, which overlapped
+             page content and could not be dismissed out of the way. --}}
+        <button class="topbar-btn" id="ai-toggle" title="AI Assistant (Ctrl+Shift+A)"
+                aria-controls="ai-rail" aria-expanded="false">
+            <i class="bi bi-robot"></i>
         </button>
     </div>
 </header>
 
 <!-- MAIN -->
 <main class="hims-main">
+    {{-- data-auto-dismiss is what the timer near the bottom of this file looks
+         for. A flash message has been read once it has been seen, so it clears
+         itself; a banner a view renders as part of the page does not. --}}
     @if(session('success'))
-        <div class="hims-alert success animate-in">
+        <div class="hims-alert success animate-in" data-auto-dismiss>
             <i class="bi bi-check-circle-fill"></i> {{ session('success') }}
         </div>
     @endif
     @if(session('error'))
-        <div class="hims-alert error animate-in">
+        <div class="hims-alert error animate-in" data-auto-dismiss>
             <i class="bi bi-exclamation-circle-fill"></i> {{ session('error') }}
+        </div>
+    @endif
+    @if(session('warning'))
+        <div class="hims-alert warning animate-in">
+            <i class="bi bi-exclamation-triangle-fill"></i> {{ session('warning') }}
         </div>
     @endif
 
@@ -198,176 +266,20 @@
     </div>
 </main>
 
-<!-- ══ FLOATING GEMINI AI BUBBLE ══ -->
-<style>
-#ai-bubble {
-    position: fixed;
-    bottom: 28px;
-    right: 28px;
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, var(--hims-primary), var(--hims-primary-dark));
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 20px rgba(22,163,74,.45);
-    z-index: 1000;
-    transition: transform .2s, box-shadow .2s;
-    font-size: 22px;
-    user-select: none;
-}
-#ai-bubble:hover { transform: scale(1.12); box-shadow: 0 6px 28px rgba(22,163,74,.6); }
-#ai-bubble.open { transform: scale(1.08) rotate(15deg); }
+{{--
+    Modals render here, as a direct child of <body>, never inside <main>.
+    The wrapper above carries .animate-in, whose fadeInUp keyframes end on
+    `transform: translateY(0)` and are held there by `forwards`. Any transform
+    other than none makes an element the containing block for its
+    position: fixed descendants — so a backdrop rendered inside that wrapper
+    resolves `inset: 0` against the full page content box instead of the
+    viewport, and centres itself in the middle of the *page*. On a long page
+    that puts the panel far below the fold. Pushing the markup out here is
+    what keeps "fixed" meaning fixed.
+--}}
+@stack('modals')
 
-#ai-panel {
-    position: fixed;
-    bottom: 96px;
-    right: 28px;
-    width: 360px;
-    max-height: 520px;
-    background: #fff;
-    border-radius: 18px;
-    box-shadow: 0 12px 48px rgba(0,0,0,.18);
-    z-index: 999;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    transform: translateY(20px) scale(.96);
-    opacity: 0;
-    pointer-events: none;
-    transition: all .25s cubic-bezier(.34,1.56,.64,1);
-}
-#ai-panel.open {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-    pointer-events: all;
-}
-
-#ai-panel-header {
-    background: linear-gradient(135deg, var(--hims-primary), var(--hims-primary-dark));
-    color: #fff;
-    padding: 14px 18px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 700;
-    font-size: 14px;
-    flex-shrink: 0;
-}
-#ai-panel-header .ai-close {
-    margin-left: auto;
-    cursor: pointer;
-    opacity: .8;
-    font-size: 18px;
-    line-height: 1;
-    background: none;
-    border: none;
-    color: #fff;
-}
-#ai-panel-header .ai-close:hover { opacity: 1; }
-
-#ai-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    background: #f8fdf9;
-}
-
-.ai-msg {
-    max-width: 86%;
-    padding: 9px 13px;
-    border-radius: 12px;
-    font-size: 13px;
-    line-height: 1.6;
-    animation: fadeInUp .2s ease;
-}
-.ai-msg.user {
-    background: var(--hims-primary);
-    color: #fff;
-    align-self: flex-end;
-    border-bottom-right-radius: 4px;
-}
-.ai-msg.ai {
-    background: #fff;
-    color: var(--hims-text-dark);
-    align-self: flex-start;
-    border: 1px solid var(--hims-border);
-    border-bottom-left-radius: 4px;
-    white-space: pre-wrap;
-}
-.ai-msg.thinking {
-    background: #fff;
-    border: 1px dashed var(--hims-border);
-    color: #9ca3af;
-    align-self: flex-start;
-    font-style: italic;
-}
-
-#ai-input-row {
-    padding: 12px;
-    border-top: 1px solid var(--hims-border);
-    display: flex;
-    gap: 8px;
-    background: #fff;
-    flex-shrink: 0;
-}
-#ai-input-row textarea {
-    flex: 1;
-    resize: none;
-    border: 1px solid var(--hims-border);
-    border-radius: 10px;
-    padding: 8px 12px;
-    font-size: 13px;
-    font-family: inherit;
-    outline: none;
-    max-height: 90px;
-    line-height: 1.5;
-}
-#ai-input-row textarea:focus { border-color: var(--hims-primary); }
-#ai-send-btn {
-    width: 38px;
-    height: 38px;
-    background: var(--hims-primary);
-    border: none;
-    border-radius: 10px;
-    color: #fff;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: background .15s;
-    font-size: 16px;
-}
-#ai-send-btn:hover { background: var(--hims-primary-dark); }
-#ai-send-btn:disabled { background: #9ca3af; cursor: not-allowed; }
-</style>
-
-<!-- Bubble toggle button -->
-<div id="ai-bubble" title="Ask AI Assistant">🤖</div>
-
-<!-- Slide-up chat panel -->
-<div id="ai-panel">
-    <div id="ai-panel-header">
-        <span>🤖</span>
-        <span>AI Assistant</span>
-        <span style="font-size:11px;opacity:.7;font-weight:400">English</span>
-        <button id="ai-clear-btn" title="Clear chat" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;margin-left:auto;transition:color .15s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,.7)'">🗑 Clear</button>
-        <button class="ai-close" id="ai-close-btn" title="Close">✕</button>
-    </div>
-    <div id="ai-messages">
-        <div id="ai-welcome" class="ai-msg ai" style="display:none">Hello! I'm your HIMS AI assistant. Ask me about performance, competency, training, succession, or anything HR-related. 🏥</div>
-    </div>
-    <div id="ai-input-row">
-        <textarea id="ai-input" placeholder="Ask me anything…" rows="1"></textarea>
-        <button id="ai-send-btn" title="Send"><i class="bi bi-send-fill"></i></button>
-    </div>
-</div>
+@include('partials.ai-rail')
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -387,6 +299,7 @@
         const dropdownPairs = [
             { btn: document.getElementById('notif-btn'),  menu: document.getElementById('notif-dropdown') },
             { btn: document.getElementById('help-btn'),   menu: document.getElementById('help-dropdown')  },
+            { btn: document.getElementById('search-btn'), menu: document.getElementById('global-search-panel') },
         ].filter(p => p.btn && p.menu);
 
         function closeDropdowns(except) {
@@ -403,17 +316,241 @@
                 closeDropdowns(p.menu);
                 p.menu.classList.toggle('open', willOpen);
                 p.btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                if (willOpen && p.menu.id === 'global-search-panel') {
+                    requestAnimationFrame(() => document.getElementById('global-search-input')?.focus());
+                }
             });
             p.menu.addEventListener('click', e => e.stopPropagation());
         });
         document.addEventListener('click', () => closeDropdowns(null));
 
-        // Notifications: "Mark all read" clears the unread dot
+        // Permission-aware global search. The server returns only explicit,
+        // access-scoped records and their real module destinations.
+        const searchBtn = document.getElementById('search-btn');
+        const searchPanel = document.getElementById('global-search-panel');
+        const searchInput = document.getElementById('global-search-input');
+        const searchStatus = document.getElementById('global-search-status');
+        const searchResults = document.getElementById('global-search-results');
+        let searchTimer = null;
+        let searchRequest = null;
+        let activeSearchIndex = -1;
+
+        function openSearch() {
+            closeDropdowns(searchPanel);
+            searchPanel.classList.add('open');
+            searchBtn.setAttribute('aria-expanded', 'true');
+            requestAnimationFrame(() => searchInput.focus());
+        }
+
+        function searchItems() {
+            return Array.from(searchResults.querySelectorAll('.global-search-result'));
+        }
+
+        function setActiveSearchResult(index) {
+            const items = searchItems();
+            if (!items.length) {
+                activeSearchIndex = -1;
+                return;
+            }
+            activeSearchIndex = (index + items.length) % items.length;
+            items.forEach((item, itemIndex) => {
+                const active = itemIndex === activeSearchIndex;
+                item.classList.toggle('active', active);
+                item.setAttribute('aria-selected', active ? 'true' : 'false');
+                if (active) item.scrollIntoView({ block: 'nearest' });
+            });
+        }
+
+        function renderSearchResults(data) {
+            searchResults.textContent = '';
+            activeSearchIndex = -1;
+            const results = data.results || [];
+
+            if (!results.length) {
+                searchStatus.textContent = '';
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-search';
+                const copy = document.createElement('span');
+                copy.append('No results for ');
+                const query = document.createElement('strong');
+                query.textContent = data.query || searchInput.value.trim();
+                copy.append(query, '.');
+                searchStatus.append(icon, copy);
+                searchStatus.classList.add('empty');
+                searchStatus.style.display = '';
+                return;
+            }
+
+            searchStatus.style.display = 'none';
+            searchStatus.classList.remove('empty');
+            let currentGroup = null;
+
+            results.forEach(result => {
+                if (result.group !== currentGroup) {
+                    currentGroup = result.group;
+                    const heading = document.createElement('div');
+                    heading.className = 'global-search-group';
+                    heading.textContent = currentGroup;
+                    searchResults.appendChild(heading);
+                }
+
+                const link = document.createElement('a');
+                link.className = 'global-search-result';
+                link.href = result.url;
+                link.setAttribute('role', 'option');
+                link.setAttribute('aria-selected', 'false');
+
+                const icon = document.createElement('span');
+                icon.className = 'global-search-icon';
+                const iconGlyph = document.createElement('i');
+                iconGlyph.className = 'bi ' + result.icon;
+                icon.appendChild(iconGlyph);
+
+                const copy = document.createElement('span');
+                copy.className = 'global-search-copy';
+                const title = document.createElement('span');
+                title.className = 'global-search-title';
+                title.textContent = result.title;
+                const subtitle = document.createElement('span');
+                subtitle.className = 'global-search-subtitle';
+                subtitle.textContent = result.subtitle || result.type;
+                copy.append(title, subtitle);
+
+                const arrow = document.createElement('i');
+                arrow.className = 'bi bi-arrow-up-right global-search-arrow';
+                link.append(icon, copy, arrow);
+                searchResults.appendChild(link);
+            });
+        }
+
+        async function runGlobalSearch() {
+            const query = searchInput.value.trim();
+            if (query.length < 2) {
+                if (searchRequest) searchRequest.abort();
+                searchResults.textContent = '';
+                searchStatus.textContent = '';
+                searchStatus.style.display = 'none';
+                return;
+            }
+
+            if (searchRequest) searchRequest.abort();
+            searchRequest = new AbortController();
+            searchStatus.textContent = '';
+            const spinner = document.createElement('span');
+            spinner.className = 'global-search-spinner';
+            searchStatus.append(spinner, document.createTextNode('Searching HIMS…'));
+            searchStatus.style.display = '';
+            searchResults.textContent = '';
+
+            try {
+                const response = await fetch('{{ route('search') }}?q=' + encodeURIComponent(query), {
+                    headers: { 'Accept': 'application/json' },
+                    signal: searchRequest.signal,
+                });
+                if (!response.ok) throw new Error('Search failed.');
+                renderSearchResults(await response.json());
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                searchStatus.textContent = '';
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-exclamation-circle';
+                searchStatus.append(icon, document.createTextNode('Search is unavailable right now.'));
+                searchStatus.style.display = '';
+            }
+        }
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(runGlobalSearch, 220);
+        });
+
+        searchInput.addEventListener('keydown', event => {
+            const items = searchItems();
+            if (event.key === 'ArrowDown' && items.length) {
+                event.preventDefault();
+                setActiveSearchResult(activeSearchIndex + 1);
+            } else if (event.key === 'ArrowUp' && items.length) {
+                event.preventDefault();
+                setActiveSearchResult(activeSearchIndex - 1);
+            } else if (event.key === 'Enter' && activeSearchIndex >= 0 && items[activeSearchIndex]) {
+                event.preventDefault();
+                items[activeSearchIndex].click();
+            }
+        });
+
+        document.addEventListener('keydown', event => {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                openSearch();
+            }
+        });
+
+        // Notifications retain their recent history after being read. Only the
+        // unread emphasis and counters change, matching a social activity feed.
         const notifClear = document.getElementById('notif-clear');
-        const notifDot   = document.getElementById('notif-dot');
+        const notifCount = document.getElementById('notif-count');
+        const notifHeadingCount = document.getElementById('notif-heading-count');
+
+        function setNotificationCount(count) {
+            const unread = Math.max(0, Number(count) || 0);
+            if (notifCount) {
+                notifCount.textContent = unread > 99 ? '99+' : String(unread);
+                notifCount.style.display = unread ? '' : 'none';
+            }
+            if (notifHeadingCount) {
+                notifHeadingCount.textContent = unread ? unread + ' unread' : 'All caught up';
+            }
+            if (notifClear) notifClear.style.display = unread ? '' : 'none';
+        }
+
+        function markNotificationRowRead(row) {
+            if (!row.classList.contains('unread')) return;
+            row.classList.remove('unread');
+            row.classList.add('read');
+            row.querySelector('.notif-unread-marker')?.remove();
+            setNotificationCount(document.querySelectorAll('.notif-item.unread').length);
+        }
+
+        document.querySelectorAll('[data-notification-id]').forEach(row => {
+            row.addEventListener('click', async event => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                const destination = row.href;
+
+                try {
+                    const response = await fetch(row.dataset.readUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                        },
+                        keepalive: true,
+                    });
+                    if (response.ok) markNotificationRowRead(row);
+                } finally {
+                    window.location.assign(destination);
+                }
+            });
+        });
+
         if (notifClear) {
-            notifClear.addEventListener('click', () => {
-                if (notifDot) notifDot.style.display = 'none';
+            notifClear.addEventListener('click', async () => {
+                notifClear.disabled = true;
+                try {
+                    const response = await fetch('{{ route('notifications.read-all') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    });
+                    if (response.ok) {
+                        document.querySelectorAll('.notif-item.unread').forEach(markNotificationRowRead);
+                        setNotificationCount(0);
+                    }
+                } finally {
+                    notifClear.disabled = false;
+                }
             });
         }
 
@@ -427,12 +564,23 @@
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
                 closeSidebar();
-                closePanel();
                 closeDropdowns(null);
+                // The AI rail is a dock, not a pop-up: Escape closes it only
+                // while it is overlaying the page, matching how the mobile
+                // nav drawer behaves. On desktop it stays put.
+                if (railOverlays()) closeRail();
             }
         });
+        // Only the flash messages this layout renders self-dismiss, which is why
+        // they are marked rather than selected by class. `.hims-alert` is also the
+        // house style for permanent explanatory banners — the frozen-review notice,
+        // the compliance rule explainers, the AI-unavailable box — and an
+        // unqualified `.hims-alert` selector deleted those four seconds after
+        // load, on every page that had one. Opt-in is the safe direction: a new
+        // flash that forgets the attribute merely stays on screen, whereas a new
+        // banner forgetting an opt-out would vanish silently.
         setTimeout(() => {
-            document.querySelectorAll('.hims-alert').forEach(el => {
+            document.querySelectorAll('[data-auto-dismiss]').forEach(el => {
                 el.style.opacity = '0';
                 el.style.transform = 'translateY(-8px)';
                 el.style.transition = 'all .4s ease';
@@ -440,84 +588,353 @@
             });
         }, 4000);
 
-        // ── AI Bubble logic ──
-        const bubble    = document.getElementById('ai-bubble');
-        const panel     = document.getElementById('ai-panel');
+        /* ══ AI ASSISTANT RAIL ══════════════════════════════════════════
+           A dock, not a pop-up. Three pieces of state:
+             open        whether the rail is showing        (localStorage)
+             width       how wide the user dragged it       (localStorage)
+             sessionId   which conversation is loaded       (localStorage)
+           All three are persisted because this is a multi-page app: every
+           navigation rebuilds the DOM, and the rail has to come back exactly
+           as the user left it or it feels like it closed itself.
+
+           Below RAIL_PUSH_MIN the rail overlays the page instead of pushing
+           it, because a 320px dock on top of a 1024px viewport leaves the
+           tables unreadable. --hims-ai-offset is what the page reflows to,
+           and it is deliberately 0 in overlay mode. */
+        const rail      = document.getElementById('ai-rail');
+        const railToggle = document.getElementById('ai-toggle');
+        const railBackdrop = document.getElementById('ai-rail-backdrop');
+        const resizer   = document.getElementById('ai-rail-resizer');
         const closeBtn  = document.getElementById('ai-close-btn');
-        const clearBtn  = document.getElementById('ai-clear-btn');
+        const newChatBtn = document.getElementById('ai-new-chat');
+        const historyBtn = document.getElementById('ai-history-btn');
+        const sessionsPane = document.getElementById('ai-sessions');
+        const sessionList  = document.getElementById('ai-session-list');
+        const sessionsEmpty = document.getElementById('ai-sessions-empty');
+        const clearAllBtn = document.getElementById('ai-clear-all');
         const input     = document.getElementById('ai-input');
         const sendBtn   = document.getElementById('ai-send-btn');
         const messages  = document.getElementById('ai-messages');
         const welcome   = document.getElementById('ai-welcome');
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-        const STORE_KEY  = 'hims_ai_open';
-        const DRAFT_KEY  = 'hims_ai_draft';
-        let historyLoaded = false;
 
-        function openPanel(skipFocus) {
-            panel.classList.add('open');
-            bubble.classList.add('open');
-            sessionStorage.setItem(STORE_KEY, '1');
-            if (!historyLoaded) loadHistory();
+        const OPEN_KEY    = 'hims_ai_open';
+        const WIDTH_KEY   = 'hims_ai_width';
+        const SESSION_KEY = 'hims_ai_session';
+        const DRAFT_KEY   = 'hims_ai_draft';
+        const HISTORY_KEY = 'hims_ai_history_open';
+        const RAIL_PUSH_MIN = 1100;   // keep in step with hims.css
+        const MIN_W = 280, MAX_W = 620;
+
+        let sessionId  = localStorage.getItem(SESSION_KEY) || null;
+        let sessionsLoaded = false;
+
+        // A global-search result can target one saved conversation on any page.
+        // Put it into the same persisted state the rail normally uses, then
+        // clean the URL so a refresh does not keep overriding the user's choice.
+        const requestedAiSession = new URLSearchParams(window.location.search).get('ai_session');
+        if (requestedAiSession) {
+            sessionId = requestedAiSession;
+            localStorage.setItem(SESSION_KEY, sessionId);
+            localStorage.setItem(OPEN_KEY, '1');
+            localStorage.setItem(HISTORY_KEY, '1');
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('ai_session');
+            window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+        }
+
+        const root = document.documentElement;
+        function railOpen()     { return rail.classList.contains('open'); }
+        function railOverlays() { return window.innerWidth < RAIL_PUSH_MIN; }
+
+        /** Width lives on :root so the topbar and main can both read it. */
+        function applyWidth(px) {
+            const w = Math.min(MAX_W, Math.max(MIN_W, Math.round(px)));
+            root.style.setProperty('--hims-ai-w', w + 'px');
+            localStorage.setItem(WIDTH_KEY, String(w));
+            applyOffset();
+        }
+        /** How much room the page gives up. Zero unless the rail pushes. */
+        function applyOffset() {
+            const push = railOpen() && !railOverlays();
+            root.style.setProperty('--hims-ai-offset',
+                push ? 'var(--hims-ai-w)' : '0px');
+            // Lets the stylesheet loosen anything that assumed a full-width
+            // main column — wide tables in particular.
+            document.body.classList.toggle('ai-rail-docked', push);
+        }
+
+        const savedWidth = parseInt(localStorage.getItem(WIDTH_KEY) || '', 10);
+        if (savedWidth) applyWidth(savedWidth);
+
+        function openRail(skipFocus) {
+            rail.classList.add('open');
+            rail.setAttribute('aria-hidden', 'false');
+            railToggle.setAttribute('aria-expanded', 'true');
+            railToggle.classList.add('active');
+            localStorage.setItem(OPEN_KEY, '1');
+            applyOffset();
+            if (railOverlays()) railBackdrop.classList.add('open');
+            loadConversation();
+            if (!sessionsPane.hasAttribute('hidden')) loadSessions();
             if (!skipFocus) input.focus();
         }
-        function closePanel() {
-            panel.classList.remove('open');
-            bubble.classList.remove('open');
-            sessionStorage.removeItem(STORE_KEY);
+        function closeRail() {
+            rail.classList.remove('open');
+            rail.setAttribute('aria-hidden', 'true');
+            railToggle.setAttribute('aria-expanded', 'false');
+            railToggle.classList.remove('active');
+            railBackdrop.classList.remove('open');
+            localStorage.removeItem(OPEN_KEY);
+            applyOffset();
         }
-        function togglePanel() { panel.classList.contains('open') ? closePanel() : openPanel(); }
+        function toggleRail() { railOpen() ? closeRail() : openRail(); }
 
-        bubble.addEventListener('click', togglePanel);
-        closeBtn.addEventListener('click', closePanel);
+        railToggle.addEventListener('click', toggleRail);
+        closeBtn.addEventListener('click', closeRail);
+        railBackdrop.addEventListener('click', closeRail);
 
-        // Restore draft text the user was typing before navigation
-        const savedDraft = sessionStorage.getItem(DRAFT_KEY) || '';
-        if (savedDraft) { input.value = savedDraft; input.style.height = Math.min(input.scrollHeight, 88) + 'px'; }
-        input.addEventListener('input', () => {
-            sessionStorage.setItem(DRAFT_KEY, input.value);
-            input.style.height = 'auto';
-            input.style.height = Math.min(input.scrollHeight, 88) + 'px';
+        // Ctrl+Shift+A, the way VSCode toggles its secondary sidebar.
+        document.addEventListener('keydown', e => {
+            if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+                e.preventDefault();
+                toggleRail();
+            }
         });
 
-        // Auto-reopen if it was open before navigation
-        if (sessionStorage.getItem(STORE_KEY)) openPanel(true);
+        // Crossing the breakpoint flips push/overlay, so the offset and the
+        // backdrop both have to be recomputed — otherwise a rail opened on a
+        // wide screen keeps squeezing the page after a resize down.
+        window.addEventListener('resize', () => {
+            applyOffset();
+            railBackdrop.classList.toggle('open', railOpen() && railOverlays());
+        });
+/* ── Resize by dragging the rail's left edge ───────────────── */
+        // Pointer events rather than mouse events so a stylus or touch drag
+        // works too, and setPointerCapture keeps the drag alive when the
+        // cursor crosses an iframe or leaves the window.
+        let dragging = false;
+        resizer.addEventListener('pointerdown', e => {
+            dragging = true;
+            resizer.setPointerCapture(e.pointerId);
+            document.body.classList.add('ai-resizing');
+            e.preventDefault();
+        });
+        document.addEventListener('pointermove', e => {
+            if (dragging) applyWidth(window.innerWidth - e.clientX);
+        });
+        document.addEventListener('pointerup', () => {
+            if (!dragging) return;
+            dragging = false;
+            document.body.classList.remove('ai-resizing');
+        });
+        // Keyboard equivalent, so the separator is not mouse-only.
+        resizer.addEventListener('keydown', e => {
+            const current = rail.getBoundingClientRect().width;
+            if (e.key === 'ArrowLeft')  { applyWidth(current + 24); e.preventDefault(); }
+            if (e.key === 'ArrowRight') { applyWidth(current - 24); e.preventDefault(); }
+        });
 
-        function appendMsg(text, role) {
+        /* ── Conversation list ─────────────────────────────────────── */
+        historyBtn.addEventListener('click', () => {
+            const show = sessionsPane.hasAttribute('hidden');
+            sessionsPane.toggleAttribute('hidden', !show);
+            historyBtn.setAttribute('aria-expanded', show ? 'true' : 'false');
+            historyBtn.classList.toggle('active', show);
+            localStorage.setItem(HISTORY_KEY, show ? '1' : '0');
+            if (show) loadSessions();
+        });
+
+        // History was previously hidden on every page load, which made the
+        // stored sessions look as though they had been deleted. Keep it visible
+        // by default and only honour an explicit collapse from this browser.
+        if (localStorage.getItem(HISTORY_KEY) === '0') {
+            sessionsPane.setAttribute('hidden', '');
+            historyBtn.setAttribute('aria-expanded', 'false');
+            historyBtn.classList.remove('active');
+        }
+
+        function setTitle(text) {
+            const label = document.getElementById('ai-rail-title');
+            label.innerHTML = '<i class="bi bi-robot"></i> ';
+            label.appendChild(document.createTextNode(text || 'AI Assistant'));
+            label.title = text || 'AI Assistant';
+        }
+
+        async function loadSessions() {
+            try {
+                const res  = await fetch('{{ route("ai.sessions") }}', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('Conversation history request failed.');
+                const data = await res.json();
+                renderSessions(data.sessions || []);
+                sessionsLoaded = true;
+            } catch (e) {
+                sessionsEmpty.textContent = 'Could not load conversations.';
+                sessionsEmpty.style.display = '';
+            }
+        }
+
+        function renderSessions(list) {
+            sessionList.textContent = '';
+            sessionsEmpty.textContent = 'No earlier conversations.';
+            sessionsEmpty.style.display = list.length ? 'none' : '';
+
+            list.forEach(s => {
+                const row = document.createElement('div');
+                row.className = 'ai-session' + (s.id === sessionId ? ' active' : '');
+
+                // textContent, never innerHTML: titles are the user's own first
+                // question echoed back, so they must not be parsed as markup.
+                const name = document.createElement('button');
+                name.type = 'button';
+                name.className = 'ai-session-name';
+                name.textContent = s.title || 'New chat';
+                name.title = s.title || 'New chat';
+                name.addEventListener('click', () => selectSession(s.id));
+
+                const rename = iconBtn('bi-pencil', 'Rename', async () => {
+                    const next = prompt('Rename conversation', s.title || '');
+                    if (next === null) return;
+                    const title = next.trim();
+                    if (!title) return;
+                    await fetch('/ai/sessions/' + encodeURIComponent(s.id), {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ title }),
+                    });
+                    if (s.id === sessionId) setTitle(title);
+                    loadSessions();
+                });
+
+                const del = iconBtn('bi-trash', 'Delete', async () => {
+                    if (!confirm('Delete this conversation?')) return;
+                    await fetch('/ai/sessions/' + encodeURIComponent(s.id), {
+                        method: 'DELETE',
+                        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                    });
+                    // Deleting the open conversation leaves nothing loaded, so
+                    // drop back to a blank chat rather than a stale transcript.
+                    if (s.id === sessionId) startNewChat(true);
+                    loadSessions();
+                });
+
+                row.append(name, rename, del);
+                sessionList.appendChild(row);
+            });
+        }
+
+        function iconBtn(icon, label, handler) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ai-session-act';
+            b.title = label;
+            b.setAttribute('aria-label', label);
+            b.innerHTML = '<i class="bi ' + icon + '"></i>';
+            b.addEventListener('click', e => { e.stopPropagation(); handler(); });
+            return b;
+        }
+
+        clearAllBtn.addEventListener('click', async () => {
+            if (!confirm('Delete every conversation? This cannot be undone.')) return;
+            await fetch('{{ route("ai.history.clear") }}', {
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+            });
+            renderSessions([]);
+            startNewChat(true);
+        });
+
+        /* ── Transcript ────────────────────────────────────────────── */
+        function appendMsg(text, role, variant) {
             const div = document.createElement('div');
-            div.className = 'ai-msg ' + role;
+            div.className = 'ai-msg ' + role + (variant ? ' ' + variant : '');
             div.textContent = text;
             messages.appendChild(div);
             messages.scrollTop = messages.scrollHeight;
             return div;
         }
 
-        async function loadHistory() {
-            historyLoaded = true;
+        function resetTranscript() {
+            messages.querySelectorAll('.ai-msg:not(#ai-welcome)').forEach(el => el.remove());
+            welcome.style.display = '';
+        }
+
+        function startNewChat(silent) {
+            // No POST /ai/sessions here: the row would be created before the
+            // user types anything, leaving an untitled empty conversation in
+            // the list if they walk away. query() creates it on first send.
+            sessionId = null;
+            localStorage.removeItem(SESSION_KEY);
+            resetTranscript();
+            setTitle(null);
+            if (sessionsLoaded) renderSessionActive();
+            if (!silent) input.focus();
+        }
+
+        function renderSessionActive() {
+            sessionList.querySelectorAll('.ai-session').forEach(el => el.classList.remove('active'));
+        }
+
+        newChatBtn.addEventListener('click', () => startNewChat(false));
+
+        async function selectSession(id) {
+            sessionId = id;
+            localStorage.setItem(SESSION_KEY, id);
+            await loadConversation(true);
+            if (sessionsLoaded) loadSessions();
+        }
+
+        /**
+         * Paint the stored transcript into the rail.
+         *
+         * With no session id it asks /ai/history, which returns the most
+         * recently used conversation — so opening the rail on a fresh browser
+         * resumes where the user left off instead of showing a blank panel.
+         */
+        let conversationLoaded = false;
+        async function loadConversation(force) {
+            if (conversationLoaded && !force) return;
+            conversationLoaded = true;
+            resetTranscript();
+
+            const url = sessionId
+                ? '/ai/sessions/' + encodeURIComponent(sessionId) + '/messages'
+                : '{{ route("ai.history") }}';
+
             try {
-                const res  = await fetch('{{ route("ai.history") }}', {
-                    headers: { 'Accept': 'application/json' }
-                });
+                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                if (res.status === 404) {      // deleted in another tab
+                    startNewChat(true);
+                    return;
+                }
+                if (!res.ok) throw new Error('Conversation request failed.');
                 const data = await res.json();
-                if (data.messages && data.messages.length > 0) {
+                if (data.session && data.session.id) {
+                    sessionId = data.session.id;
+                    localStorage.setItem(SESSION_KEY, sessionId);
+                    setTitle(data.session.title);
+                }
+                if (data.messages && data.messages.length) {
+                    welcome.style.display = 'none';
                     data.messages.forEach(m => appendMsg(m.message, m.role));
-                } else {
-                    welcome.style.display = '';
                 }
             } catch (e) {
-                welcome.style.display = '';
+                conversationLoaded = false;
+                /* leave the welcome message showing */
             }
         }
 
-        clearBtn.addEventListener('click', async () => {
-            if (!confirm('Clear all chat history?')) return;
-            await fetch('{{ route("ai.history.clear") }}', {
-                method: 'DELETE',
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-            });
-            messages.querySelectorAll('.ai-msg:not(#ai-welcome)').forEach(el => el.remove());
-            welcome.style.display = '';
-            historyLoaded = true;
+        /* ── Composer ──────────────────────────────────────────────── */
+        const savedDraft = localStorage.getItem(DRAFT_KEY) || '';
+        if (savedDraft) { input.value = savedDraft; input.style.height = Math.min(input.scrollHeight, 120) + 'px'; }
+        input.addEventListener('input', () => {
+            localStorage.setItem(DRAFT_KEY, input.value);
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 120) + 'px';
         });
 
         async function sendQuery() {
@@ -527,7 +944,7 @@
             welcome.style.display = 'none';
             input.value = '';
             input.style.height = 'auto';
-            sessionStorage.removeItem(DRAFT_KEY);
+            localStorage.removeItem(DRAFT_KEY);
             sendBtn.disabled = true;
             appendMsg(text, 'user');
 
@@ -541,11 +958,31 @@
                         'X-CSRF-TOKEN': csrfToken,
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify({ query: text }),
+                    // session_id is what turns the reply into a follow-up:
+                    // the controller replays this conversation's earlier turns
+                    // to the model. Omitting it starts a fresh one.
+                    body: JSON.stringify({ query: text, session_id: sessionId }),
                 });
                 const data = await res.json();
                 thinking.remove();
-                appendMsg(data.response ?? 'No response.', 'ai');
+                // A reply that changed the database is tinted; a plain answer
+                // carries neither field and renders exactly as before. Replaying
+                // a transcript has no such data, so history stays untinted.
+                const variant = data.pending_confirm ? 'did-pending'
+                    : data.action_status === 'ok' ? 'did-ok'
+                    : data.action_status === 'error' ? 'did-error'
+                    : null;
+                appendMsg(data.response ?? 'No response.', 'ai', variant);
+
+                if (data.session_id) {
+                    const isNew = data.session_id !== sessionId;
+                    sessionId = data.session_id;
+                    localStorage.setItem(SESSION_KEY, sessionId);
+                    setTitle(data.title);
+                    // Titles and ordering both change on send, so the list is
+                    // stale the moment a message lands.
+                    if (sessionsLoaded && (isNew || !sessionsPane.hasAttribute('hidden'))) loadSessions();
+                }
             } catch (err) {
                 thinking.remove();
                 appendMsg('⚠️ Connection error. Please try again.', 'ai');
@@ -559,6 +996,10 @@
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
         });
+
+        // Reopen where the user left off. skipFocus so arriving on a new page
+        // does not steal the caret from the page's own first field.
+        if (localStorage.getItem(OPEN_KEY)) openRail(true);
     });
 </script>
 @stack('scripts')

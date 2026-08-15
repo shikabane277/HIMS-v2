@@ -3,6 +3,25 @@
 @section('page-title','Training Management')
 @section('breadcrumb','HIMS / Training / Session')
 @section('content')
+@php
+    // Hoisted out of the Feedback Summary header, where it used to be computed
+    // inline. The modal that replaced the feedback page is included at the foot
+    // of this file, so the same answer has to be in scope in two places — and a
+    // variable defined inside an @if branch is undefined when that branch does
+    // not run.
+    $sessionIsOver = $session->status === 'completed' || \Carbon\Carbon::parse($session->session_date)->isPast();
+    $empId = auth()->user()->employee_id ?? null;
+    $hasAttended = $sessionIsOver && $empId && DB::table('training_registrations')
+        ->where('session_id', $session->session_id)
+        ->where('employee_id', $empId)
+        ->where('status', 'attended')
+        ->exists();
+    $hasFeedback = $empId && DB::table('training_feedback')
+        ->where('session_id', $session->session_id)
+        ->where('employee_id', $empId)
+        ->exists();
+    $canGiveFeedback = $hasAttended && ! $hasFeedback;
+@endphp
 <div class="d-flex justify-content-between align-items-center mb-4">
     <a href="{{ route('training.index') }}" class="btn-hims btn-hims-ghost"><i class="bi bi-arrow-left"></i> Back</a>
     <form method="POST" action="{{ route('training.register', $session->session_id) }}">
@@ -51,8 +70,40 @@
         @endif
 
         <div class="hims-card mb-3">
-            <div class="card-header"><h5><i class="bi bi-people-fill"></i> Registrations ({{ $session->registered_count ?? 0 }})</h5></div>
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5><i class="bi bi-people-fill"></i> Registrations ({{ $session->registered_count ?? 0 }})</h5>
+                    @can('manage-training')
+                        @if($session->status === 'scheduled' && count($registrations ?? []) > 0)
+                            <button type="button" class="btn-hims btn-hims-outline" style="font-size:13px;padding:6px 14px" onclick="document.getElementById('checkin-form').style.display = document.getElementById('checkin-form').style.display === 'none' ? '' : 'none'">
+                                <i class="bi bi-check2-square"></i> Mark Attendance
+                            </button>
+                        @endif
+                    @endcan
+                </div>
+            </div>
             <div class="card-body" style="padding:0">
+                @can('manage-training')
+                    <form method="POST" action="{{ route('training.sessions.checkin', $session->session_id) }}" id="checkin-form" style="display:none;padding:20px;background:var(--hims-bg);border-bottom:1px solid var(--hims-border)">
+                        @csrf
+                        <div style="margin-bottom:12px;font-weight:600;font-size:13px">Mark each registrant as attended or no-show:</div>
+                        @foreach($registrations ?? [] as $reg)
+                            <div style="padding:8px 0;border-bottom:1px solid var(--hims-border-light)">
+                                <div style="font-weight:600;margin-bottom:4px">{{ $reg->employee_name }}</div>
+                                <label style="margin-right:16px;cursor:pointer">
+                                    <input type="radio" name="registrations[{{ $reg->registration_id }}]" value="attended" @checked($reg->status === 'attended')> Attended
+                                </label>
+                                <label style="cursor:pointer">
+                                    <input type="radio" name="registrations[{{ $reg->registration_id }}]" value="no_show" @checked($reg->status === 'no_show')> No-show
+                                </label>
+                            </div>
+                        @endforeach
+                        <div class="d-flex gap-2 justify-content-end mt-3">
+                            <button type="button" class="btn-hims btn-hims-outline" onclick="document.getElementById('checkin-form').style.display = 'none'">Cancel</button>
+                            <button type="submit" class="btn-hims btn-hims-primary"><i class="bi bi-check-circle"></i> Save Attendance</button>
+                        </div>
+                    </form>
+                @endcan
                 <table class="hims-table">
                     <thead><tr><th>Employee</th><th>Department</th><th>Status</th><th>Registered</th></tr></thead>
                     <tbody>
@@ -60,11 +111,11 @@
                         <tr>
                             <td><strong>{{ $reg->employee_name }}</strong></td>
                             <td>{{ $reg->department_name ?? '—' }}</td>
-                            <td><span class="hims-badge {{ $reg->status === 'attended' ? 'green' : ($reg->status === 'absent' ? 'red' : 'yellow') }}">{{ ucfirst($reg->status) }}</span></td>
+                            <td><span class="hims-badge {{ $reg->status === 'attended' ? 'green' : ($reg->status === 'no_show' ? 'red' : 'yellow') }}">{{ ucfirst(str_replace('_',' ',$reg->status)) }}</span></td>
                             <td style="font-size:12px;color:#6b7280">{{ \Carbon\Carbon::parse($reg->registration_date)->format('M d, Y') }}</td>
                         </tr>
                         @empty
-                        <tr><td colspan="4" style="text-align:center;color:#9ca3af;padding:24px">No registrations yet.</td></tr>
+                        <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:24px">No registrations yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -72,7 +123,16 @@
         </div>
 
         <div class="hims-card">
-            <div class="card-header"><h5><i class="bi bi-chat-square-text"></i> Feedback Summary</h5></div>
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5><i class="bi bi-chat-square-text"></i> Feedback Summary</h5>
+                    @if($canGiveFeedback)
+                        <button type="button" class="btn-hims btn-hims-primary" style="font-size:13px;padding:6px 14px" data-modal-open="feedbackModal">
+                            <i class="bi bi-pencil"></i> Give Feedback
+                        </button>
+                    @endif
+                </div>
+            </div>
             <div class="card-body">
                 @if(($session->avg_rating ?? 0) > 0)
                     <div style="text-align:center;margin-bottom:16px">
@@ -86,4 +146,8 @@
         </div>
     </div>
 </div>
+
+@if($canGiveFeedback)
+    @include('training.sessions._feedback-modal')
+@endif
 @endsection

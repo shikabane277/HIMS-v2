@@ -20,29 +20,29 @@ class AnthropicProvider extends AbstractAiProvider
         return 'Anthropic';
     }
 
-    public function ask(string $prompt): string
+    public function ask(string $prompt, array $history = [], ?string $scope = null): string
     {
         if ($this->apiKey() === '') {
             return $this->missingKey();
         }
 
-        $base    = rtrim((string) ($this->config['base_url'] ?? 'https://api.anthropic.com'), '/');
+        $base = rtrim((string) ($this->config['base_url'] ?? 'https://api.anthropic.com'), '/');
         $version = (string) ($this->config['anthropic_version'] ?? '2023-06-01');
+
+        $messages = $this->buildMessages($prompt, $history);
 
         foreach ($this->models() as $model) {
             try {
                 $response = Http::timeout($this->timeout())
                     ->withHeaders([
-                        'x-api-key'         => $this->apiKey(),
+                        'x-api-key' => $this->apiKey(),
                         'anthropic-version' => $version,
                     ])
                     ->post("{$base}/v1/messages", [
-                        'model'      => $model,
+                        'model' => $model,
                         'max_tokens' => $this->maxTokens(),
-                        'system'     => $this->systemContext(),
-                        'messages'   => [
-                            ['role' => 'user', 'content' => $prompt],
-                        ],
+                        'system' => $this->systemContext($scope),
+                        'messages' => $messages,
                         'temperature' => $this->temperature(),
                     ]);
 
@@ -63,10 +63,35 @@ class AnthropicProvider extends AbstractAiProvider
             } catch (\Throwable $e) {
                 Log::error('Anthropic request failed', ['error' => $e->getMessage()]);
 
-                return '⚠️ AI service error: ' . $e->getMessage();
+                return '⚠️ AI service error: '.$e->getMessage();
             }
         }
 
         return '⚠️ Unable to reach Anthropic with the configured models. Check ANTHROPIC_MODEL / ANTHROPIC_API_KEY in .env.';
+    }
+
+    /**
+     * Build the Messages API array. The system prompt is not a message here, so
+     * the list is prior turns plus the current question. sanitiseHistory()
+     * already guarantees the two constraints this API enforces: the list starts
+     * on 'user' and roles strictly alternate.
+     *
+     * @param  list<array{role?: string, message?: string}>|array<mixed>  $history
+     * @return list<array{role: string, content: string}>
+     */
+    private function buildMessages(string $prompt, array $history): array
+    {
+        $messages = [];
+
+        foreach ($this->sanitiseHistory($history) as $turn) {
+            $messages[] = [
+                'role' => $turn['role'] === 'user' ? 'user' : 'assistant',
+                'content' => $turn['text'],
+            ];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $prompt];
+
+        return $messages;
     }
 }

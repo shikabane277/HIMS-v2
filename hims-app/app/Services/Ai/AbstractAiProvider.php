@@ -27,15 +27,29 @@ abstract class AbstractAiProvider implements AiProvider
      * The HIMS system prompt prepended to (or sent alongside) every user
      * prompt. Kept identical across drivers so answers stay consistent
      * whichever model is configured.
+     *
+     * Carries HimsKnowledge::appGuide() — a map of the real navigation and,
+     * more usefully, of the real limits. Without it the model answers "how do I
+     * do X in HIMS" from generic LMS conventions and invents pages and fields
+     * that were never built; see that class for the case that prompted it.
+     *
+     * $scope is the caller's role-based access instruction from
+     * AiAccessPolicy::scopeFor(), appended when present. It arrives per call
+     * because this driver is a shared singleton — see AiProvider::ask().
      */
-    protected function systemContext(): string
+    protected function systemContext(?string $scope = null): string
     {
-        return 'You are an AI assistant for a Hospital Information Management System (HIMS) '
+        $base = 'You are an AI assistant for a Hospital Information Management System (HIMS) '
             .'in the Philippines. You help HR officers with performance reviews, competency gaps, '
-            .'succession planning, training schedules, learning pathways, and employee recognition. '
+            .'succession planning, training schedules, and learning pathways. '
             .'Reply in English by default. Only switch to Tagalog or Taglish when the user clearly '
             .'writes to you in Tagalog or Taglish, and then match their language. Be concise and helpful. '
-            .'Always be professional and sensitive to healthcare context.';
+            .'Always be professional and sensitive to healthcare context.'
+            ."\n\n".HimsKnowledge::appGuide();
+
+        return $scope === null || trim($scope) === ''
+            ? $base
+            : $base."\n\n".trim($scope);
     }
 
     protected function apiKey(): string
@@ -79,6 +93,140 @@ abstract class AbstractAiProvider implements AiProvider
     protected function timeout(): int
     {
         return (int) ($this->config['timeout'] ?? 30);
+    }
+
+    /** Most recent turns to replay. Caps the request size; oldest are dropped. */
+    protected function historyTurns(): int
+    {
+        return max(0, (int) ($this->config['history_turns'] ?? 20));
+    }
+
+    /** Character ceiling across all replayed turns. A crude but hard budget. */
+    protected function historyChars(): int
+    {
+        return max(0, (int) ($this->config['history_chars'] ?? 12000));
+    }
+
+    /**
+     * Normalise stored chat rows into turns that are safe to send to a model.
+     *
+     * The stored history cannot be forwarded as-is. Four things have to happen:
+     *
+     * 1. Replies HIMS wrote itself are dropped, along with the question each one
+     *    answered. AiController persists whatever came back, and that is not
+     *    always model output: on an API/config error it is a "⚠️" string from
+     *    this class, and on a blocked question it is a "🔒" refusal from
+     *    AiAccessPolicy. Replaying either would teach the model that its own
+     *    voice says "⚠️ API key not configured" or "🔒 I can't help with that",
+     *    and it would keep saying so for the life of the conversation. The
+     *    question goes with it because an exchange that never happened should
+     *    not leave half of itself behind.
+     * 2. Roles are forced to alternate user → ai → user → ai. Anthropic rejects
+     *    two consecutive turns of the same role outright. Where a duplicate does
+     *    occur, the OLDER turn is the one dropped: the answer that follows
+     *    belongs to the most recent question, so keeping the newer question is
+     *    what preserves the pairing.
+     * 3. A trailing unanswered question is dropped, because the caller appends
+     *    the current prompt as the final user turn.
+     * 4. The result is capped — by turn count and by total characters, oldest
+     *    first. Nothing else in the stack bounds the request: max_tokens limits
+     *    generation only, so an unbounded transcript would grow until the
+     *    provider rejected it.
+     *
+     * @param  list<array{role?: string, message?: string}>|array<mixed>  $history
+     * @return list<array{role: 'user'|'ai', text: string}>
+     */
+    protected function sanitiseHistory(array $history): array
+    {
+        $turns = [];
+
+        foreach ($history as $entry) {
+            $entry = is_object($entry) ? (array) $entry : $entry;
+
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $role = ($entry['role'] ?? '') === 'user' ? 'user' : 'ai';
+            $text = trim((string) ($entry['message'] ?? ''));
+
+            if ($text === '') {
+                continue;
+            }
+
+            $lastRole = $turns === [] ? null : $turns[count($turns) - 1]['role'];
+
+            if ($role === 'ai') {
+                // A reply this app generated rather than the model — take the
+                // question it stood in for out with it.
+                if ($this->isSyntheticReply($text)) {
+                    if ($lastRole === 'user') {
+                        array_pop($turns);
+                    }
+
+                    continue;
+                }
+
+                // An answer cannot open the list or follow another answer.
+                if ($lastRole !== 'user') {
+                    continue;
+                }
+            } elseif ($lastRole === 'user') {
+                // Two questions running: the previous one never got an answer,
+                // so drop it rather than let it absorb this one's reply.
+                array_pop($turns);
+            }
+
+            $turns[] = ['role' => $role, 'text' => $text];
+        }
+
+        // The caller supplies the current question, so the replay must end on a
+        // completed exchange.
+        if ($turns !== [] && $turns[count($turns) - 1]['role'] === 'user') {
+            array_pop($turns);
+        }
+
+        return $this->capHistory($turns);
+    }
+
+    /**
+     * True for a stored reply that HIMS wrote rather than a model: provider
+     * failures and RBAC refusals. Both are real parts of the transcript the user
+     * sees, and neither belongs in what the model is told it said.
+     */
+    private function isSyntheticReply(string $text): bool
+    {
+        return str_starts_with($text, '⚠️')
+            || str_starts_with($text, AiAccessPolicy::REFUSAL_PREFIX);
+    }
+
+    /**
+     * Trim to the configured budget from the oldest end, then re-drop a leading
+     * 'ai' turn — cutting mid-exchange can leave the list starting on an answer,
+     * which Anthropic will not accept.
+     *
+     * @param  list<array{role: 'user'|'ai', text: string}>  $turns
+     * @return list<array{role: 'user'|'ai', text: string}>
+     */
+    private function capHistory(array $turns): array
+    {
+        if (count($turns) > $this->historyTurns()) {
+            $turns = array_slice($turns, -$this->historyTurns());
+        }
+
+        $budget = $this->historyChars();
+        $total = array_sum(array_map(fn (array $t): int => mb_strlen($t['text']), $turns));
+
+        while ($turns !== [] && $total > $budget) {
+            $dropped = array_shift($turns);
+            $total -= mb_strlen($dropped['text']);
+        }
+
+        while ($turns !== [] && $turns[0]['role'] === 'ai') {
+            array_shift($turns);
+        }
+
+        return array_values($turns);
     }
 
     /** Standard "no key" failure string (honours the ⚠️ contract). */

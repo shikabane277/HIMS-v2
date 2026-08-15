@@ -70,14 +70,39 @@
                             <input type="date" name="hire_date" class="hims-input" value="{{ old('hire_date') }}" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="hims-label">Employment Status</label>
-                            <select name="employment_status" class="hims-input hims-select">
-                                <option value="active" selected>Active</option>
-                                <option value="probationary">Probationary</option>
-                                <option value="on_leave">On Leave</option>
-                                <option value="resigned">Resigned</option>
-                                <option value="terminated">Terminated</option>
+                            <label class="hims-label">Reports To</label>
+                            <select name="supervisor_id" class="hims-input hims-select">
+                                <option value="">&mdash; No supervisor &mdash;</option>
+                                @foreach($supervisors as $supervisor)
+                                    <option value="{{ $supervisor->employee_id }}" @selected(old('supervisor_id') === $supervisor->employee_id)>
+                                        {{ $supervisor->first_name }} {{ $supervisor->last_name }} &mdash;
+                                        {{ $supervisor->position_title ?: 'No position title' }} &mdash;
+                                        {{ $supervisor->department_name }} &mdash; {{ $supervisor->access_label }}
+                                    </option>
+                                @endforeach
                             </select>
+                            <div id="managerWarning" class="hims-alert warning mt-2" style="display:none;padding:9px 12px;font-size:12px">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                No manager is assigned. Review authority will need an HR/Admin exception until a reporting line is set.
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="hims-label">Employment Status</label>
+                            @php $status = old('employment_status', 'active'); @endphp
+                            <select name="employment_status" class="hims-input hims-select" required>
+                                @foreach(['active'=>'Active','probationary'=>'Probationary','on_leave'=>'On Leave','suspended'=>'Suspended','resigned'=>'Resigned','terminated'=>'Terminated'] as $value => $label)
+                                    <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="hims-label d-flex align-items-center gap-2">
+                                <input type="checkbox" name="is_people_manager" value="1" @checked(old('is_people_manager'))>
+                                People Manager
+                            </label>
+                            <div style="font-size:11.5px;color:#6b7280;margin-top:2px">
+                                This employee can have other employees report to them. This setting does not grant HIMS access; the account role remains a separate decision.
+                            </div>
                         </div>
                         <div class="col-12 mt-3 d-flex gap-2 justify-content-end">
                             <a href="{{ route('employees.index') }}" class="btn-hims btn-hims-outline">Cancel</a>
@@ -92,3 +117,16 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    (() => {
+        const select = document.querySelector('select[name="supervisor_id"]');
+        const warning = document.getElementById('managerWarning');
+        if (!select || !warning) return;
+        const sync = () => { warning.style.display = select.value ? 'none' : 'flex'; };
+        select.addEventListener('change', sync);
+        sync();
+    })();
+</script>
+@endpush

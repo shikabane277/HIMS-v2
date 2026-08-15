@@ -50,7 +50,7 @@
 <div class="row g-3">
     @forelse($depts as $dept)
     <div class="col-sm-6 col-lg-4">
-        <div class="hims-card" style="height:100%;transition:.2s" onmouseover="this.style.boxShadow='var(--hims-shadow-md)'" onmouseout="this.style.boxShadow='var(--hims-shadow)'">
+        <div class="hims-card" id="department-{{ $dept->department_id }}" style="height:100%;transition:.2s;scroll-margin-top:84px" onmouseover="this.style.boxShadow='var(--hims-shadow-md)'" onmouseout="this.style.boxShadow='var(--hims-shadow)'">
             <div class="card-header" style="padding:16px 20px">
                 <h5 style="font-size:14px">
                     <span style="font-size:18px;margin-right:6px">{{ $dept->is_clinical ? '🏥' : '🗂️' }}</span>

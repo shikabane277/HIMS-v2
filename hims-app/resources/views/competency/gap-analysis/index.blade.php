@@ -80,14 +80,14 @@
     </div>
     <div class="card-body" style="padding:0">
         <table class="hims-table">
-            <thead><tr><th>Employee</th><th>Position</th><th>Department</th><th style="text-align:right">Analysis</th></tr></thead>
+            <thead><tr><th>Employee</th><th>Position</th><th>Department</th><th class="text-end">Analysis</th></tr></thead>
             <tbody>
                 @forelse($employees as $employee)
                 <tr>
                     <td><strong>{{ $employee->first_name }} {{ $employee->last_name }}</strong></td>
                     <td>{{ $employee->position_title ?? '—' }}</td>
                     <td>{{ $employee->department_name }}</td>
-                    <td style="text-align:right">
+                    <td class="text-end">
                         <a href="{{ route('competency.gap.employee', $employee->employee_id) }}" class="btn-hims btn-hims-primary btn-sm">
                             <i class="bi bi-robot"></i> Analyse
                         </a>

@@ -60,12 +60,19 @@ return [
     |--------------------------------------------------------------------------
     |
     | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | will be used by the PHP date and date-time functions.
+    |
+    | This is a single-site hospital system in the Philippines, so the app's
+    | clock is the hospital's clock. It is NOT cosmetic: dates here are decision
+    | boundaries, not display values. CycleStatus and CredentialStatus both ask
+    | "has this date passed?" against now()->toDateString(), and under the stock
+    | UTC default that question answered "no" for the first eight hours of every
+    | Philippine day — so a review cycle that ended yesterday locally stayed
+    | editable until 8am, and a credential expiring today read as current.
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Manila'),
 
     /*
     |--------------------------------------------------------------------------

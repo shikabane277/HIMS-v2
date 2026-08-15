@@ -66,6 +66,11 @@ class User extends Authenticatable
         return $this->role === 'staff';
     }
 
+    public function canCompleteReviews(): bool
+    {
+        return $this->hasRole('admin', 'hr_manager', 'supervisor');
+    }
+
     /**
      * Admin and HR see the whole organisation; everyone else is scoped.
      */

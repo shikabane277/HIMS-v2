@@ -49,7 +49,7 @@ class AiManager
             return $this->resolved[$default] ??= $this->make($default);
         } catch (InvalidArgumentException $e) {
             Log::error('Invalid AI_PROVIDER configured', [
-                'provider'  => $default,
+                'provider' => $default,
                 'available' => array_keys((array) ($this->config['providers'] ?? [])),
             ]);
 
@@ -70,10 +70,10 @@ class AiManager
 
         return match ($name) {
             'google', 'google-gemini', 'googleai' => 'gemini',
-            'claude', 'claude-ai'                 => 'anthropic',
-            'gpt', 'chatgpt', 'open-ai'           => 'openai',
-            'openai-compatible', 'custom'         => 'compatible',
-            default                               => $name,
+            'claude', 'claude-ai' => 'anthropic',
+            'gpt', 'chatgpt', 'open-ai' => 'openai',
+            'openai-compatible', 'custom' => 'compatible',
+            default => $name,
         };
     }
 
@@ -86,23 +86,25 @@ class AiManager
             throw new InvalidArgumentException("AI provider [{$name}] is not configured in services.ai.providers.");
         }
 
-        $conf   = (array) $providers[$name];
+        $conf = (array) $providers[$name];
         $driver = (string) ($conf['driver'] ?? $name);
 
         // Fold the shared defaults under each provider's own settings.
         $conf += [
             'temperature' => $this->config['temperature'] ?? 0.7,
-            'max_tokens'  => $this->config['max_tokens'] ?? 1024,
-            'timeout'     => $this->config['timeout'] ?? 30,
+            'max_tokens' => $this->config['max_tokens'] ?? 1024,
+            'timeout' => $this->config['timeout'] ?? 30,
+            'history_turns' => $this->config['history_turns'] ?? 20,
+            'history_chars' => $this->config['history_chars'] ?? 12000,
         ];
 
         return match ($driver) {
-            'gemini'     => new GeminiProvider($conf),
-            'anthropic'  => new AnthropicProvider($conf),
-            'openai'     => new OpenAiProvider($conf, 'OpenAI'),
+            'gemini' => new GeminiProvider($conf),
+            'anthropic' => new AnthropicProvider($conf),
+            'openai' => new OpenAiProvider($conf, 'OpenAI'),
             // Any OpenAI-compatible host (Groq, DeepSeek, xAI, Mistral, …).
             'compatible' => new OpenAiProvider($conf, (string) ($conf['label'] ?? 'AI')),
-            default      => throw new InvalidArgumentException("Unknown AI driver [{$driver}] for provider [{$name}]."),
+            default => throw new InvalidArgumentException("Unknown AI driver [{$driver}] for provider [{$name}]."),
         };
     }
 }

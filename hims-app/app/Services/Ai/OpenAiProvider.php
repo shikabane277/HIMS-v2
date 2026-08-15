@@ -25,7 +25,7 @@ class OpenAiProvider extends AbstractAiProvider
         return $this->label;
     }
 
-    public function ask(string $prompt): string
+    public function ask(string $prompt, array $history = [], ?string $scope = null): string
     {
         if ($this->apiKey() === '') {
             return $this->missingKey();
@@ -33,18 +33,17 @@ class OpenAiProvider extends AbstractAiProvider
 
         $base = rtrim((string) ($this->config['base_url'] ?? 'https://api.openai.com/v1'), '/');
 
+        $messages = $this->buildMessages($prompt, $history, $scope);
+
         foreach ($this->models() as $model) {
             try {
                 $response = Http::timeout($this->timeout())
                     ->withToken($this->apiKey())
                     ->post("{$base}/chat/completions", [
-                        'model'    => $model,
-                        'messages' => [
-                            ['role' => 'system', 'content' => $this->systemContext()],
-                            ['role' => 'user',   'content' => $prompt],
-                        ],
+                        'model' => $model,
+                        'messages' => $messages,
                         'temperature' => $this->temperature(),
-                        'max_tokens'  => $this->maxTokens(),
+                        'max_tokens' => $this->maxTokens(),
                     ]);
 
                 if ($response->successful()) {
@@ -58,24 +57,46 @@ class OpenAiProvider extends AbstractAiProvider
                 }
 
                 $msg = $response->json('error.message') ?? $response->body();
-                Log::warning($this->label() . ' API error', ['status' => $response->status(), 'body' => $response->body()]);
+                Log::warning($this->label().' API error', ['status' => $response->status(), 'body' => $response->body()]);
 
                 return "⚠️ {$this->label()} API Error ({$response->status()}): {$msg}";
             } catch (\Throwable $e) {
-                Log::error($this->label() . ' request failed', ['error' => $e->getMessage()]);
+                Log::error($this->label().' request failed', ['error' => $e->getMessage()]);
 
-                return '⚠️ AI service error: ' . $e->getMessage();
+                return '⚠️ AI service error: '.$e->getMessage();
             }
         }
 
         return "⚠️ Unable to reach {$this->label()} with the configured models. Check the model/API key in .env.";
     }
 
+    /**
+     * Build the chat-completions messages array.
+     *
+     * @param  list<array{role?: string, message?: string}>|array<mixed>  $history
+     * @return list<array{role: string, content: string}>
+     */
+    private function buildMessages(string $prompt, array $history, ?string $scope = null): array
+    {
+        $messages = [['role' => 'system', 'content' => $this->systemContext($scope)]];
+
+        foreach ($this->sanitiseHistory($history) as $turn) {
+            $messages[] = [
+                'role' => $turn['role'] === 'user' ? 'user' : 'assistant',
+                'content' => $turn['text'],
+            ];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $prompt];
+
+        return $messages;
+    }
+
     /** Heuristic: does this error body point at the model name rather than auth/quota? */
     private function looksLikeModelError(mixed $body): bool
     {
         $message = is_array($body) ? ($body['error']['message'] ?? '') : '';
-        $code    = is_array($body) ? ($body['error']['code'] ?? '') : '';
+        $code = is_array($body) ? ($body['error']['code'] ?? '') : '';
 
         return str_contains(strtolower((string) $message), 'model')
             || in_array($code, ['model_not_found', 'invalid_model'], true);

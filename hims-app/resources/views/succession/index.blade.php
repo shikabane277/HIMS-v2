@@ -8,96 +8,54 @@
         <h2 style="font-size:20px;font-weight:700;margin:0">Succession Planning</h2>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">9-Box talent grid, critical role management, and leadership pipelines.</p>
     </div>
+    @can('manage-succession')
     <div class="d-flex gap-2">
         <a href="{{ route('succession.positions.create') }}" class="btn-hims btn-hims-outline"><i class="bi bi-briefcase"></i> Add Critical Position</a>
-        <a href="{{ route('succession.candidates.create') }}" class="btn-hims btn-hims-primary"><i class="bi bi-person-plus"></i> Nominate Candidate</a>
+        <button type="button" class="btn-hims btn-hims-primary" data-modal-open="nominationModal"><i class="bi bi-person-plus"></i> Nominate Successor</button>
     </div>
+    @endcan
 </div>
 
+@if($canSeeConfidential)
 <div class="row g-3 mb-4">
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">🏥</div><div class="stat-value">{{ $stats['critical_positions'] ?? 0 }}</div><div class="stat-label">Critical Positions</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">🌟</div><div class="stat-value">{{ $stats['ready_now'] ?? 0 }}</div><div class="stat-label">Ready Now</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">📈</div><div class="stat-value">{{ $stats['in_development'] ?? 0 }}</div><div class="stat-label">In Development</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">🔴</div><div class="stat-value">{{ $stats['high_risk'] ?? 0 }}</div><div class="stat-label">High-Risk Vacancies</div></div></div>
+    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon">🏥</div><div class="stat-value">{{ $stats['critical_positions'] ?? 0 }}</div><div class="stat-label">Critical Positions</div></div></div>
+    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon">🌟</div><div class="stat-value">{{ $stats['ready_now'] ?? 0 }}</div><div class="stat-label">Ready Now</div></div></div>
+    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon">📈</div><div class="stat-value">{{ $stats['in_development'] ?? 0 }}</div><div class="stat-label">In Development</div></div></div>
 </div>
-
+@else
 <div class="row g-3 mb-4">
-    <!-- 9-Box Grid -->
-    <div class="col-lg-6">
-        <div class="hims-card">
-            <div class="card-header">
-                <h5><i class="bi bi-grid-3x3-gap"></i> 9-Box Talent Grid</h5>
-                <div style="display:flex;gap:12px;align-items:center">
-                    <span style="font-size:11px;color:#6b7280">↑ Performance  → Potential</span>
-                </div>
-            </div>
-            <div class="card-body">
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:6px;height:260px">
-                    @php
-                        $boxes = [
-                            ['label'=>'Future Star','class'=>'star','perf'=>'High','pot'=>'High'],
-                            ['label'=>'High Performer','class'=>'high','perf'=>'High','pot'=>'Medium'],
-                            ['label'=>'Solid Contributor','class'=>'solid','perf'=>'High','pot'=>'Low'],
-                            ['label'=>'High Potential','class'=>'potential','perf'=>'Medium','pot'=>'High'],
-                            ['label'=>'Core Employee','class'=>'core','perf'=>'Medium','pot'=>'Medium'],
-                            ['label'=>'Average','class'=>'avg','perf'=>'Medium','pot'=>'Low'],
-                            ['label'=>'Rough Diamond','class'=>'diamond','perf'=>'Low','pot'=>'High'],
-                            ['label'=>'Inconsistent','class'=>'inconsist','perf'=>'Low','pot'=>'Medium'],
-                            ['label'=>'Underperformer','class'=>'under','perf'=>'Low','pot'=>'Low'],
-                        ];
-                        $boxCounts = $box_counts ?? [];
-                    @endphp
-                    @foreach($boxes as $box)
-                    <div class="nine-box-cell {{ $box['class'] }}"
-                         title="{{ $box['perf'] }} Performance / {{ $box['pot'] }} Potential">
-                        <span class="nine-box-count">{{ $boxCounts[$box['class']] ?? 0 }}</span>
-                        <span style="font-size:10px;text-align:center;line-height:1.2">{{ $box['label'] }}</span>
-                    </div>
-                    @endforeach
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:10.5px;color:#6b7280">
-                    <span>← Low Potential</span><span>High Potential →</span>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div class="col-sm-6"><div class="stat-card"><div class="stat-icon"><i class="bi bi-briefcase"></i></div><div class="stat-value">{{ $stats['critical_positions'] ?? 0 }}</div><div class="stat-label">Relevant Critical Positions</div></div></div>
+    <div class="col-sm-6"><div class="stat-card"><div class="stat-icon"><i class="bi bi-signpost-split"></i></div><div class="stat-value">{{ $candidates->count() }}</div><div class="stat-label">Direct-Report Development Plans</div></div></div>
+</div>
+@endif
 
-    <!-- Critical Positions -->
-    <div class="col-lg-6">
-        <div class="hims-card">
-            <div class="card-header">
-                <h5><i class="bi bi-exclamation-triangle-fill"></i> Critical Positions</h5>
-                <a href="{{ route('succession.positions.index') }}" class="btn-hims btn-hims-ghost btn-sm">All</a>
-            </div>
-            <div class="card-body" style="padding:0">
-                <table class="hims-table">
-                    <thead><tr><th>Position</th><th>Dept</th><th>Candidates</th><th>Risk</th></tr></thead>
-                    <tbody>
-                        @forelse($positions ?? [] as $pos)
-                        <tr>
-                            <td>
-                                <a href="{{ route('succession.positions.show', $pos->position_id) }}" style="font-weight:600;color:var(--hims-text-dark)">{{ $pos->position_title }}</a>
-                                <div style="font-size:11px;color:#9ca3af">{{ $pos->current_holder_name ?? 'Vacant' }}</div>
-                            </td>
-                            <td style="font-size:12.5px">{{ $pos->department_name ?? '—' }}</td>
-                            <td>
-                                <span class="hims-badge {{ $pos->candidates_count > 0 ? 'green' : 'red' }}">
-                                    {{ $pos->candidates_count ?? 0 }} candidates
-                                </span>
-                            </td>
-                            <td>
-                                <span class="hims-badge {{ $pos->vacancy_risk === 'critical' ? 'red' : ($pos->vacancy_risk === 'high' ? 'yellow' : 'green') }}">
-                                    {{ ucfirst($pos->vacancy_risk) }}
-                                </span>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:32px">No critical positions defined yet.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<div class="hims-card mb-4">
+    <div class="card-header">
+        <h5><i class="bi bi-exclamation-triangle-fill"></i> Critical Positions & Coverage</h5>
+        <a href="{{ route('succession.positions.index') }}" class="btn-hims btn-hims-ghost btn-sm">All Positions</a>
+    </div>
+    <div class="card-body" style="padding:0">
+        <table class="hims-table">
+            <thead><tr><th>Position</th><th>Department</th><th>Current Holder</th>@if($canSeeConfidential)<th>Nominated Candidates</th>@endif</tr></thead>
+            <tbody>
+                @forelse($positions ?? [] as $pos)
+                <tr>
+                    <td>
+                        <a href="{{ route('succession.positions.show', $pos->position_id) }}" style="font-weight:600;color:var(--hims-text-dark)">{{ $pos->position_title }}</a>
+                    </td>
+                    <td style="font-size:12.5px">{{ $pos->department_name ?? '—' }}</td>
+                    <td style="font-size:12.5px">{{ $pos->current_holder_name ?? 'Vacant' }}</td>
+                    @if($canSeeConfidential)<td>
+                        <span class="hims-badge {{ $pos->candidates_count > 0 ? 'green' : 'red' }}">
+                            {{ $pos->candidates_count ?? 0 }} candidate(s)
+                        </span>
+                    </td>@endif
+                </tr>
+                @empty
+                <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:32px">No critical positions defined yet.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -106,7 +64,6 @@
     <div class="card-header">
         <h5><i class="bi bi-people-fill"></i> Succession Candidate Pipeline</h5>
         <div class="d-flex gap-2">
-            {{-- GET so the filter is shareable/bookmarkable and survives a refresh. --}}
             <form method="GET" action="{{ route('succession.index') }}">
                 <select name="position_id" onchange="this.form.submit()"
                         class="hims-input hims-select" style="width:190px;padding:6px 12px;font-size:13px">
@@ -127,7 +84,7 @@
     </div>
     <div class="card-body" style="padding:0">
         <table class="hims-table">
-            <thead><tr><th>Candidate</th><th>Target Position</th><th>9-Box</th><th>Readiness</th><th>Dev Progress</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Candidate</th><th>Target Position</th>@if($canSeeConfidential)<th>Readiness</th>@endif<th>Dev Progress</th>@if($canSeeConfidential)<th>Status</th>@endif<th>Actions</th></tr></thead>
             <tbody>
                 @forelse($candidates ?? [] as $cand)
                 <tr>
@@ -143,28 +100,18 @@
                         </div>
                     </td>
                     <td style="font-size:13px">{{ $cand->target_position ?? '—' }}</td>
-                    <td>
-                        @php
-                            $boxClass = match($cand->nine_box_label ?? '') {
-                                'star' => 'green', 'high' => 'green', 'solid' => 'green',
-                                'potential', 'core' => 'blue', 'diamond' => 'yellow',
-                                'under', 'inconsist' => 'red', default => 'gray'
-                            };
-                        @endphp
-                        <span class="hims-badge {{ $boxClass }}">{{ ucfirst(str_replace('_',' ',$cand->nine_box_label ?? '—')) }}</span>
-                    </td>
-                    <td>
+                    @if($canSeeConfidential)<td>
                         <span class="hims-badge {{ $cand->readiness_level === 'ready_now' ? 'green' : ($cand->readiness_level === '1_2_years' ? 'yellow' : 'gray') }}">
                             {{ str_replace('_',' ',ucfirst($cand->readiness_level ?? '—')) }}
                         </span>
-                    </td>
+                    </td>@endif
                     <td>
                         <div style="min-width:100px">
                             <div style="font-size:11px;color:#6b7280;margin-bottom:3px">{{ $cand->dev_progress ?? 0 }}%</div>
                             <div class="hims-progress"><div class="hims-progress-bar" style="width:{{ $cand->dev_progress ?? 0 }}%"></div></div>
                         </div>
                     </td>
-                    <td><span class="hims-badge {{ $cand->status === 'approved' ? 'green' : 'yellow' }}">{{ ucfirst($cand->status ?? 'proposed') }}</span></td>
+                    @if($canSeeConfidential)<td><span class="hims-badge {{ $cand->status === 'approved' ? 'green' : 'yellow' }}">{{ ucfirst($cand->status ?? 'proposed') }}</span></td>@endif
                     <td>
                         <div class="d-flex gap-1">
                             <a href="{{ route('succession.candidates.show', $cand->candidate_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
@@ -177,7 +124,7 @@
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="7" class="text-center" style="color:#9ca3af;padding:32px">
+                <tr><td colspan="6" class="text-center" style="color:#9ca3af;padding:32px">
                     {{ ($filterPositionId ?? null) ? 'No candidates nominated for this position.' : 'No candidates nominated yet.' }}
                 </td></tr>
                 @endforelse
@@ -185,4 +132,66 @@
         </table>
     </div>
 </div>
+
+@can('manage-succession')
+@push('modals')
+<div class="hims-modal-backdrop" id="nominationModal" style="display:none">
+    <div class="hims-modal" style="max-width:520px">
+        <div class="hims-modal-header">
+            <h4><i class="bi bi-person-plus"></i> Nominate Successor</h4>
+            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
+        </div>
+        <form method="POST" action="{{ route('succession.candidates.store') }}">
+            @csrf
+            <div class="hims-modal-body">
+                <div class="mb-3">
+                    <label class="hims-label">Candidate</label>
+                    <select name="employee_id" class="hims-input hims-select" required>
+                        <option value="">Select Employee...</option>
+                        @foreach($employees ?? [] as $emp)
+                            <option value="{{ $emp->employee_id }}">{{ $emp->first_name }} {{ $emp->last_name }} ({{ $emp->position_title ?? 'Employee' }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Target Position</label>
+                    <select name="position_id" class="hims-input hims-select" required>
+                        <option value="">Select Target Position...</option>
+                        @foreach($positions ?? [] as $pos)
+                            <option value="{{ $pos->position_id }}">{{ $pos->position_title }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Readiness Stage</label>
+                    <select name="readiness_level" class="hims-input hims-select" required>
+                        <option value="ready_now">Ready Now</option>
+                        <option value="1_2_years" selected>Ready in 1–2 Years</option>
+                        <option value="2_5_years">Ready in 2–5 Years</option>
+                        <option value="long_term">Long Term</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Assigned Mentor (Optional)</label>
+                    <select name="mentor_id" class="hims-input hims-select">
+                        <option value="">None</option>
+                        @foreach($employees ?? [] as $emp)
+                            <option value="{{ $emp->employee_id }}">{{ $emp->first_name }} {{ $emp->last_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Notes</label>
+                    <textarea name="notes" class="hims-input" rows="3" placeholder="Nomination rationale or initial goals..."></textarea>
+                </div>
+            </div>
+            <div class="hims-modal-footer">
+                <button type="button" class="btn-hims btn-hims-ghost" data-modal-dismiss>Cancel</button>
+                <button type="submit" class="btn-hims btn-hims-primary">Submit Nomination</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endpush
+@endcan
 @endsection

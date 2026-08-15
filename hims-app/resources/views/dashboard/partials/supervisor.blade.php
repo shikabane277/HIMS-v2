@@ -95,15 +95,14 @@
                 <a href="{{ route('performance.reviews.create') }}" class="btn-hims btn-hims-primary" style="justify-content:center"><i class="bi bi-clipboard-check"></i> Start a Review</a>
                 @endcan
                 @can('manage-competency')
-                <a href="{{ route('competency.assessments.create') }}" class="btn-hims btn-hims-outline" style="justify-content:center"><i class="bi bi-bullseye"></i> Record Assessment</a>
+                <a href="{{ route('competency.index', ['new' => 'assessment']) }}" class="btn-hims btn-hims-outline" style="justify-content:center"><i class="bi bi-bullseye"></i> Record Assessment</a>
                 @endcan
                 @can('run-gap-analysis')
                 <a href="{{ route('competency.gap.department') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-robot"></i> Department Gap Analysis</a>
                 @endcan
                 @can('manage-training')
-                <a href="{{ route('training.sessions.create') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-calendar-plus"></i> Schedule Training</a>
+                <a href="{{ route('training.index') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-calendar-plus"></i> Schedule Training</a>
                 @endcan
-                <a href="{{ route('recognition.posts.create') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-star"></i> Give Recognition</a>
             </div>
         </div>
     </div>

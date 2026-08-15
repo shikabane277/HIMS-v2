@@ -52,9 +52,9 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.12s">
-            <div class="stat-icon">⭐</div>
-            <div class="stat-value">{{ $stats['recognitions_this_month'] ?? 0 }}</div>
-            <div class="stat-label">Recognitions This Month</div>
+            <div class="stat-icon">📚</div>
+            <div class="stat-value">{{ $stats['active_enrollments'] ?? 0 }}</div>
+            <div class="stat-label">Active Enrollments</div>
         </div>
     </div>
     @if(isset($system))
@@ -172,18 +172,17 @@
             <div class="card-header"><h5>🚀 Quick Actions</h5></div>
             <div class="card-body d-flex flex-column gap-2">
                 @can('manage-review-cycles')
-                <a href="{{ route('performance.cycles.create') }}" class="btn-hims btn-hims-primary" style="justify-content:center"><i class="bi bi-plus-circle"></i> New Review Cycle</a>
+                <a href="{{ route('performance.index', ['new' => 'cycle']) }}" class="btn-hims btn-hims-primary" style="justify-content:center"><i class="bi bi-plus-circle"></i> New Review Cycle</a>
                 @endcan
                 @can('manage-performance')
                 <a href="{{ route('performance.reviews.create') }}" class="btn-hims btn-hims-outline" style="justify-content:center"><i class="bi bi-clipboard-check"></i> Start a Review</a>
                 @endcan
                 @can('manage-competency')
-                <a href="{{ route('competency.assessments.create') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-bullseye"></i> Record Assessment</a>
+                <a href="{{ route('competency.index', ['new' => 'assessment']) }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-bullseye"></i> Record Assessment</a>
                 @endcan
                 @can('manage-training')
-                <a href="{{ route('training.sessions.create') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-calendar-plus"></i> Schedule Training</a>
+                <a href="{{ route('training.index') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-calendar-plus"></i> Schedule Training</a>
                 @endcan
-                <a href="{{ route('recognition.posts.create') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-star"></i> Give Recognition</a>
                 @can('manage-succession')
                 <a href="{{ route('succession.candidates.create') }}" class="btn-hims btn-hims-ghost" style="justify-content:center"><i class="bi bi-person-plus"></i> Nominate Candidate</a>
                 @endcan
@@ -193,7 +192,7 @@
 </div>
 
 <div class="row g-3">
-    <div class="col-lg-4">
+    <div class="col-lg-6">
         <div class="hims-card animate-in">
             <div class="card-header">
                 <h5>⚠️ Succession Risk</h5>
@@ -203,7 +202,7 @@
             </div>
             <div class="card-body" style="padding:0">
                 <table class="hims-table">
-                    <thead><tr><th>Position</th><th>Risk</th><th>Cover</th></tr></thead>
+                    <thead><tr><th>Position</th><th>Risk</th><th>Ready</th></tr></thead>
                     <tbody>
                         @forelse($risk_positions ?? [] as $pos)
                         <tr>
@@ -218,12 +217,12 @@
                             </td>
                             <td>
                                 <span class="hims-badge {{ ($pos->candidates ?? 0) > 0 ? 'green' : 'red' }}">
-                                    {{ $pos->candidates ?? 0 }}
+                                    {{ $pos->ready_successors ?? 0 }}
                                 </span>
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="3" class="text-center" style="color:#9ca3af;padding:24px">No critical positions defined.</td></tr>
+                        <tr><td colspan="3" class="text-center" style="color:#9ca3af;padding:24px">No high-risk role is missing a ready successor.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -231,7 +230,7 @@
         </div>
     </div>
 
-    <div class="col-lg-4">
+    <div class="col-lg-6">
         <div class="hims-card animate-in" style="animation-delay:.06s">
             <div class="card-header">
                 <h5>🪪 Credential Alerts</h5>
@@ -251,29 +250,6 @@
                 </div>
                 @empty
                 <div style="text-align:center;color:#9ca3af;padding:20px">All credentials current ✅</div>
-                @endforelse
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4">
-        <div class="hims-card animate-in" style="animation-delay:.12s">
-            <div class="card-header">
-                <h5>❤️ Latest Recognition</h5>
-                <a href="{{ route('recognition.index') }}" class="btn-hims btn-hims-ghost btn-sm">Wall</a>
-            </div>
-            <div class="card-body d-flex flex-column gap-3">
-                @forelse($recent_recognition ?? [] as $post)
-                <div style="display:flex;gap:12px;align-items:flex-start">
-                    <div style="width:36px;height:36px;background:var(--hims-primary-xlight);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">{{ $post->badge_icon ?? '⭐' }}</div>
-                    <div>
-                        <div style="font-size:13px;font-weight:600">{{ $post->author_name }} → {{ $post->recipient_name }}</div>
-                        <div style="font-size:12px;color:#6b7280;margin-top:2px">{{ Str::limit($post->message ?? '', 80) }}</div>
-                        @if($post->badge_name)<span class="recognition-badge-pill mt-1">{{ $post->badge_name }}</span>@endif
-                    </div>
-                </div>
-                @empty
-                <div style="text-align:center;color:#9ca3af;padding:20px">No recognition posts yet.</div>
                 @endforelse
             </div>
         </div>
