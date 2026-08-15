@@ -60,7 +60,7 @@
     <div class="card-body" style="padding:0">
         <table class="hims-table">
             <thead>
-                <tr id="cpd-{{ $cpd->cpd_id }}" style="scroll-margin-top:84px">
+                <tr>
                     <th>Employee</th><th>Activity</th><th>Source</th><th>Hours</th>
                     <th>Date</th><th>Verified By</th><th>Status</th>
                     @if($canVerify)<th></th>@endif
@@ -68,7 +68,9 @@
             </thead>
             <tbody>
                 @forelse($records ?? [] as $cpd)
-                <tr>
+                {{-- Global search deep-links a CPD hit to #cpd-<id>; the anchor
+                     has to sit on the record's own row. --}}
+                <tr id="cpd-{{ $cpd->cpd_id }}" style="scroll-margin-top:84px">
                     <td><strong>{{ $cpd->employee_name ?? '—' }}</strong></td>
                     <td>{{ $cpd->activity_name }}</td>
                     <td><span class="hims-badge {{ $cpd->source_type === 'external' ? 'gray' : 'blue' }}">{{ ucfirst(str_replace('_',' ',$cpd->source_type)) }}</span></td>

@@ -143,7 +143,7 @@
                     <thead><tr><th>KPI</th><th>Rating</th><th>Share of final score</th></tr></thead>
                     <tbody>
                         @forelse($kpi_scores ?? [] as $k)
-                        <tr id="review-goal-{{ $g->goal_id }}" style="scroll-margin-top:84px">
+                        <tr>
                             <td><strong>{{ $k->kpi_name ?? '—' }}</strong></td>
                             <td>{{ $k->supervisor_score ?? '—' }}</td>
                             {{-- The raw weight said nothing on its own; this is the same
@@ -172,7 +172,9 @@
                     <thead><tr><th>Goal</th><th>Target</th><th>Achievement</th><th>Status</th></tr></thead>
                     <tbody>
                         @forelse($goals ?? [] as $g)
-                        <tr>
+                        {{-- Global search deep-links a goal hit to #review-goal-<id>; the
+                             anchor has to sit on the goal's own row. --}}
+                        <tr id="review-goal-{{ $g->goal_id }}" style="scroll-margin-top:84px">
                             <td>{{ $g->goal_description }}</td>
                             <td>{{ $g->target_value ?? '—' }}</td>
                             <td>{{ $g->achievement_value ?? '—' }}</td>

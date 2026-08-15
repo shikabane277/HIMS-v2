@@ -59,7 +59,7 @@
     <div class="card-body" style="padding:0">
         <table class="hims-table">
             <thead>
-                <tr id="competency-{{ $competency->competency_id }}" style="scroll-margin-top:84px">
+                <tr>
                     <th>Competency</th>
                     <th style="width:110px">Code</th>
                     <th style="width:130px">Required Level</th>
@@ -68,7 +68,9 @@
             </thead>
             <tbody>
                 @forelse($byCategory->get($category->category_id, collect()) as $competency)
-                <tr>
+                {{-- Global search deep-links a competency hit to #competency-<id>;
+                     the anchor has to sit on the competency's own row. --}}
+                <tr id="competency-{{ $competency->competency_id }}" style="scroll-margin-top:84px">
                     <td>
                         <strong>{{ $competency->competency_name }}</strong>
                         @if($competency->description)
