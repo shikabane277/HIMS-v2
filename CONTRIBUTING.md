@@ -55,7 +55,12 @@ add a table to a view, seed at least one row of it in the test.
   Laravel falls back to `.env` and `RefreshDatabase` on MySQL runs `migrate:fresh`,
   dropping your development database.
 - To test against MySQL, name a **scratch** database explicitly and drop it
-  afterwards: `DB_CONNECTION=mysql DB_DATABASE=hims_scratch php artisan test`.
+  afterwards: `DB_CONNECTION=mysql DB_DATABASE=hims_scratch php artisan test`. Never
+  name `hims_v2` — that is the development database, and `RefreshDatabase` would
+  `migrate:fresh` it away. This has happened once for real.
+- **Run the suite against MySQL before you believe a green run.** `composer test`
+  skips 21 tests on SQLite, and every one of them drives a read screen built on
+  MySQL-only SQL. A regression in one of those screens looks exactly like a skip.
 - If a new test reaches MySQL-only SQL, gate it: add `@group mysql` to the class
   docblock and `markTestSkipped()` in `setUp()` when the driver is not MySQL. See
   `tests/Feature/EmployeeProgressionTest.php` for the pattern. If only *some* tests
@@ -69,6 +74,11 @@ add a table to a view, seed at least one row of it in the test.
 - Styling lives in **`public/css/hims.css`**, which is hand-authored and served
   directly. Tailwind and Vite are installed but the domain UI does not go through the
   build. Add styles to `hims.css`.
+- **Load the stylesheet only with `@include('partials.app-css')`**, never a bare
+  `asset('css/hims.css')`. Because the file is outside the Vite build its URL never
+  changes on its own, so the partial appends the file's own md5 — without it, the
+  browser and the CDN serve the previous stylesheet for hours after a release and only
+  *newly added* classes render bare. A contract test asserts this.
 - Tables use the single `.hims-table` class. A column that is not left-aligned must
   say so on **both** its `<th>` and its `<td>`s using the shared `.text-center` /
   `.text-end` / `.text-start` classes. Inline `style="text-align:…"` on a table cell
@@ -92,12 +102,14 @@ and don't override it in `phpunit.xml`.
 
 ## Documentation
 
-This repository keeps four long-form documents in sync with the code:
+This repository keeps five long-form documents in sync with the code:
 `HIMS_ARCHITECTURE_AND_SECURITY.md`, `HIMS_SYSTEM_DOCUMENTATION.md`,
-`HIMS_USER_GUIDE.md` and `HIMS_PATCH_NOTES.md`. The first three describe **as-built**
-behaviour only — if your change alters what the app does, update them, and put the
-change-log entry in the patch notes. `CLAUDE.md` carries the working notes for
-AI-assisted development.
+`HIMS_USER_GUIDE.md`, `HIMS_ACCESS_AND_VISIBILITY.md` and `HIMS_PATCH_NOTES.md`. The
+first four describe **as-built** behaviour only — if your change alters what the app
+does, update them, and put the change-log entry in the patch notes. The
+`RELEASE_NOTES_*.md` files are historical records of a shipped version: leave their
+figures alone even when the code has since moved on. `CLAUDE.md` carries the working
+notes for AI-assisted development.
 
 ## Reporting issues
 

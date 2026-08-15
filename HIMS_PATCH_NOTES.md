@@ -11,6 +11,120 @@ Entries marked 📋 are specified but not implemented.
 
 ---
 
+## v2.20.1 - 2026-08-16
+
+A documentation-precision release. v2.20.0 corrected the *measured figures* in the as-built documents; this one
+corrects the *prose*, which had drifted further and in a way no count would have caught. The single code change is
+the AI assistant's app guide, which is prose too — it was telling users to click things that no longer exist.
+
+### Fixed
+
+*   **The AI assistant no longer directs users to a sidebar item that does not exist.** `HimsKnowledge::appGuide()`
+    listed "Training" among the sidebar entries and described it as its own module ("session list and Venues"),
+    when `layouts/hims.blade.php` renders eleven sidebar links and Training is not one of them — Sessions and
+    Venues have been tabs inside Learning since the modules were folded. Three button labels in the same guide were
+    also stale: registering for a session is **Register Me** (not "Register"), the feedback control is **Give
+    Feedback** (the "Submit Feedback" text is the button *inside* the modal), and both are reached through
+    Learning → Sessions. The Learning tab strip is now described as eight tabs with the correct five/three
+    ungated/gated split. `Unit\HimsKnowledgeTest` was re-pinned accordingly: the module list now checks
+    `recognition` in Training's place, and the guide is asserted to contain the *denial* — `no "training" sidebar
+    item` — so the phantom cannot come back the way it arrived. The register-flow pin tightened from `"register"`
+    to `"register me"`, since the looser string matched the very text that was wrong.
+
+### Docs
+
+Every claim below was checked against the code that implements it, and the code was treated as the source of
+truth in each case — no document was made accurate by changing the application to match it.
+
+*   **`HIMS_USER_GUIDE.md` — 12 corrections, the heaviest of them the attendance procedure.** The guide described a
+    per-row **Check In** button, told supervisors they would see nothing on another supervisor's session, and said
+    an unmarked registrant becomes a no-show. All three were wrong. `training/sessions/show.blade.php:79` renders
+    one **Mark Attendance** toggle above the roster, gated on `manage-training` plus a `scheduled` status plus at
+    least one registration — so a supervisor *does* see it on somebody else's session. What differs is whose marks
+    survive: `TrainingController::checkIn()` (`:188-239`) lets an admin, an HR manager or the session's own
+    instructor mark anyone, while a non-instructor supervisor's marks for registrants outside their department are
+    **silently discarded** — no error, no note on the confirmation — which the guide now warns about explicitly.
+    Unmarked rows are left as `registered`, so "no-show" on a HIMS roster always means somebody actively recorded
+    it. Also corrected: the phantom `### Sidebar: 🎓 Training` section (rewritten as Learning → Sessions and
+    Venues, with the `## 9. Training Management` heading deliberately kept so the `#9-training-management` anchor
+    and its two cross-references still resolve); the CPD path and button (`Learning → CPD` / "Log CPD Activity" →
+    `Learning → My CPD` / **Record CPD**); `Record Assessment` → **Save Assessment**; the Learning tab sentence
+    (six tabs → eight, with a note that a visible tab is not a blanket permission); the roster's **Attendance**
+    link, which is a shortcut to the session's own page rather than a sheet in the modal; three FAQ answers; and
+    the Certificates section, which now names the real **Certificates Issued** stat card and states that nothing
+    writes the table, so it reads **0**.
+*   **`README.md` — the module count and one whole missing module.** The features preamble was reconciled with the
+    sidebar: **six** domain modules, with Training and Compliance named as *not* among them so a reader who
+    remembers them is not left guessing. **AI Gap Analysis had no bullet at all** despite being a real sidebar item
+    with its own gate; it has one now, including the two `system_settings` switches applied before anything leaves
+    for the provider. Learning's full eight-tab strip is spelled out. The demo-logins table now distinguishes admin
+    from hr_manager (Users & Access and the AI settings are admin-only, which the shared "everything" hid), and two
+    notes were added that a role table structurally cannot hold: no role has blanket performance-review access, and
+    a supervisor's row-level visibility is their reporting line rather than their department. `hims:mail-test` is
+    documented with its **required** address argument — it was shown bare, which fails.
+*   **`CONTRIBUTING.md` — four long-form documents → five**, adding `HIMS_ACCESS_AND_VISIBILITY.md`, plus an
+    instruction to leave `RELEASE_NOTES_*.md` figures alone as historical records. Two rules were added that had
+    caused real incidents and were nowhere in the contributor guidance: **never name `hims_v2` as the scratch
+    database** (`RefreshDatabase` on MySQL would `migrate:fresh` it away — this has happened once for real), and
+    **run the suite against MySQL before believing a green run**, because all 21 sqlite skips drive read screens
+    built on MySQL-only SQL and a regression in one of them is indistinguishable from a skip. The stylesheet
+    cache-busting rule from v2.20.0 was added to the styling section, where a contributor will actually meet it.
+*   **`HIMS_ACCESS_AND_VISIBILITY.md` — five corrections, all of them boundaries stated more loosely than the code
+    enforces them.** The review-exception paragraph named one basis; there are **four** (`no_supervisor`,
+    `supervisor_unavailable`, `supervisor_is_subject`, `supervisor_account_unavailable`), and each is now given with
+    its condition. The succession supervisor row now names the exact redacted fields rather than gesturing at
+    "confidential data" — candidate `performance_score`, `potential_score`, `nine_box_label`, `readiness_level`,
+    `mentor_id`, `status` and position `vacancy_risk`, `risk_factors`, `estimated_vacancy_date` — and explains that
+    redaction nulls the field on the row *after* the query, so the page renders an em dash rather than omitting the
+    column. The notification feed's "a short recent history" is a hard limit of **twelve** rows, read and unread
+    together, and both mark-read endpoints are keyed on the caller's own `employee_id`. Global Search's staff row
+    was missing the training-session catalogue, and `searchTraining()` is the one deliberately unscoped source — it
+    takes no user at all — which is now stated rather than left as an apparent inconsistency. Audit access now
+    names the endpoint and middleware it actually is (`GET /audit/history`, `role:admin,hr_manager`) and repeats
+    that there is no hash chaining. Two further paragraphs were added for things the document implied but never
+    said: Performance's three summary tiles and the review-cycle list are hospital-wide counts for every role that
+    can reach the page (the row-level rule governs review *records*), and the 9-box counts are computed for
+    HR/Admin while **no 9-box grid is rendered** — so nobody should be directed to one.
+*   **Three completeness sweeps, run mechanically rather than by reading.** Every `route('…')` reference in every
+    `*.md` was resolved against `routes/web.php`; every gate-shaped token in the documents was resolved against the
+    20 real `Gate::define` calls; and the live table set was re-derived by replaying each migration's `up()` body in
+    filename order. All three came back clean, confirming **51 tables + 1 view and 30 migrations** independently of
+    the figures v2.20.0 recorded. The table sweep threw one false positive on `peer_reviews` — a fault in the
+    replay script, not the documents, which correctly record it as dropped by
+    `..._000170_remove_self_and_peer_review` (it is recreated only in `down()`). No edit was made; four correct
+    statements were nearly "fixed" into wrongness, which is the argument for reading the code before editing the
+    document that describes it.
+*   The `partials/learning-tabs.blade.php` docblock was corrected from six tabs to eight with the right
+    ungated/gated split. Comment-only; no rendered output changed.
+*   Re-verified suite: **359 tests, 338 passed, 21 skipped, 1537 assertions** on sqlite `:memory:`, and **359
+    tests, 359 passed, 0 skipped, 1605 assertions** against a MySQL scratch database (`hims_align_check`, dropped
+    afterwards). Both assertion counts are one higher than v2.20.0 recorded — the new `no "training" sidebar item`
+    pin — so the as-built figures in `CLAUDE.md` and `HIMS_SYSTEM_DOCUMENTATION.md` §14 were updated. The
+    v2.20.0 entry above keeps its own numbers: it is a record of what was measured then. Test and skip counts are
+    unchanged, and the MySQL run still contributes exactly 68 more assertions than sqlite.
+
+### Known and unfixed
+
+Found while verifying the above, reported rather than silently corrected — each is a product or design decision
+rather than a typo, and fixing one blind would have meant guessing at intent:
+
+*   `dashboard/partials/organisation.blade.php` renders the **Active Enrollments** card twice in the same row of
+    four (lines 39-44 and 53-58) — identical label, identical `$stats['active_enrollments']` value, different
+    emoji. The third slot was plainly meant for another figure; which one is a product call.
+*   The Succession nomination modal has a **Notes** textarea whose contents go nowhere: `succession_candidates` has
+    no `notes` column and `storeCandidate()` never inserts one, so what the user types is discarded without
+    warning.
+*   `users/index.blade.php:132` and `:140` carry an unterminated `class` attribute
+    (`class="form-check-label d-flex align-items-center gap-2 style="font-weight:600"`), which swallows the
+    `style` into the class list.
+*   `training/sessions/feedback.blade.php` and `training/sessions/create.blade.php` are **orphaned views** — both
+    became modals and `routes/web.php:220-239` declares no GET route for either, so neither file is reachable.
+
+No migration is required for this release, and no application behaviour changed apart from the assistant's guide
+text.
+
+---
+
 ## v2.20.0 - 2026-08-15
 
 This release fixes two deploy-only failures — one that shipped a release's new markup to clients still holding

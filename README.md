@@ -26,8 +26,12 @@
 
 ## Features
 
-The application provides eight primary operational modules. Learning contains the
-compliance and oversight tabs rather than exposing a second Compliance module.
+The application provides **six domain modules** — Performance, Competency, AI Gap
+Analysis, Learning, Recognition and Succession — plus Employees / Departments /
+Users & Access administration and the Dashboard and My Development surfaces. The
+former Training and Compliance modules are **not** among them: both were folded into
+Learning, which now carries all eight of their tabs. The bullets below group the
+features by the work they do, so Learning gets three of them.
 
 - **Performance appraisal** — review cycles, a weighted KPI library, and supervisor
   reviews. Review authority follows the *reporting line* (`employees.supervisor_id`),
@@ -43,16 +47,25 @@ compliance and oversight tabs rather than exposing a second Compliance module.
   pathways, renewal oversight, accreditation reporting, and CPD logging with a
   separate verification step. Course enrolment is assignment-only; completing a
   course credits verified CPD hours.
-- **Training administration** — sessions, venues, registration, attendance check-in
-  and post-session feedback.
+- **Training logistics, inside Learning** — the **Sessions** and **Venues** tabs:
+  session scheduling with a same-venue/same-start-time guard, self-service
+  registration, roster attendance marking, and post-session feedback from anyone
+  marked present. Both tabs are visible to every role; the write controls inside them
+  check the role separately.
 - **Succession planning** — key positions, named candidates, confidential readiness
   data, vacancy risk, quarterly position reviews, evidence and development milestones.
 - **Recognition** — named public or private badges/posts, audience-limited comments and
   reactions, moderation and a public-only leaderboard.
-- **Compliance & accreditation inside Learning** — one Learning sidebar entry and
-  tab strip joins the catalogue with Required Training, Renewals, CPD, Pathways,
-  and Reports. Assign multiple courses or sessions at once to an employee,
+- **AI Gap Analysis** — a per-employee and per-department competency gap narrative
+  built from assessments, review scores and written review feedback, with the
+  hospital's two AI data-sharing switches (withhold comments, redact names) applied
+  before anything leaves for the provider. Admin, HR manager and supervisor only.
+- **Compliance & accreditation oversight, inside Learning** — the **Required
+  Training**, **Renewals** and **Reports** tabs, all three behind the
+  `view-compliance` gate. Assign multiple courses or sessions at once to an employee,
   department, role, or the whole hospital and chase completion from modal rosters.
+  Learning's full tab strip is Overview · Required Training · Renewals · My CPD ·
+  Pathways · Sessions · Venues · Reports — eight tabs, five of them ungated.
 - **AI assistant** — provider-agnostic (Gemini, OpenAI, Anthropic, or any
   OpenAI-compatible host). It answers questions about the app *and* executes actions
   on request, gated by the signed-in user's role and written to an audit trail.
@@ -61,8 +74,11 @@ compliance and oversight tabs rather than exposing a second Compliance module.
 
 Also included: a Facebook-style in-app notification feed with unread/read state and
 deep links, a permission-aware global search that opens the relevant module/tab, and
-a schedulable command that emails employees and supervisors about expiring credentials
-and due reassessments.
+a schedulable command that alerts employees and supervisors about expiring credentials
+and due reassessments. That command always writes the in-app notifications and the
+`credential_alert_log`; the **email** half is opt-in and **off by default**
+(`CREDENTIAL_ALERT_EMAIL`, `config/hims.php`), so turn it on only once
+`php artisan hims:mail-test <address>` actually delivers.
 
 **Role-based access** is enforced at the route level (20 gates plus a `role:`
 middleware) and, in the modules that handle personal records, at the row level — a
@@ -158,18 +174,24 @@ change.
 
 | Email | Role | Sees |
 |---|---|---|
-| `admin@hospital.ph` | `admin` | everything |
-| `l.garcia@hospital.ph` | `hr_manager` | everything, plus HR workflows |
+| `admin@hospital.ph` | `admin` | everything, including **Users & Access** and the AI data-sharing settings |
+| `l.garcia@hospital.ph` | `hr_manager` | everything **except** Users & Access — user accounts and the AI settings are admin-only |
 | `m.santos@hospital.ph` | `supervisor` | own record + direct reports |
 | `j.reyes@hospital.ph` | `staff` | own record only |
 | `r.lim@hospital.ph` | `staff` | own record only |
+
+Two role notes the table cannot hold: **no role has blanket performance-review
+access** — reviewer legitimacy is the reporting line, so admin and HR reach outside
+it only through a logged exception path — and a supervisor's row-level visibility is
+their reporting line, not their department.
 
 ### Maintenance commands
 
 ```bash
 # Email employees and supervisors about expiring credentials / due reassessments
+# (in-app notifications always; email only if CREDENTIAL_ALERT_EMAIL is on)
 php artisan hims:scan-credential-expiry
-php artisan hims:scan-credential-expiry --dry-run   # report only, sends nothing
+php artisan hims:scan-credential-expiry --dry-run   # report only, writes and sends nothing
 
 # Verify your mail transport actually works
 php artisan hims:mail-test you@example.com
@@ -229,7 +251,8 @@ mailbox as `MAIL_USERNAME`).
 that block outbound SMTP, use `brevo` (sends over HTTPS) with `BREVO_API_KEY`.
 
 After any change run `php artisan config:clear`, then verify with
-`php artisan hims:mail-test`.
+`php artisan hims:mail-test you@example.com`. The address is a required argument —
+the command has nowhere to send the test message without it.
 
 ### AI assistant
 

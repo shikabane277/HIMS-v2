@@ -63,7 +63,7 @@ class HimsKnowledgeTest extends TestCase
             // literally. The catalogue heading is spelled "Catalogue"; the CPD
             // button reads "Record CPD", not "Log CPD Activity".
             'the catalogue by its label' => ['course catalogue'],
-            'the register flow' => ['"register"'],
+            'the register flow' => ['"register me"'],
             'cpd logging' => ['"record cpd"'],
             'external cpd needs approval' => ['wait for hr approval'],
             'check-in is not self-service' => ['no qr code or self-check-in'],
@@ -106,11 +106,18 @@ class HimsKnowledgeTest extends TestCase
 
         foreach ([
             'dashboard', 'my development', 'performance', 'competency',
-            'gap analysis', 'learning', 'training', 'succession',
+            'gap analysis', 'learning', 'recognition', 'succession',
             'employees', 'departments', 'users & access',
         ] as $module) {
             $this->assertStringContainsString($module, $guide, "Sidebar item missing from the guide: {$module}");
         }
+
+        // Training is deliberately absent from that list: layouts/hims.blade.php
+        // renders eleven sidebar links and none of them is Training — sessions
+        // and venues are tabs inside Learning. It was on the list once, which is
+        // how the guide came to name a sidebar item that does not exist, so what
+        // gets pinned now is the denial rather than the item.
+        $this->assertStringContainsString('no "training" sidebar item', $guide);
     }
 
     /**

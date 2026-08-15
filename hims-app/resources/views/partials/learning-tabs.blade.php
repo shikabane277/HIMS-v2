@@ -1,17 +1,24 @@
 {{--
     The Learning module's tab strip.
 
-    Learning and Compliance used to be two sidebar entries over one domain. They
-    are now one module, and this strip is the seam: six tabs, each gated on the
-    same Gate as the route it points at, so a member of staff is never offered a
-    tab that would refuse them. Staff see three (Overview, My CPD, Pathways);
-    supervisors and above see all six.
+    Learning, Compliance and Training used to be separate sidebar entries over one
+    domain. They are now one module, and this strip is the seam: eight tabs, the
+    gated ones carrying the same Gate as the route they point at, so a member of
+    staff is never offered a tab that would refuse them. Five are ungated and
+    every role sees them (Overview, My CPD, Pathways, Sessions, Venues); the three
+    oversight tabs (Required Training, Renewals, Reports) are behind
+    `view-compliance`, so supervisors and above see all eight. Sessions and Venues
+    are ungated because the screens themselves are readable by everyone — a member
+    of staff registers for a session here — and the write controls inside them do
+    their own role checks.
 
     Every tab is a real navigation — no JS, no client-side panel switching — so a
     tab is bookmarkable, survives a refresh, and keeps working with the browser's
     back button. `request()->routeIs(...)` decides the active one, and each tab
     claims its whole family so a drill-down (a roster, a rule list) keeps its
-    parent tab lit rather than showing no tab at all.
+    parent tab lit rather than showing no tab at all. Sessions and Venues still
+    match `training.*` route names, which is the one place the old module's naming
+    survives.
 --}}
 <nav class="hims-tabs" aria-label="Learning sections">
     <a href="{{ route('learning.index') }}"

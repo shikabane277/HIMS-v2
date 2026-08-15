@@ -76,7 +76,7 @@ fail. `created_at`/`updated_at` must likewise be set manually, since Query Build
 > **Removed legacy schema.** Later migrations dropped `peer_reviews` and the unused placeholder tables
 > `permissions`, `role_permissions`, `system_users`, `course_modules`, `quiz_questions`, `quiz_attempts`,
 > `training_tests`, `training_test_results`, `succession_reviews`, and `credential_types`. They are not part of
-> the 52-table live baseline. Real authentication runs off Laravel's `users`, extended with `role`, a nullable
+> the 51-table live baseline. Real authentication runs off Laravel's `users`, extended with `role`, a nullable
 > `employee_id`, failed-attempt, and lockout columns.
 >
 > Renewal rules intentionally match the live free-text `employee_credentials.credential_type` values instead
@@ -119,7 +119,7 @@ fail. `created_at`/`updated_at` must likewise be set manually, since Query Build
     *   *Columns*: `pip_id` (PK), `employee_id` (FK), `triggered_by_review` (FK), `status` (varchar, app-validated), `action_steps` (JSON tasks checklist), `start_date`, `target_end_date`, `actual_end_date`, `supervisor_id` (FK), `notes`, `created_at`, `updated_at`.
     *   `triggered_by_review` is `NOT NULL` with a plain foreign key — **no cascade, no null-on-delete** — so a PIP pins its review in place. Migration `..._000170` had to delete every PIP before it could purge the reviews; that data loss is recorded in the patch notes.
 9. **`review_goals`**: SMART goals associated with a performance dossier.
-    *   *Columns*: `goal_id` (PK), `review_id` (FK), `employee_id` (FK), `goal_title`, `goal_description`, `target_date`, `progress_pct` (CHECK 0 to 100), `status` (varchar, app-validated), `created_at`.
+    *   *Columns*: `goal_id` (PK), `review_id` (FK), `employee_id` (FK), `goal_title`, `goal_description`, `target_date`, `progress_pct` (int, app-validated 0–100), `status` (varchar, app-validated), `created_at`.
 
 #### 2.2.1 Review and cycle status are derived from the cycle's end date
 
@@ -155,8 +155,8 @@ That cost has already been paid once. The dashboard's **Pending Reviews** tile f
 and silently became a no-op when nothing did. It excluded no rows, so every frozen review in every
 ended cycle stayed counted as outstanding work while the review screen showed it Completed and
 refused edits. Both the organisation-wide and supervisor tiles now join `review_cycles`
-([DashboardController.php:112](hims-app/app/Http/Controllers/DashboardController.php#L112),
-[:203](hims-app/app/Http/Controllers/DashboardController.php#L203)). **Any new read that means
+([DashboardController.php:116](hims-app/app/Http/Controllers/DashboardController.php#L116),
+[:209](hims-app/app/Http/Controllers/DashboardController.php#L209)). **Any new read that means
 "reviews still open" has to join the cycle**; the status column cannot answer the question, and the
 default sqlite test run cannot catch the mistake, because the admin dashboard is one of the
 `CONCAT()`-carrying screens that skips off MySQL.
@@ -284,12 +284,12 @@ leaves the deterministic analysis and the on-page feedback list fully intact.
 11. **`competency_categories`**: Skill groups mapped to JCI Standards (e.g., JCI.SQE.3).
     *   *Columns*: `category_id` (PK), `domain_id` (FK), `category_name`, `jci_standard_code`, `created_at`.
 12. **`competencies`**: Individual skill templates.
-    *   *Columns*: `competency_id` (PK), `category_id` (FK), `competency_name`, `competency_code` (unique), `description`, `required_proficiency` (CHECK 1 to 5), `is_mandatory` (bool), `reassessment_months` (nullable int — the type-level default cadence, added by migration `..._000130`), `created_at`.
+    *   *Columns*: `competency_id` (PK), `category_id` (FK), `competency_name`, `competency_code` (unique), `description`, `required_proficiency` (int, app-validated 1–5), `is_mandatory` (bool), `reassessment_months` (nullable int — the type-level default cadence, added by migration `..._000130`), `created_at`.
 13. **`role_competency_requirements`**: Target minimum proficiencies by role.
-    *   *Columns*: `id` (PK), `role_id` (FK), `competency_id` (FK), `minimum_proficiency` (CHECK 1 to 5), `is_critical` (bool).
+    *   *Columns*: `id` (PK), `role_id` (FK), `competency_id` (FK), `minimum_proficiency` (int, app-validated 1–5), `is_critical` (bool).
     *   *Constraint*: Unique combination of `(role_id, competency_id)`.
 14. **`competency_assessments`**: Audit logs of employee evaluations.
-    *   *Columns*: `assessment_id` (PK), `employee_id` (FK), `competency_id` (FK), `assessed_by` (FK), `assessment_method` (varchar, app-validated), `current_proficiency` (CHECK 1 to 5), `gap` (computed delta), `evidence_url`, `notes`, `assessed_date`, `next_assessment_due` (per-assessment override; falls back to `competencies.reassessment_months` when null), `created_at`, `updated_at`.
+    *   *Columns*: `assessment_id` (PK), `employee_id` (FK), `competency_id` (FK), `assessed_by` (FK), `assessment_method` (varchar, app-validated), `current_proficiency` (int, app-validated 1–5), `gap` (computed delta), `evidence_url`, `notes`, `assessed_date`, `next_assessment_due` (per-assessment override; falls back to `competencies.reassessment_months` when null), `created_at`, `updated_at`.
 15. **`employee_credentials`**: Official clinical credentials (PRC license, Board certifications).
     *   *Columns*: `credential_id` (PK), `employee_id` (FK), `credential_type`, `credential_number`, `issuing_body`, `issue_date`, `expiry_date`, `document_url`, `verified_by` (FK), `verified_at`, `created_at`, `updated_at`. **There is no `status` column** — status is derived at read time from `expiry_date`.
     *   *Status derivation*: `App\Support\CredentialStatus` is the single definition. `of(?string $expiryDate)` decides in PHP; `caseSql($column)` emits the same decision as SQL, parameterised with the two bindings from `caseBindings()` (today, and the window end 30 days out) so it runs on sqlite as well as MySQL. The four states are mutually exclusive, so a set of counts over them sums to the row total:
@@ -311,7 +311,7 @@ leaves the deterministic analysis and the on-page feedback list fully intact.
     *   *Columns*: `id` (PK), `pathway_id` (FK), `course_id` (FK), `sequence_order` (int), `is_prerequisite` (bool).
     *   *Constraint*: Unique combination of `(pathway_id, course_id)`.
 19. **`course_enrollments`**: Course requirement/progress records. New rows are created by Required Training rather than self-service.
-    *   *Columns*: `enrollment_id` (PK), `employee_id` (FK), `course_id` (FK), `enrolled_by` (FK), `assignment_id` (nullable FK to `training_assignments`; non-null on current writes), `enrollment_date`, `due_date`, `status` (varchar, app-validated), `progress_pct` (CHECK 0 to 100), `completed_at`, `cpd_hours_earned` (decimal), `certificate_id` (FK).
+    *   *Columns*: `enrollment_id` (PK), `employee_id` (FK), `course_id` (FK), `enrolled_by` (FK), `assignment_id` (nullable `CHAR(36)`, **no FK** — the link to `training_assignments` is application-enforced; non-null on current writes), `enrollment_date`, `due_date`, `status` (varchar, app-validated), `progress_pct` (int, app-validated 0–100), `completed_at`, `cpd_hours_earned` (decimal), `certificate_id` (FK).
     *   *Constraint*: Unique combination of `(employee_id, course_id)`.
 20. **`cpd_records`**: Consolidated CPD points ledger.
     *   *Columns*: `cpd_id` (PK), `employee_id` (FK), `source_type` (varchar, app-validated), `source_id` (FK reference), `activity_name`, `cpd_hours`, `date_earned`, `renewal_period`, `verified` (bool), `verified_by` (FK), `created_at`.
@@ -327,7 +327,7 @@ leaves the deterministic analysis and the on-page feedback list fully intact.
 24. **`training_registrations`**: Registration and attendance state records.
     *   *Columns*: `registration_id` (PK), `session_id` (FK), `employee_id` (FK), `registered_by` (FK), `registration_date`, `status` (varchar, app-validated), `check_in_time`, `check_in_method`, `UNIQUE (session_id, employee_id)`.
 25. **`training_feedback`**: Surveys compiled after completion.
-    *   *Columns*: `feedback_id` (PK), `session_id` (FK), `employee_id` (FK), `overall_rating` (CHECK 1 to 5), `content_rating`, `instructor_rating`, `venue_rating`, `comments`, `ai_sentiment_score` (decimal), `ai_sentiment_label`, `submitted_at`, `UNIQUE (session_id, employee_id)`.
+    *   *Columns*: `feedback_id` (PK), `session_id` (FK), `employee_id` (FK), `overall_rating` (int, app-validated 1–5), `content_rating`, `instructor_rating`, `venue_rating`, `comments`, `ai_sentiment_score` (decimal), `ai_sentiment_label`, `submitted_at`, `UNIQUE (session_id, employee_id)`.
 
 ### 2.6 Succession Planning Subsystem
 26. **`critical_positions`**: Target critical hospital roles.
@@ -392,7 +392,7 @@ leaves the deterministic analysis and the on-page feedback list fully intact.
 
 ### 2.8 AI Assistant Subsystem
 33. **`ai_chat_sessions`**: One row per conversation in the assistant sidebar.
-    *   *Columns*: `id` (PK, UUID), `user_id` (FK → `users`, `ON DELETE CASCADE`), `title` (nullable, 120 — derived from the first question, so an abandoned chat never gets a misleading name), `pending_action` (JSON, nullable), `pending_action_at` (timestamp, nullable), `created_at`, `updated_at`.
+    *   *Columns*: `id` (PK, UUID), `user_id` (FK → `users`, `ON DELETE CASCADE`), `title` (nullable, 120 — derived from the first question, so an abandoned chat never gets a misleading name), `pending_action` (text, nullable — holds a JSON payload, but declared `TEXT`, not a MySQL `JSON` column), `pending_action_at` (timestamp, nullable), `created_at`, `updated_at`.
     *   *Index*: `(user_id, updated_at)` — the sidebar list, most recent first.
     *   *`pending_action` holds a destructive action awaiting confirmation* — added by migration `..._000140`. A delete is never executed on the turn that requests it: the plan is resolved, parked here, and fired only if the **next** message in that session confirms it. `pending_action_at` bounds that window to five minutes (`AiController::CONFIRM_TTL_MINUTES`), so a "yes" answering some later question cannot detonate a stale offer. Both columns are cleared the moment the pending action is read, whether it is confirmed or cancelled. Scoped per session, so a confirmation in one conversation cannot fire an action parked in another.
 34. **`ai_chat_messages`**: The turns of a conversation.
@@ -443,7 +443,7 @@ interactive workflows.
     *   The sweep keys on `(credential_id, alert_type)` and skips anything already present, so a credential sitting inside the 30-day window for a month raises one alert rather than thirty — and still raises a second, distinct one when it crosses into `expired`.
     *   *Widened by the compliance layer.* `credential_id` was `NOT NULL` with an FK, which a renewal-cycle shortfall alert cannot satisfy — it has no credential to point at. The column became nullable and `subject_type` / `subject_id` were added as a discriminator (`credential` + `credential_id`, or `renewal_cycle` + `cycle_id`). **One ledger, one dedupe path**: a second table would have needed its own skip logic, and two copies of that logic drift.
 37. **`audit_trails`**: Selective attributable write-action ledger.
-    *   *Columns*: `audit_id` (PK), `user_id` (FK → `users`, nullable), `employee_id` (FK → `employees`, nullable), `action` (30 — `ai_create`, `ai_update`, `ai_delete`), `resource_type` (50 — the registry's `table` value), `resource_id` (36 UUID, nullable — best effort, see below), `ip_address` (45, NOT NULL), `user_agent` (text, nullable), `request_method` (10), `request_path` (255), `before_state` (JSON, nullable), `after_state` (JSON, nullable), `before_state_hash` / `after_state_hash` / `chain_hash` (64 char, all nullable, never written — hash chaining is documented as not implemented), `metadata` (JSON, nullable — carries `action_key`, `prompt`, `session_id`, `provider`), `timestamp` (defaults to insert time).
+    *   *Columns*: `audit_id` (PK), `user_id` (`CHAR(36)`, nullable — the stringified `users.id`, **no FK**), `employee_id` (`CHAR(36)`, nullable, **no FK**), `action` (30 — `ai_create`, `ai_update`, `ai_delete`), `resource_type` (50 — the registry's `table` value), `resource_id` (36 UUID, nullable — best effort, see below), `ip_address` (45, NOT NULL), `user_agent` (text, nullable), `request_method` (10), `request_path` (text), `before_state` (JSON, nullable), `after_state` (JSON, nullable), `before_state_hash` / `after_state_hash` / `chain_hash` (64 char, all nullable, never written — hash chaining is documented as not implemented), `metadata` (JSON, nullable — carries `action_key`, `prompt`, `session_id`, `provider`), `timestamp` (defaults to insert time). The table has **no foreign keys at all** and exactly two indexes: `(user_id, timestamp)` and `(resource_type, resource_id, timestamp)`.
     *   *Scope*: AI writes; training assignment; compliance rule/cycle administration; course completion/reopen;
         employee/user creation and update; competency assessment/credential creation; recognition creation,
         badge creation and moderation; review cycle/review creation,
@@ -484,7 +484,8 @@ module rather than producing a focus filter for a row the module will not return
 
 `GET /search?q=...` is handled by `GlobalSearchController` for every authenticated role. The controller uses an
 explicit allow-list of sources rather than discovering tables or columns dynamically. A query must contain at
-least two characters, each source contributes at most six matches, and the combined response is capped at fifty
+least two characters, each **database-backed** source contributes at most six matches (the navigation list is a
+fixed, role-filtered set and is not capped), and the combined response is capped at fifty
 results. The shell debounces requests, groups the JSON response, supports arrow-key selection, and follows the
 returned real route when the user chooses a result.
 
@@ -565,7 +566,7 @@ passed, stamping `met` or `shortfall` so the history records the outcome rather 
     JOIN employees e ON rp.recipient_id = e.employee_id
     JOIN departments d ON e.department_id = d.department_id
     LEFT JOIN recognition_badges rb ON rp.badge_id = rb.badge_id
-    WHERE rp.moderation_status = 'approved'
+    WHERE rp.moderation_status = 'approved' AND rp.is_public = 1
     GROUP BY rp.recipient_id, e.first_name, e.last_name, e.department_id, d.name, DATE_FORMAT(rp.created_at, '%Y-%m-01');
     ```
 
@@ -734,7 +735,7 @@ attendance for staff in their own department. `storeFeedback()` is bound to the 
 
 **Two different supervisor rules therefore coexist in the codebase**, and the difference is deliberate rather
 than an oversight left to tidy up. `TrainingController::checkIn()` compares `employees.department_id` directly
-(`TrainingController.php:209`) and was **not** migrated to the reporting line, because marking a room full of
+(`TrainingController.php:226`) and was **not** migrated to the reporting line, because marking a room full of
 attendees present is a logistical act about who was in the room — a ward supervisor running the fire drill
 should not have to be the line manager of everyone who attended. The shared helpers govern statements *about a
 person* (their review, their completion record, their renewal standing), which is where the chain of command is
@@ -869,8 +870,9 @@ return only reviews the account is part of: their own, ones they authored, or th
 `PerformanceController::scopeToVisibleReviews()` / `canViewReview()`, and it applies to admin and HR too — a
 review is visible because of a relationship to it, not because of a job title.
 
-Covered by `tests/Feature/ReviewAuthorityTest.php` (36 tests): chain-of-command creates and refusals, all three
-exception bases with their flag/reason/audit stamping, the no-self-review rule at both create and score,
+Covered by `tests/Feature/ReviewAuthorityTest.php` (36 tests): chain-of-command creates and refusals, three of
+the four exception bases with their flag/reason/audit stamping (the fourth,
+`supervisor_account_unavailable`, is covered by `tests/Feature/PeopleManagerTest.php`), the no-self-review rule at both create and score,
 dedupe-to-edit, scoring restricted to the named reviewer, the end-date freeze at both the GET screen and the
 write, refusing a create into an ended cycle, and the `performance.show` scoping. The seven tests that drive a
 read screen are MySQL-gated — the listings select `CONCAT()`, which sqlite does not provide.
@@ -973,7 +975,10 @@ Three deliberate gaps:
 
 ## 4. Outbound Mail
 
-Password reset is the only feature that sends mail, and it is entirely dependent on the transport being real.
+Password reset is the only feature that sends mail *by default*. The credential-expiry sweep also sends mail, but
+only where `CREDENTIAL_ALERT_EMAIL` has been switched on (`config/hims.php:19`, default `false`) — see
+`ScanCredentialExpiry::emailIfEnabled()`, which posts `Mail::raw()` to the subject employee and to any escalation
+recipient with no `users` row. Both paths are entirely dependent on the transport being real.
 The failure mode is silent by design in Laravel: `MAIL_MAILER=log` accepts every message, writes it to
 `storage/logs/laravel.log`, and reports success — so the app tells the user "We have emailed your password
 reset link" while nothing is delivered.
@@ -1080,15 +1085,15 @@ graph LR
 | **Resolution** | `AiManager` reads `config('services.ai')`; `AppServiceProvider::register()` binds `AiProvider` to the default driver. |
 | **Selection** | `AI_PROVIDER` = `gemini` \| `openai` \| `anthropic` \| `compatible`. **Default: `gemini`**, so an existing `GEMINI_API_KEY` keeps working unchanged. |
 | **Drivers** | `GeminiProvider`, `OpenAiProvider`, `AnthropicProvider` — all raw HTTP over `Http::`, all extending `AbstractAiProvider`. The `compatible` slot reuses `OpenAiProvider` with a custom label and `base_url` for OpenAI-compatible hosts. `NullAiProvider` is returned when `AI_PROVIDER` names an unknown driver, so a typo degrades the panel instead of 500-ing the page. |
-| **Model config** | Per-provider `*_MODEL` plus a `fallback_models` list; a 404/model-error response advances to the next candidate automatically. |
+| **Model config** | Per-provider `*_MODEL` env var. The fallback chains are **not** env-configurable: they are hardcoded literal arrays in `config/services.php`, and only `gemini` (`:70`) and `anthropic` (`:85`) define one — there, a 404/model-error response advances to the next candidate automatically. `openai` and `compatible` have no `fallback_models` key, so `AbstractAiProvider::models()` yields a single candidate and a bad model name is a hard failure. |
 | **Failure contract** | `ask()` **never throws** for an API or config problem — it returns a `⚠️`-prefixed string. `CompetencyGapAnalysisService::parseAiJson()` detects that prefix and degrades gracefully to "AI unavailable". Callers must not assume the return value is model output. |
 | **Statelessness** | `AiManager` registers each driver as a **memoised singleton** shared by every consumer. A driver that held conversation state or the caller's role would leak one user's chat into the next request and into `CompetencyGapAnalysisService`, so both `$history` and `$scope` are passed per call and never stored on the driver. |
 | **Conversation memory** | `$history` is the current session's earlier turns, oldest first, in storage shape (`['role' => 'user'\|'ai', 'message' => string]`). Each driver maps `ai` to its own wire role — `assistant` for OpenAI and Anthropic, `model` for Gemini. Drivers must not trust the list: `AbstractAiProvider::sanitiseHistory()` drops `⚠️`/`🔒` replies HIMS wrote itself along with the question each answered, forces strict `user`/`ai` alternation (Anthropic rejects consecutive same-role turns outright), removes a trailing unanswered question, and caps the result by turn count (`history_turns`, default 20) and total characters (`history_chars`, default 12000), oldest first. |
 | **Access scope** | `$scope` is the role instruction from `AiAccessPolicy::scopeFor()`, appended to the system prompt. A **soft** control that shapes borderline answers; the hard block is in `AiController` — see [§3.2.1](#321-subject-matter-rbac-for-the-ai-assistant). |
 | **System prompt** | `AbstractAiProvider::systemContext($scope)` — shared by all four drivers, so a change there applies everywhere. It sets the HIMS/hospital-HR domain framing and, since v2.5.0-beta.1, an explicit **English-by-default** instruction: switch to Tagalog or Taglish only when the user clearly writes in it, then match their language. The previous wording only stated that the assistant *understood* both languages, which — combined with Tagalog cues in the widget UI — produced Tagalog replies to English questions. Bilingual capability is unchanged. Anthropic receives it as a separate top-level `system` field rather than a message, which is why `AnthropicProvider::buildMessages()` takes no scope argument. |
-| **Application grounding** | `HimsKnowledge::appGuide()` (~3.5 KB, carried on every request) maps the real sidebar, each module's write permissions, the assignment-only course workflow, and the remaining self-service flows (session registration and CPD logging), then lists what HIMS **does not** have. Added in v2.6.1 after the assistant answered "how do I enrol an employee in a course?" with an employee picker, an enrolment-type dropdown and a date field — none of which exist. The assistant cannot see the database or the running UI, so absent grounding it answers "how do I…" from generic LMS conventions and states the result confidently. The negative list is the operative half: enumerating what exists does not stop invention, because the model fills whatever gap is left; contradicting the convention does. This is prompt text, so drift causes no failure — it silently resumes misleading users. Treat it like `AiAccessPolicy::TOPICS`: when a route, button or permission changes, change it here too. Guarded by `tests/Unit/HimsKnowledgeTest.php`. |
+| **Application grounding** | `HimsKnowledge::appGuide()` (~7.7 KB, carried on every request) maps the sidebar, each module's write permissions, the assignment-only course workflow, and the remaining self-service flows (session registration and CPD logging), then lists what HIMS **does not** have. Added in v2.6.1 after the assistant answered "how do I enrol an employee in a course?" with an employee picker, an enrolment-type dropdown and a date field — none of which exist. The assistant cannot see the database or the running UI, so absent grounding it answers "how do I…" from generic LMS conventions and states the result confidently. The negative list is the operative half: enumerating what exists does not stop invention, because the model fills whatever gap is left; contradicting the convention does. This is prompt text, so drift causes no failure — it silently resumes misleading users. Treat it like `AiAccessPolicy::TOPICS`: when a route, button or permission changes, change it here too. Guarded by `tests/Unit/HimsKnowledgeTest.php`. |
 | **Consumers** | `AiController` — the sidebar: `POST /ai/query`, the `/ai/sessions*` group, `GET`/`DELETE /ai/history`, persisted to `ai_chat_sessions` + `ai_chat_messages`. It replays session history and enforces subject-matter RBAC before calling `ask()`. And `CompetencyGapAnalysisService` (gap-analysis narratives), which passes neither history nor scope — a one-shot question gated by its own route. Since v2.14.0 the employee prompt also carries the **verbatim written feedback** from the last three review cycles, assembled by `App\Support\ReviewFeedback` — see [§2.2.3](#223-the-written-half-of-a-review-is-the-half-that-states-a-cause) for the privacy consequence. |
-| **Action pipeline** | **New in v2.7.** When a message matches an action verb, `AiController::resolveAction()` runs a four-stage pipeline *before* hitting the conversational path. (1) **Pre-filter** — `ACTION_VERBS` regex skips questions without a model call. (2) **Classify** — `AiActionPlanner` sends the full permitted catalogue (from `AiActionRegistry::catalogueFor()`) and returns `{"action":"<key>","params":{...},"missing":[...],"summary":"..."}`. If the model cannot map the instruction, or the key is outside `availableTo()`, the message falls through to normal conversation. (3) **Resolve** — `AiEntityResolver` converts names/codes/emails to UUIDs through its own department-level employee scope and other lookups; ambiguous or missing targets are reported back as a question. (4) **Execute** — `AiActionExecutor` builds a `Request`, pre-fills unspecified fields from the current row (so "set status to X" does not blank name/email/department), calls the *real controller method*, catches `ValidationException`, and writes an `audit_trails` row. Destructive actions pause at step 1: the target is resolved, named back, and stored in `pending_action` until the next message confirms. Two role layers must both pass — `AiAccessPolicy::deniedTopic()` for the subject and `AiActionRegistry::get()` for the specific route. The planner costs one extra AI call per command; the conversational path remains at one. |
+| **Action pipeline** | **New in v2.7.** When a message matches an action verb, `AiController::resolveAction()` runs a four-stage pipeline *before* hitting the conversational path. (1) **Pre-filter** — `ACTION_VERBS` regex skips questions without a model call. (2) **Classify** — `AiActionPlanner` sends the full permitted catalogue (from `AiActionRegistry::catalogueFor()`) and returns `{"action":"<key>","params":{...},"missing":[...],"summary":"..."}`. If the model cannot map the instruction, or the key is outside `availableTo()`, the message falls through to normal conversation. (3) **Resolve** — `AiEntityResolver` converts names/codes/emails to UUIDs through its own department-level employee scope and other lookups; ambiguous or missing targets are reported back as a question. (4) **Execute** — `AiActionExecutor` builds a `Request`, pre-fills unspecified fields from the current row (so "set status to X" does not blank name/email/department), calls the *real controller method*, catches `ValidationException`, and writes an `audit_trails` row. Destructive actions stop short of step 4: the target is resolved, named back, and stored in `pending_action` until the next message confirms. Two role layers must both pass — `AiAccessPolicy::deniedTopic()` for the subject and `AiActionRegistry::get()` for the specific route. The planner costs one extra AI call per command; the conversational path remains at one. |
 
 **Action services** (all under `app/Services/Ai/`):
 
@@ -1115,7 +1120,7 @@ route sits behind `['auth', 'verified']`, with per-route `role:` gating.
 | Competency | `CompetencyController` | `competency/` (+ `assessments/`, `credentials/`, `domains/`) | read: all · assess: `admin,hr_manager,supervisor` · domains: `admin,hr_manager` |
 | Gap Analysis | `GapAnalysisController` (`competency.gap.*`) | `competency/gap-analysis/` | `admin,hr_manager,supervisor` |
 | Learning | `LearningController` + `ComplianceController` | `learning/` (+ `courses/`, `cpd/`, `pathways/`, `assignments/`, `renewals/`) | one sidebar entry and canonical `learning.*` routes · catalogue/CPD/pathways: all authenticated · course/pathway authoring: `admin,hr_manager` · Required Training/Renewals/Reports: `admin,hr_manager,supervisor`, read lists row-scoped · assignment: same roles; a single-employee target is access-checked, while department/role/all expand the selected organisational target · rules/sync/accounts: `admin,hr_manager` · `learning.cycles.mine`: all roles |
-| Training | `TrainingController` | `training/` (+ `sessions/`, `venues/`) | read/register: all · own feedback: all (needs attendance) · check-in: `admin,hr_manager` or the session's instructor · sessions: `+supervisor` · venues: `admin,hr_manager` |
+| Training | `TrainingController` | `training/` (+ `sessions/`, `venues/`) | read/register: all · own feedback: all (needs attendance) · check-in: `admin,hr_manager,supervisor` — the session's instructor and any admin/HR mark anyone present, a supervisor who is not the instructor only registrants in their own department · sessions: `+supervisor` · venues: `admin,hr_manager` |
 | Succession | `SuccessionController` | `succession/` (+ `candidates/`, `positions/`) | `admin,hr_manager,supervisor` (staff: no access) · admin/HR full confidential management · supervisors see redacted direct-report candidates/positions and manage those milestones only |
 | Recognition | `RecognitionController` | `recognition/` (+ `badges/`, `posts/`, `comments/`) | public wall: all · private: sender/recipient/HR/Admin · writes require a linked employee · badges/moderation: `admin,hr_manager` |
 | Employees | `EmployeeController` | `employees/` | group `admin,hr_manager,supervisor`; supervisor read is direct-report scoped · CRUD: `admin,hr_manager` |

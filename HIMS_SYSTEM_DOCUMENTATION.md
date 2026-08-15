@@ -388,7 +388,7 @@ what the two screens actually render.
 
 *   **Hospital Course Catalogue**: Course records categorised by compliance, clinical, and soft skills, each with CPD hours, difficulty, duration and passing score. The catalogue has no Enrol or View action buttons: admins/HR get one shared **Edit** modal per row, while the linked title remains the route to course detail and competency tagging.
 *   **Course enrolment is assignment-only**: employees cannot put themselves on a course. Required Training creates `course_enrollments` on their behalf; every new row carries an `assignment_id`. Null identifies legacy rows created before self-enrolment was removed. Training sessions remain independently self-registerable.
-*   **CPD (Continuing Professional Development) Ledger**: A record of hours earned from courses, training, and external activities, listed per employee and totalled on the dashboard. Hours arrive two ways. **Automatically**, when a course enrolment is marked complete. **Manually**, through the **Log CPD Activity** modal on `/learning/cpd`; in-house course/session entries are auto-verified, while external activities need HR/Admin verification.
+*   **CPD (Continuing Professional Development) Ledger**: A record of hours earned from courses, training, and external activities, listed per employee and totalled on the dashboard. Hours arrive two ways. **Automatically**, when a course enrolment is marked complete. **Manually**, through the **Record CPD** button on `/learning/cpd`, which opens the **Record CPD Hours** modal; in-house course/session entries are auto-verified, while external activities need HR/Admin verification.
 *   **Learning Pathways**: Multi-course curriculums (e.g., "Critical Care Nurse Pathway") sequencing courses with prerequisite ordering.
 *   **My Renewal Cycles** (`/learning/my-cycles`): the employee-facing half of the compliance layer — how many CPD hours this cycle requires, how many are verified so far, and the date the window closes. Served by `ComplianceController::myCycles()` and open to every role. See [§G](#g-compliance--oversight).
 
@@ -399,7 +399,7 @@ what the two screens actually render.
 *   **Session Scheduling**: Instructor-led workshops (e.g., Infection Control Seminar) with date, times, capacity, category, registration deadline, and optional linked course.
 *   **Venue & Conflict Prevention**: Sessions are assigned to classrooms or simulator rooms; a unique index on `(venue_id, session_date, start_time)` blocks two sessions starting at the *same instant* in the same room on the same day. It is an exact-match index, **not an overlap check** — a 09:00–12:00 session and a 10:00–11:00 session in the same venue on the same date both insert successfully. `storeSession()` does not pre-check for the collision or catch the failure, so a genuine duplicate surfaces as a database error page rather than a validation message.
 *   **Registration & Attendance**: Employees register for a session, with a capacity check and a unique constraint preventing duplicate registration. Registrations are written with status `registered`, and the session page carries a check-in panel (`POST /training/sessions/{id}/checkin`) where each registration is moved to `attended` or `no_show`; `attended` also stamps `check_in_time` and sets `check_in_method` to `manual`. Access is gated on the `manage-training` Gate — the session's own instructor and any admin/HR Manager may check anyone in, while a supervisor who is not running the session is silently limited to their own department's staff. The "Avg Attendance" figure on the training page is the proportion of all registrations sitting at `attended`.
-*   **Feedback Display**: `training_feedback` holds 1–5 ratings and free-text comments, and the training page shows the average and a recent-feedback list. The app **reads** this table only — there is no survey form, so rows must be loaded directly into the database.
+*   **Feedback Display**: `training_feedback` holds 1–5 ratings and free-text comments, and the training page shows the average and a recent-feedback list. Rows are written by the **Give Feedback** modal on the session page (`training.sessions.feedback.store`), which is reachable only to an employee whose own registration has been marked attended — see [§12.6](#126-training-management).
 
 ### E. Succession Planning
 
@@ -414,14 +414,14 @@ only for those direct-report candidates.
 *   **9-Box Grid Placement**: Maps candidates on Performance vs. Potential. Scores are **1–5** on each axis (not 1–3), banded low (1–2) / med (3) / high (4–5) to give the nine cells:
     | | Low Potential (1–2) | Medium Potential (3) | High Potential (4–5) |
     |---|---|---|---|
-    | **High Performance (4–5)** | Solid Performer | High Performer | ⭐ Star Talent |
-    | **Medium Performance (3)** | Average Performer | Core Contributor | High Potential |
+    | **High Performance (4–5)** | Solid Performer | High Performer | Star |
+    | **Medium Performance (3)** | Average Performer | Core Player | High Potential |
     | **Low Performance (1–2)** | Underperformer | Inconsistent | Rough Diamond |
 
-    The label is **derived server-side on every write** and never accepted from the form, so it cannot contradict the scores. The nomination form shows a live preview of the resulting placement as scores are entered.
+    The label is **derived server-side on every write** and never accepted from the form, so it cannot contradict the scores. `nine_box_label` stores a slug — `star`, `high`, `solid`, `potential`, `core`, `avg`, `diamond`, `inconsist`, `under` — and the candidate and position pages map it to the words above. The nomination form shows a live preview of the resulting placement as scores are entered.
 *   **Readiness Scale**: Categorises successors as "Ready Now," "Ready in 1–2 Years," "Ready in 2–5 Years," or "Long Term."
 *   **Candidate Pipeline**: Hospital-wide and fully rated for HR/Admin; direct-report scoped and confidentially redacted for Supervisors. Position filters cannot name a position outside the current user's visible set.
-*   **Leadership Development Paths**: Per-candidate milestones (course, assignment, mentoring, rotation, certification, project) with target dates. Each advances `not started → in progress → completed`; the completion date is stamped automatically and cleared if the milestone moves back. Completion drives the pipeline's Dev Progress percentage.
+*   **Leadership Development Paths**: Per-candidate milestones (course, assignment, mentoring, rotation, certification, project) with target dates. Each advances `not_started → in_progress → completed`; the completion date is stamped automatically and cleared if the milestone moves back. Completion drives the pipeline's Dev Progress percentage. A milestone belongs to a **candidate**, not to an employee — `leadership_development_paths` has no `employee_id`, only `candidate_id` (cascade-deleted with the nomination), which is why withdrawing a candidate removes their milestones.
 *   **Nomination Management**: Scores, readiness, and mentor can be revised after nomination (stamping `reviewed_at`); a candidate can be withdrawn, which also removes their milestones.
 *   **Vacancy Risk Flagging**: Each critical position carries a `low` / `medium` / `high` / `critical` risk level set when the position is created or edited, used to sort and highlight the positions list and the dashboard's at-risk panel.
 *   **Quarterly Review Tracking**: HR/Admin can stamp `last_reviewed_at`, `last_reviewed_by`, and optional `quarterly_review_notes`; the change is audited.
@@ -501,9 +501,15 @@ a precondition.
 *   **Escalation routing** (`credentials:scan`, extended): the nightly scan now raises cycle-shortfall alerts
     alongside credential expiry, and routes each one to the employee's own account, their supervisor, and their
     department head. Where the subject has no `users` row it falls back to the email on the `employees` record,
-    so a proxy-tracked employee is still reachable. Sends are recorded in `credential_alert_log` — one ledger,
-    one dedupe path — which is why that table gained `subject_type` / `subject_id` and a nullable
-    `credential_id` instead of a parallel table being created beside it.
+    so a proxy-tracked employee is still reachable — **but that email fallback is off unless it is switched on**:
+    both send sites in `ScanCredentialExpiry` are guarded by `config('hims.credential_alert_email')`, which
+    defaults to **false** (`config/hims.php:19`, `CREDENTIAL_ALERT_EMAIL`). The default is deliberate: a
+    deployment running `MAIL_MAILER=log` would otherwise silently "send" expiry warnings nobody receives, so the
+    flag is meant to be turned on only once `php artisan hims:mail-test <address>` actually delivers. With it off,
+    a proxy-tracked employee's alert is written and deduped but not emailed. Sends are recorded in
+    `credential_alert_log` — one ledger, one dedupe path — which is why that table gained
+    `subject_type` / `subject_id` and a nullable `credential_id` instead of a parallel table being created beside
+    it.
 *   **Accreditation report** (`/learning/accreditation`): one row per active employee carrying competency
     proficiency, credential standing, and training completion, filterable by department, role, and JCI standard.
     This is the compilation a survey asks for. The standard code is tagged on `competency_categories`, one join
@@ -526,7 +532,7 @@ the `App\Contracts\AiProvider` interface (one method: `ask(string $prompt, array
 | **Default** | `gemini` — an existing `GEMINI_API_KEY` keeps working with no other change |
 | **Drivers** | `GeminiProvider` · `OpenAiProvider` · `AnthropicProvider` · `compatible` (reuses `OpenAiProvider` with a custom label + `base_url` for Groq / DeepSeek / xAI / Mistral / Together / OpenRouter / Ollama) |
 | **Transport** | Raw `Http::` calls — no vendor SDKs |
-| **Model fallback** | Per-provider `*_MODEL` plus a `fallback_models` list; a 404/model error advances to the next candidate |
+| **Model fallback** | The active model is env-configurable per provider (`GEMINI_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `AI_COMPATIBLE_MODEL`); the fallback chains are **not** — they are hardcoded literal arrays in `config/services.php`. Only `gemini` and `anthropic` define a `fallback_models` key at all; `openai` and `compatible` have none, so a bad model there is a hard failure rather than a downgrade. Where a chain exists, a 404/model error advances to the next candidate |
 | **Failure contract** | `ask()` **never throws** on an API or config error — it returns a `⚠️`-prefixed string that callers detect and degrade on |
 | **Conversation memory** | `$history` is the current chat session's earlier turns, oldest first. Drivers map the stored `ai` role to their own wire role (`assistant` for OpenAI/Anthropic, `model` for Gemini) and must not trust the list — `AbstractAiProvider::sanitiseHistory()` cleans and caps it first. |
 | **Access scope** | `$scope` is a per-request role instruction from `AiAccessPolicy::scopeFor()`, appended to the system prompt. Passed per call rather than read from `auth()` inside a driver, because `AiManager` shares each driver as a memoised singleton — state stored on one would leak into the next request. |
@@ -576,19 +582,22 @@ the first would hand supervisors the delete.
 
 **Request flow** in `AiController::query()`:
 
-1.  **Pending confirmation?** If `pending_action` is set and under five minutes old, `confirm`/`yes`/`proceed`
+1.  **`AiAccessPolicy::deniedTopic()`** — first, and ahead of everything else. A refusal must not depend on the
+    model choosing to comply, a blocked question should cost nothing, and a topic the role cannot discuss is one
+    it certainly cannot act on. Steps 2–8 all run inside the `else` branch of this check, in
+    `resolveAction()`.
+2.  **Pending confirmation?** If `pending_action` is set and under five minutes old, `confirm`/`yes`/`proceed`
     executes it; anything else clears it and replies "Cancelled — nothing was changed."
-2.  **Verb pre-filter.** Only messages containing an action verb reach the classifier, so a question costs one
+3.  **Verb pre-filter.** Only messages containing an action verb reach the classifier, so a question costs one
     AI call as it always did and a command costs two.
-3.  **`AiAccessPolicy::deniedTopic()`** — unchanged, and still first. A topic the role cannot discuss is one it
-    certainly cannot act on.
 4.  **Plan.** `AiActionPlanner` returns `{"action","params","missing","summary"}`. An unmappable instruction or
     a key outside `availableTo()` falls through to normal conversation.
-5.  **Resolve.** `AiEntityResolver` turns names, codes and emails into UUIDs. Ambiguous or missing targets are
+5.  **Anything missing is asked for, not invented** — the planner reports the gaps and the reply names them.
+6.  **Resolve.** `AiEntityResolver` turns names, codes and emails into UUIDs. Ambiguous or missing targets are
     reported as a question; nothing executes.
-6.  **Destructive?** The target is resolved and named back ("⚠️ Delete an employee record: **Maria Santos
+7.  **Destructive?** The target is resolved and named back ("⚠️ Delete an employee record: **Maria Santos
     (EMP-0001)**"), stored in `pending_action`, and the turn ends. Otherwise execute now.
-7.  **Execute, audit, reply** with the controller's own flash message — so the chat says exactly what the web
+8.  **Execute, audit, reply** with the controller's own flash message — so the chat says exactly what the web
     form would have said.
 
 **Partial updates are filled from the current row.** Update controllers are written against a web form that
@@ -667,7 +676,6 @@ erDiagram
     EMPLOYEES ||--o{ TRAINING_FEEDBACK : submits
 
     EMPLOYEES ||--o{ SUCCESSION_CANDIDATES : nominated_as
-    EMPLOYEES ||--o{ LEADERSHIP_DEVELOPMENT_PATHS : follows
 
     EMPLOYEES ||--o{ RECOGNITION_POSTS : gives_or_receives
     EMPLOYEES ||--o{ RECOGNITION_REACTIONS : reacts
@@ -739,7 +747,7 @@ CREATE TABLE employees (
     first_name          VARCHAR(100) NOT NULL,
     last_name           VARCHAR(100) NOT NULL,
     email               VARCHAR(255) UNIQUE NOT NULL,
-    phone               VARCHAR(100),
+    phone               TEXT,                             -- widened by ..._000004: holds Crypt ciphertext
     department_id       CHAR(36) NOT NULL REFERENCES departments(department_id),
     role_id             CHAR(36) NOT NULL REFERENCES roles(role_id),
     position_title      VARCHAR(200),
@@ -914,6 +922,7 @@ CREATE TABLE competencies (
     description         TEXT,
     required_proficiency INT NOT NULL CHECK (required_proficiency BETWEEN 1 AND 5),
     is_mandatory        BOOLEAN DEFAULT FALSE,
+    reassessment_months INT NULL,                        -- added by ..._000130; drives the reassessment scan
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -967,7 +976,7 @@ CREATE TABLE employee_credentials (
     credential_id       CHAR(36) PRIMARY KEY,
     employee_id         CHAR(36) NOT NULL REFERENCES employees(employee_id),
     credential_type     VARCHAR(50) NOT NULL,             -- 'PRC_License','Board_Cert','BLS'
-    credential_number   VARCHAR(100),
+    credential_number   TEXT,                             -- widened by ..._000004: holds Crypt ciphertext
     issuing_body        VARCHAR(150),
     issue_date          DATE,
     expiry_date         DATE,
@@ -1042,8 +1051,8 @@ CREATE TABLE course_enrollments (
     completed_at        TIMESTAMP NULL DEFAULT NULL,
     cpd_hours_earned    DECIMAL(4,1) DEFAULT 0,
     certificate_id      CHAR(36),                         -- FK added post-creation
-    assignment_id       CHAR(36) NULL                     -- set on new rows; null only on legacy enrolments
-                        REFERENCES training_assignments(assignment_id) ON DELETE SET NULL,
+    assignment_id       CHAR(36) NULL,                    -- set on new rows; null only on legacy enrolments
+                                                          -- no FK: application-enforced (see migration ..._000150)
     UNIQUE KEY (employee_id, course_id)
 );
 
@@ -1135,8 +1144,8 @@ CREATE TABLE training_registrations (
         CHECK (status IN ('registered','waitlisted','attended','no_show','cancelled')),
     check_in_time       TIMESTAMP NULL DEFAULT NULL,
     check_in_method     VARCHAR(20),                      -- 'qr_scan','manual'
-    assignment_id       CHAR(36) NULL                     -- set => mandatory, null => self-registered
-                        REFERENCES training_assignments(assignment_id) ON DELETE SET NULL,
+    assignment_id       CHAR(36) NULL,                    -- set => mandatory, null => self-registered
+                                                          -- no FK: application-enforced (see migration ..._000150)
     required_by         DATE NULL,                        -- deadline copied from the assignment
     UNIQUE KEY (session_id, employee_id)
 );
@@ -1271,7 +1280,7 @@ CREATE TABLE recognition_reactions (
     reaction_id         CHAR(36) PRIMARY KEY,
     post_id             CHAR(36) NOT NULL REFERENCES recognition_posts(post_id) ON DELETE CASCADE,
     employee_id         CHAR(36) NOT NULL REFERENCES employees(employee_id),
-    reaction_type       VARCHAR(20) DEFAULT 'like'
+    reaction_type       VARCHAR(20) DEFAULT 'clap'
         CHECK (reaction_type IN ('like','clap','heart','celebrate','support')),
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY (post_id, employee_id)
@@ -1371,7 +1380,7 @@ CREATE TABLE training_assignments (
 ALTER TABLE course_enrollments     ADD assignment_id CHAR(36) NULL;   -- null retained for legacy rows
 ALTER TABLE training_registrations ADD assignment_id CHAR(36) NULL,   -- null => self-registered
                                    ADD required_by   DATE    NULL;
-ALTER TABLE credential_alert_log   ADD subject_type  VARCHAR(20) NOT NULL DEFAULT 'credential',
+ALTER TABLE credential_alert_log   ADD subject_type  VARCHAR(30) NULL,
                                    ADD subject_id    CHAR(36) NULL;   -- credential_id | cycle_id
 ALTER TABLE credential_alert_log   MODIFY credential_id CHAR(36) NULL; -- a cycle alert has no credential
 ```
@@ -1389,7 +1398,8 @@ one more thing to run and get wrong.
 ledger for "have we told this person about this yet". A second table would have meant two dedupe paths, and the
 nightly scan would have had to consult both to avoid sending the same warning twice.
 
-**Why `credential_types` was not used for renewal rules.** It exists in the schema and is written by nothing.
+**Why `credential_types` was not used for renewal rules.** It was a placeholder table that nothing ever wrote
+to, and it has since been dropped (`..._000002_drop_unused_legacy_tables`) — it is not in the live schema.
 Adopting a dead table would have meant populating it first and then reconciling it against the free-text
 `employee_credentials.credential_type` values that are actually in use. `renewal_rules.subject_key` matches
 those strings directly.
@@ -1474,44 +1484,60 @@ HIPAA or RA 10173 compliant system.
 
 ## 9. Dashboard Layout
 
-The dashboard renders one of four partials depending on the signed-in user's role
-(`dashboard/partials/organisation`, `supervisor`, `staff`). The organisation view — shown to `admin` and
-`hr_manager` — is laid out as follows.
+The dashboard renders one of three partials depending on the signed-in user's role —
+`dashboard/partials/organisation` (admin and `hr_manager`), `supervisor`, and `staff`. The organisation view is
+laid out as follows.
 
 ```
 +------------------------------------------------------------------------------------------------------+
 |  HIMS Performance & Development                     [ Bell ] [ Help ] [ Search ] [ AI Assistant ] |
 +------------------------------------------------------------------------------------------------------+
-|  [Dashboard] [Performance] [Competency] [Learning] [Training] [Succession] [Recognition] [Admin]      |
+|  SIDEBAR: Dashboard · My Development · Performance · Competency · AI Gap Analysis · Learning ·        |
+|           Recognition · Succession · Employees · Departments · Users & Access                        |
 +------------------------------------------------------------------------------------------------------+
 |  STAT CARDS:                                                                                         |
 |  [ Active Employees ] [ Reviews In Progress ] [ Expiring Licenses ] [ Critical Skill Gaps ]          |
-|  [ Active Enrollments ] [ Upcoming Sessions ] [ Recognitions This Month ] [ Login Accounts ]         |
-|  [ Never Assessed ]                                                                                  |
+|  [ Active Enrollments ] [ Upcoming Sessions ] [ Active Enrollments ] [ Login Accounts ]              |
+|                                                     ^ duplicate      ^ or [ Never Assessed ]         |
 |                                                                                                      |
 |  +--------------------------------------------------+  +-------------------------------------------+ |
 |  |  Workforce by Department                          |  | 🚀 Quick Actions                          | |
 |  |  Largest Skill Gaps                               |  | ⚠️  Succession Risk                        | |
 |  |  Recent Performance Reviews                       |  | 🪪 Credential Alerts                      | |
-|  |                                                   |  | ❤️  Latest Recognition                     | |
 |  +--------------------------------------------------+  +-------------------------------------------+ |
 +------------------------------------------------------------------------------------------------------+
 ```
 
+Two things the diagram is deliberately faithful about. The **eighth card is one card, not two**: it is
+`@if(isset($system))` → *Login Accounts* and `@elseif(isset($unassessed_employees))` → *Never Assessed*, so the
+row is never nine cards wide. And the **seventh card is a defect, not a distinct metric** —
+`dashboard/partials/organisation.blade.php` prints `$stats['active_enrollments']` at both line 42 and line 56,
+so the same number appears twice under the same label. It is recorded here rather than silently omitted because
+a reader comparing screen to document would otherwise assume the document was stale.
+
 Every figure on this screen is a live aggregate query in `DashboardController` — none of the panels are
-placeholders.
+placeholders. There is no recognition panel and no recognition stat card on the dashboard; recognition lives on
+its own module page.
 
 ---
 
 ## 10. Sample Form
 
-### Competency Assessment (the **New Assessment** modal on `/competency`)
-*   **Employee**: Maria Santos, RN
-*   **Competency**: Advanced Ventilator Support (COMP-ICU-009)
-*   **Assessment method**: observation | exam | simulation | self-report
-*   **Current proficiency (1–5)**: [3]
-*   **Assessed date** / **Next assessment due**
-*   **Evidence URL**, **Notes**
+### Competency Assessment (the **New Competency Assessment** modal on `/competency`)
+*   **Employee \*** — a select, e.g. Maria Santos
+*   **Competency \*** — a select, e.g. Advanced Ventilator Support
+*   **Current Proficiency (1–5) \*** — a number input, e.g. `3`, captioned "The gap against the competency's
+    required level is worked out for you."
+*   **Assessment Method** — Self Assessment | Supervisor Rating | Practical Test | Written Exam | Direct
+    Observation (stored as `self_assessment` / `supervisor_rating` / `practical_test` / `written_exam` /
+    `observation`)
+*   **Assessment Date** — defaults to today
+*   **Notes**
+*   Saved with **Save Assessment**.
+
+The form has no *Next assessment due* field and no *Evidence URL* field; the reassessment interval is a property
+of the competency (`competencies.reassessment_months`), not of an individual assessment, and there is no file or
+link attachment anywhere in HIMS.
 
 On save the MySQL trigger subtracts the competency's `required_proficiency` from the submitted
 `current_proficiency` and stores the result in `gap` — the reviewer never types the gap, and it cannot be
@@ -1525,11 +1551,17 @@ inconsistent with the two proficiency figures.
 *   **Department**: Critical Care Unit (ICU)
 *   **Generated**: 2026-07-06
 
-| Competency Name | Code | Target Score | Current Avg | Gap |
-| :--- | :--- | :---: | :---: | :---: |
-| **Advanced Vent Support** | COMP-ICU-009 | 5 | 3.4 | **-1.6** |
-| **ACLS Certification** | COMP-GEN-002 | 5 | 4.8 | -0.2 |
-| **JCI Sterile Techniques** | COMP-INF-001 | 4 | 3.9 | -0.1 |
+The page's main table is headed **Measured Weakest Competencies** and carries six columns — there is no code
+column, and the gap is an average across the department's assessed employees rather than one person's:
+
+| Competency | Required | Avg | Avg Gap | Below | Assessed |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Advanced Vent Support** `Mandatory` | 5/5 | 3.40 | `-1.60` | 6 | 9 |
+| **ACLS Certification** | 5/5 | 4.80 | `-0.20` | 1 | 12 |
+| **JCI Sterile Techniques** | 4/5 | 3.90 | `-0.10` | 2 | 11 |
+
+*Below* is the number of assessed employees under the required level; *Assessed* is how many have an assessment
+at all. A **Training Demand** panel sits beside the table.
 
 `CompetencyGapAnalysisService` sends the aggregated figures to the configured AI provider for a narrative
 summary and development recommendations, which are rendered alongside the table. If the provider is unavailable
@@ -1615,10 +1647,16 @@ mandatory reason field when one is selected. That does not survive being reduced
 |---|---|---|---|
 | GET | `/competency` | `competency.index` | all authenticated |
 | POST | `/competency/assessments` | `competency.assessments.store` | `admin,hr_manager,supervisor` |
-| GET | `/competency/credentials` | `competency.credentials.index` | `admin,hr_manager,supervisor` |
+| GET | `/competency/credentials` | `competency.credentials.index` | all authenticated *(rows scoped)* |
 | POST | `/competency/credentials` | `competency.credentials.store` | `admin,hr_manager,supervisor` |
 | POST | `/competency/domains` | `competency.domains.store` | `admin,hr_manager` |
-| GET | `/competency/domains/{id}` | `competency.domains.show` | `admin,hr_manager` |
+| GET | `/competency/domains/{id}` | `competency.domains.show` | all authenticated |
+
+> Both GETs sit **outside** the `role:` groups in `routes/web.php` (lines 95 and 122), so any signed-in account
+> reaches them; what differs by role is the rows. The credentials register runs its query through
+> `scopeToVisibleEmployees()`, so admin/HR see the hospital, a supervisor sees their direct reports plus
+> themselves, and a member of staff sees only their own credentials. Only the three write routes carry role
+> middleware.
 
 > The `domains/{id}` wildcard is still registered **last** on principle, but it is now the only GET under
 > `/domains` — the create page it used to be ordered around became the `?new=domain` modal.
@@ -1737,8 +1775,10 @@ places recording the same fact. Both operations write an `audit_trails` row — 
 column, so that row is the record of who certified it.
 
 **CPD logging.** Any signed-in employee can record continuing-professional-development hours against their own
-record through the **Log CPD Activity** modal on `learning.cpd.index`, posting to `learning.cpd.store`. Entries
-carry a two-tier verification state:
+record through the **Record CPD** button on `learning.cpd.index`, which opens the **Record CPD Hours** modal
+posting to `learning.cpd.store`. (`learning/my-cycles` carries a **Log CPD** button, but it is a deep link to
+`learning.cpd.index?new=cpd` — the same modal, opened on arrival, since the renewal-cycle page does not host
+it.) Entries carry a two-tier verification state:
 
 - **System-sourced entries are auto-verified.** When the activity is an in-house course or training session the
   system already knows about, `LearningController::storeCpd()` marks the row verified on insert — the system is
@@ -1800,11 +1840,14 @@ Sessions are scheduled, venues managed, and employees register themselves. Sched
 venue and filing feedback are all **modals**, so this module has no `.../create` GET routes and no GET
 feedback page — `?new=session`, `?new=venue` and `?feedback=1` open them on load.
 
-**Attendance.** `training.sessions.checkin` marks a registrant present. The route sits behind
-`role:admin,hr_manager,supervisor`, and `TrainingController::checkIn()` narrows that further: a supervisor may
-only check in attendees of a session they are the instructor for, while `admin` and `hr_manager` may check in
-any session. Marking attendance is what flips a registration to attended and makes the feedback form reachable;
-anyone not checked in is left as a no-show on the roster.
+**Attendance.** `training.sessions.checkin` records who showed up. The route sits behind
+`role:admin,hr_manager,supervisor` and `TrainingController::checkIn()` re-checks the `manage-training` gate, then
+narrows by *whose* registrations may be marked rather than by which sessions are reachable: the session's own
+instructor, `admin` and `hr_manager` may mark **anyone** on the roster, while a supervisor who is not the
+instructor may mark only registrants **from their own department** — others in the same submission are silently
+skipped rather than the whole request being refused. The form posts a `registrations` map of
+`attended` / `no_show` per row, so a registration nobody marked is left as `registered`, **not** as a no-show.
+Marking somebody attended is what makes the feedback form reachable for them.
 
 **Feedback.** `training.sessions.feedback.store` writes `training_feedback`, which the session page has always
 displayed; the form itself is the `feedbackModal` partial on that page, reached from the Feedback Summary button
@@ -1924,24 +1967,24 @@ Notes:
 
 | Area | Status |
 |---|---|
-| MySQL schema & migrations (51 live tables, 1 view, 2 triggers; 29 applied migrations) | ✅ Complete |
+| MySQL schema & migrations (51 live tables, 1 view, 2 triggers; 30 applied migrations) | ✅ Complete |
 | Laravel Breeze session auth; admin-provisioned accounts, registration disabled | ✅ Complete |
 | RBAC — 20 Gates + `EnsureUserHasRole` middleware over 4 roles | ✅ Complete *(Gates, not Policies)* |
 | Performance module — cycles, named reviews, KPI scoring, employee response/acknowledgement, automatic close | ✅ Core paths |
 | Competency module — domains, assessments (trigger-computed gap), credentials | ✅ Core paths |
 | Competency Gap Analysis (Objective 6) — org / department / employee views + JSON | ✅ Complete |
 | Learning — catalogue, assignment-only enrolment, pathways, CPD, Required Training, renewals and reports | ✅ Complete |
-| Training module — sessions, venues, registration, attendance check-in, feedback | ✅ Core paths |
+| Training — sessions, venues, registration, attendance check-in, feedback (surfaced as the **Sessions** and **Venues** tabs inside Learning; still `training.*` routes and `TrainingController`) | ✅ Core paths |
 | Succession module — confidential positions/candidates, 9-box, quarterly reviews, direct-report milestone scope, alerts | ✅ Complete except approval workflow |
 | Recognition module — named public/private posts, audience-limited interaction, moderation, public leaderboard | ✅ Complete |
 | Employees / Departments / Users administration | ✅ Complete |
-| AI assistant + provider-agnostic AI layer (4 providers, fallback models, owner-only saved history) | ✅ Complete |
+| AI assistant + provider-agnostic AI layer (4 providers, hardcoded fallback chains on two of them, owner-only saved history) | ✅ Complete |
 | UI shell, permission-aware Global Search, design system, full mobile-responsive support | ✅ Complete |
 | Password reset by email — request, delivery, tokenised reset, single-use enforcement | ✅ Complete *(needs mail credentials + a correct `APP_URL`; see "Outbound Mail" in `HIMS_ARCHITECTURE_AND_SECURITY.md`)* |
 | Topbar Notifications and Help/FAQ dropdowns | ✅ Complete *(recent read/unread feed, numeric badge, per-item read, mark-all read, access-aware destinations)* |
-| Credential, competency and renewal-cycle alerts — `hims:scan-credential-expiry`, scheduled daily | ✅ Complete *(escalates to supervisor/department head; falls back to the `employees` email when there is no login)* |
+| Credential, competency and renewal-cycle alerts — `hims:scan-credential-expiry`, scheduled daily | ✅ Complete *(in-app; escalates to supervisor/department head. The email fallback to the `employees` address when there is no login is gated on `CREDENTIAL_ALERT_EMAIL`, which defaults to **false**)* |
 | Development progression view — per-employee consolidation, staff-accessible | ✅ Complete |
-| Automated test suite — **359 tests, 338 passed, 21 skipped, 1536 assertions** on sqlite `:memory:`; **359 passed, 0 skipped, 1604 assertions** against MySQL | ✅ Passing *(the 21 sqlite skips are MySQL-specific read paths — `EmployeeProgressionTest` 5, `GapAnalysisFeedbackTest` 9, `ReviewAuthorityTest` 7 — and only the MySQL run exercises them)* |
+| Automated test suite — **359 tests, 338 passed, 21 skipped, 1537 assertions** on sqlite `:memory:`; **359 passed, 0 skipped, 1605 assertions** against MySQL | ✅ Passing *(the 21 sqlite skips are MySQL-specific read paths — `EmployeeProgressionTest` 5, `GapAnalysisFeedbackTest` 9, `ReviewAuthorityTest` 7 — and only the MySQL run exercises them)* |
 
 ---
 
@@ -1979,5 +2022,7 @@ Notes:
 | **Laravel infrastructure** | `users`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `password_reset_tokens` | Framework tables. `users` is the real auth table, extended with `role` + nullable `employee_id` FK, plus `failed_login_attempts` / `locked_until` for lockout. |
 
 **Current live baseline: 51 tables + 1 view, with 30 applied migration rows**, configured for MySQL 8. The
-legacy placeholder tables and `peer_reviews` named earlier in project history have been dropped. The latest
-schema additions are employee review-response fields and quarterly succession-review fields.
+legacy placeholder tables and `peer_reviews` named earlier in project history have been dropped. The newest
+migration is `..._000030_add_people_manager_to_employees`, which added `employees.is_people_manager`; the
+additions immediately before it are the employee review-response fields and the quarterly succession-review
+fields.

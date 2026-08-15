@@ -54,7 +54,7 @@ Once logged in, you will see:
 >
 > **Credential, reassessment, and renewal-shortfall alerts are not private to you.** Each one goes to you, to your supervisor, and to the head of your department, because a lapsed licence affects whether you can be rostered. CPD verification notices go to you alone.
 >
-> **If you have no HIMS login,** these alerts are emailed to the address on your employee record instead. Your supervisor and department head are told either way.
+> **If you have no HIMS login,** these alerts reach you by email at the address on your employee record instead. Your supervisor and department head are told either way. **Email is switched on per deployment and is off by default**, so on a hospital that has not enabled it the alerts appear in the bell and nowhere else — which is why an employee with no login may need telling in person.
 
 ### Global Search
 
@@ -68,9 +68,9 @@ Search never grants additional access. Staff receive only their own employee and
 
 Most pages in HIMS end in a table. Every one of them reads the same way: **a column heading sits directly over
 the column it names**, so you can run your eye straight down from the heading to the values under it. The one
-place headings and values are centred instead of left-aligned is **My Development**, where the proficiency
-columns (Required, Current, Gap) hold single digits — heading and digits are centred together, so they still
-line up.
+page that centres anything is **My Development**, where the narrow number columns are centred together with
+their headings so they still line up: Required, Current and Gap on the competency table, Progress and CPD on
+courses, CPD on training sessions, and Hours on the CPD log.
 
 ### Adding Something New
 
@@ -99,7 +99,7 @@ What you can reach depends on your assigned role:
 
 > **Note:** Menu items you do not have access to are hidden from your sidebar.
 >
-> **What you see within a module varies.** In **Employees**, **Gap Analysis**, **My Development**, Learning's oversight/employee-record lists, the core supervisor dashboard figures, and **Succession**, supervisor access follows the reporting line. Recognition has its own public/private audience rule. Training, the Learning catalogue, credential alerts on the supervisor dashboard, and upcoming-session lists have their own wider scopes, so do not assume one module's list rule applies everywhere.
+> **What you see within a module varies.** In **Employees**, **Gap Analysis**, **My Development**, Learning's oversight/employee-record lists, the core supervisor dashboard figures, and **Succession**, supervisor access follows the reporting line. Recognition has its own public/private audience rule. The Learning catalogue, Learning's Sessions and Venues tabs, credential alerts on the supervisor dashboard, and upcoming-session lists have their own wider scopes, so do not assume one module's list rule applies everywhere.
 >
 > **Performance is stricter than all of them.** A review is visible to the person it is about, the person who wrote it, and that person's supervisor — and to nobody else, whatever their role. See [§4](#4-performance-management).
 >
@@ -169,7 +169,7 @@ Below the figures are six panels:
 
 > **Unverified CPD does not appear here.** The panel and the twelve-month figure both count verified hours only. An external activity still waiting on HR approval is on your CPD list under **Learning**, but not on this page — see [§7](#7-learning-management).
 
-> **Nothing on this page can be edited.** It reads records created elsewhere: assessments and credentials are entered by an assessor, enrolments and registrations by you, CPD by you or the system.
+> **Nothing on this page can be edited.** It reads records created elsewhere: assessments and credentials are entered by an assessor, course enrolments by whoever required the training of you, session registrations by you, CPD by you or the system.
 
 ---
 
@@ -257,7 +257,7 @@ The Final Score is the figure the rest of HIMS quotes. They differ whenever your
 
 Saving as **Finished** stamps the review with a signature and the time, recording that you attested to it. It stays editable while the cycle is still running — come back, change a score, save again, and it is re-signed so the signature always covers what the review actually says today. Moving it back to **Draft** removes the signature, because a review you have reopened is not one you are still standing behind.
 
-**Completed is not on the form.** You cannot choose it and you cannot undo it. When the cycle's end date passes, every review in it becomes Completed overnight and stops accepting changes — no button to press, nothing to remember, and it happens on time whether or not anyone is logged in.
+**Completed is not on the form.** You cannot choose it and you cannot undo it. When the cycle's end date passes, every review in it becomes Completed the moment the date rolls over and stops accepting changes — no button to press, nothing to remember, and no overnight job that has to run first: the status is worked out from the cycle's dates each time the review is opened, so it is right whether or not anyone is logged in.
 
 > **What a freeze looks like if you are mid-edit.** Nothing is lost that you had already saved, but the next save is refused: the **Score** button is gone from the review, the page carries a banner explaining that the cycle has ended, and going to the scoring address directly returns you to the read-only review. Anything you had typed but not saved when the date rolled over is not kept. If you know a cycle is about to end and the review is not finished, save it before the day is out.
 
@@ -302,11 +302,11 @@ Competencies are organised into:
 Assessments record an employee's proficiency level (1–5) for a competency. The system compares that to the level required for their role and calculates the **gap** automatically.
 
 **Creating an Assessment (Admins/HR/Supervisors):**
-1. Go to **Competency** and click **New Assessment**. A panel opens over the page.
+1. Go to **Competency** and click **New Assessment**. A modal headed *New Competency Assessment* opens over the page.
 2. Select the employee and the competency, and rate their current proficiency level.
 3. Choose the assessment method (observation, self assessment, supervisor rating, practical test, or written exam).
 4. Add assessor notes if needed.
-5. Click **Record Assessment**.
+5. Click **Save Assessment**.
 
 You do not enter the gap — the system works it out from the proficiency you recorded and the level the role
 requires.
@@ -320,14 +320,23 @@ The system records clinical licences and certifications (e.g., PRC License, Boar
 | 🟢 Green | **Active** | Valid and current |
 | 🟡 Yellow | **Expiring Soon** | Expires within 30 days |
 | 🔴 Red | **Expired** | Past the expiry date |
-| ⚪ Grey | **Revoked** | Marked as revoked |
+| ⚪ Grey | **No expiry** | No expiry date recorded — nothing to fall due |
 
 **Adding a Credential (Admins/HR/Supervisors):**
 1. Click **Add Credential** — it is on the **Competency** page and on the credentials register itself, so you can add one without leaving the list you are reading.
-2. Enter the credential name, type, licence number, issue date, and expiry date.
-3. Click **Add Credential**.
+2. Choose the **employee**, then the **credential type** from the fixed list — PRC License, BLS Certification, ACLS Certification, IV Therapy, Board Certificate, JCI Training, or Other. There is no free-text credential name: the type *is* the name you will see on every screen afterwards.
+3. Optionally record the licence/certificate number, the issuing body, the issue date and the expiry date. Leave the expiry blank for something that never falls due.
+4. Click **Add Credential**.
 
-> **These statuses are shown on screen only.** The system does **not** send renewal reminders or escalation emails, and nothing alerts HR when a credential expires. Someone has to look at the Credential Alerts panel on the Competency page or the Dashboard.
+> **These statuses raise alerts; they are not just colours on a screen.** A daily sweep at 06:30 hospital time
+> notifies the employee, their supervisor, and their department head — where one is recorded; see [§13](#13-administration) — about every credential that has expired or
+> has fallen inside the 30-day window, and logs that it did so. The Credential Alerts panel on the Competency
+> page and on the Dashboard is the same calculation, so the screen and the alert cannot disagree.
+>
+> Two things your administrator controls: the sweep only runs if the server's scheduled task is set up (the
+> notifications can also be raised by running the check by hand), and **email is off unless it has been switched
+> on for your deployment** — until then the alerts are in-app only. See [§1](#1-getting-started) for who receives
+> them.
 
 #### Department Skills Gap Matrix
 
@@ -371,7 +380,7 @@ Two places on the page show this:
 
 A review cycle that carries no written comment is still listed, saying exactly that. A cycle where somebody was scored but nobody wrote anything down is worth knowing about.
 
-> **Two things to be aware of.** These comments are sent to the AI provider to be summarised — the same external service the assistant uses. Bear that in mind when writing a review comment: avoid patient names and identifying details, as you should in any personnel record. And the summary is a summary; where a decision turns on exactly what was said, read the comment itself in **Written Feedback on Record** rather than the paraphrase above it.
+> **Two things to be aware of.** These comments are sent to the AI provider to be summarised — the same external service the assistant uses — **unless your administrator has turned that off**. Two switches on the user-administration screen govern it: one stops written comments leaving the hospital at all (the AI is then told the text was withheld, so it cannot quietly guess), and one blanks the employee's own name and any patient identifier out of the text before it is sent. Name redaction is the safe default: if the setting cannot be read for any reason, HIMS redacts. Bear it in mind anyway when writing a review comment — avoid patient names and identifying details, as you should in any personnel record. And the summary is a summary; where a decision turns on exactly what was said, read the comment itself in **Written Feedback on Record** rather than the paraphrase above it.
 
 > **If the AI service is unavailable**, the numbers and tables still work; only the AI-written commentary is replaced with a ⚠️ message. The **Written Feedback on Record** card is unaffected — the comments are read straight from the reviews.
 
@@ -452,10 +461,12 @@ You cannot mark your own enrolment complete; see [§8](#8-learning-oversight-tab
 
 For everything the system did not witness — a conference, a webinar, private study — log it yourself.
 
-1. Go to **Learning** → **CPD**.
-2. Click **Log CPD Activity**.
+1. Go to **Learning** → **My CPD**.
+2. Click **Record CPD**. A modal headed *Record CPD Hours* opens on the page.
 3. Choose the **activity type**, then give the activity a title, the date you did it, and the number of hours.
 4. Click **Save**.
+
+> The **Log CPD** button on **My Cycles** does the same thing — it is a link back to My CPD with the same modal already open.
 
 **Whether it counts straight away depends on where the activity came from.** An activity that HIMS can already see — an in-house course or a training session you attended here — is accepted as verified immediately. Anything external (a conference, a webinar, private study) is saved as **unverified** and waits for HR to approve it. Unverified hours are listed with your other records but are marked as pending.
 
@@ -465,9 +476,9 @@ For everything the system did not witness — a conference, a webinar, private s
 
 #### Certificates
 
-The Learning page shows a count of certificates on record.
+The Learning Overview carries a **Certificates Issued** stat card, which counts the rows in the `certificates` table.
 
-> **The system does not issue certificates.** Nothing generates a certificate when you finish a course, and there is no download or QR verification.
+> **The system does not issue certificates.** Nothing writes to that table — no code path anywhere in HIMS creates a certificate when you finish a course — so in practice the card reads **0** and stays there. There is no download and no QR verification. Read the card as "certificates on record", not as evidence that HIMS produced any.
 
 ---
 
@@ -477,7 +488,9 @@ The Learning page shows a count of certificates on record.
 
 ### Sidebar: 📚 Learning
 
-There is no separate Compliance sidebar item. Everyone sees **Learning**. Staff see Overview, My CPD and Pathways; Supervisors, HR Managers and Admins additionally see **Required Training**, **Renewals**, and **Reports**. Supervisors can assign training; their visible oversight rosters are limited to their reporting line, while department/role/all assignment targets themselves are broader. Renewal rules and Account Coverage remain HR/Admin only.
+There is no separate Compliance sidebar item. Everyone sees **Learning**, which carries eight tabs. Five are open to every role — **Overview**, **My CPD**, **Pathways**, **Sessions** and **Venues** — and Supervisors, HR Managers and Admins additionally see **Required Training**, **Renewals** and **Reports**, the three covered in this section. Supervisors can assign training; their visible oversight rosters are limited to their reporting line, while department/role/all assignment targets themselves are broader. Renewal rules and Account Coverage remain HR/Admin only.
+
+> **A visible tab is not a blanket permission.** Sessions and Venues are readable by everyone because staff register for sessions there, but the write controls inside them check the role separately — only Admins, HR Managers and Supervisors can schedule a session, and only Admins and HR Managers can add a venue.
 
 > **Nothing on these pages needs the person to have a login.** Every list here is built from employee records, not user accounts. Someone who has never signed in to HIMS still appears in the compliance figures, still gets assigned mandatory training, and still has renewal cycles tracked. The one page that mentions accounts at all is **Account Coverage**, and there the account is the thing being reported on, not a requirement.
 
@@ -513,7 +526,7 @@ The roster respects your role: a Supervisor sees only rows for people who report
 
 The completion rate only moves when someone records a completion, and how you do that depends on what was assigned.
 
-- **A training session** — take the register. The last column on each row is an **Attendance** link that opens the session's attendance sheet, where you check people in. That check-in *is* the completion; there is nothing else to do here.
+- **A training session** — take the register. The last column on each row is an **Attendance** link, which is a shortcut to the session's own page rather than a sheet in the modal; from there you click **Mark Attendance** and save as described in [§9](#9-training-management). Marking someone **Attended** *is* the completion; there is nothing else to do here.
 - **A course** — click **Mark complete** on that person's row. HIMS stamps today's date, moves them to Completed, and the rate at the top of the page goes up immediately.
 
 Marking a course complete also **credits that course's CPD hours** to the person, already verified — you do not need to log them separately, and they count straight away toward that employee's renewal cycle. The person gets a notification saying so.
@@ -561,9 +574,9 @@ Being tracked without a login is a supported state, not a fault. What this page 
 
 #### How Alerts Reach People Without Accounts
 
-The daily check that raises credential and reassessment alerts also covers renewal cycles running short. Each alert goes to the employee, their supervisor, and their department head.
+The daily check that raises credential and reassessment alerts also covers renewal cycles running short. Each alert goes to the employee, their supervisor, and their department head where one is recorded — see [§13](#13-administration) for why a department created through HIMS has no head.
 
-Where the employee has no HIMS login, the alert is sent to the email address on their **employee record** instead of the notification bell. Where there is neither, the supervisor and department head still receive theirs — the alert is never silently dropped.
+Where the employee has no HIMS login, the alert can be sent to the email address on their **employee record** instead of the notification bell — but **only if credential-alert email has been switched on for your deployment, which it is not by default.** Until it is, an employee with no login has nowhere to receive their own copy, and their supervisor and department head are the ones who have to act on it. The **unreachable** figure on Account Coverage is exactly this population, which is why it is the one worth working down.
 
 ---
 
@@ -571,17 +584,19 @@ Where the employee has no HIMS login, the alert is sent to the email address on 
 
 **What it does:** Schedules instructor-led training sessions, manages venues, and takes registrations.
 
-### Sidebar: 🎓 Training
+### Learning → **Sessions** and **Venues**
+
+> **There is no Training item in the sidebar.** Sessions and venues are two tabs inside **Learning**, and both are visible to every role. This section is kept separate only because the work — scheduling, registering, taking the register — is its own job; everything below starts from **Learning**.
 
 #### Viewing Training Sessions
 
-The Training page lists **upcoming sessions** (workshops, seminars, drills) with their date, venue, instructor, and how many people have registered. It is a list, not an interactive calendar.
+The Sessions tab lists **upcoming sessions** (workshops, seminars, drills) with their date, venue, instructor, and how many people have registered. It is a list, not an interactive calendar.
 
 #### Registering for Training (all roles)
 
-1. Go to **Training** in the sidebar.
+1. Go to **Learning** → **Sessions**.
 2. Find an upcoming session and open it.
-3. Click **Register**.
+3. Click **Register Me**.
 
 The system refuses the registration if the session is already at capacity, if you have already registered, or if your login is not linked to an employee profile.
 
@@ -591,34 +606,35 @@ The system refuses the registration if the session is already at capacity, if yo
 
 #### Creating a Training Session (Admins/HR/Supervisors)
 
-1. Go to **Training** → **Create Session**.
+1. Go to **Learning** → **Sessions** and click **New Session**. A modal headed *Schedule New Training Session* opens over the session list.
 2. Fill in the session title, date, start and end time, venue, instructor, and maximum capacity.
-3. Click **Save**.
+3. Click **Schedule Session**.
 
 The database refuses two sessions in the same venue on the same date with the **same start time**. Note that this is an exact match, not an overlap check — a 09:00–12:00 session and a 10:00–11:00 session in the same room on the same day are both accepted. The refusal also arrives as a database error page rather than a friendly message, so if saving a session fails unexpectedly, check whether another session already starts at that exact time in that venue.
 
 #### Venues (Admins/HR)
 
-Go to **Training** → **Venues** to add classrooms, simulator rooms, and other spaces with their capacity.
+Go to **Learning** → **Venues** and click **Add Venue** to record classrooms, simulator rooms, and other spaces with their capacity. A panel opens over the venue list.
 
 #### Marking Attendance (Instructors, Admins/HR)
 
 After a session runs, someone marks who actually turned up:
 
-1. Open the session from the **Training** list.
-2. The registered attendees are listed on the session page.
-3. Click **Check In** next to each person who attended.
+1. Open the session from the **Sessions** tab.
+2. Click **Mark Attendance**, at the top of the **Registrations** panel. An attendance sheet opens inline above the roster.
+3. For each registrant choose **Attended** or **No-show**.
+4. Click **Save Attendance**.
 
-**Who can do this:** Admins and HR Managers can mark attendance for any session. A Supervisor can only do it for sessions **they are the instructor of** — opening someone else's session gives them no check-in buttons.
+**Who can do this:** the button appears for Admins, HR Managers and Supervisors on any *scheduled* session that has at least one registration — so a Supervisor does see it on somebody else's session. What differs is who their marks apply to. An Admin, an HR Manager, or **the instructor running the session** can mark anyone on the roster. A Supervisor who is not the instructor can only mark registrants **from their own department**; marks they submit for anyone else are discarded silently, with no error and no note on the confirmation, so check the roster afterwards rather than assuming everything you ticked was saved.
 
-> **There is no QR code and no self-check-in.** Attendees cannot mark themselves present; it is done from the roster by the instructor or HR. Anyone not checked in stays on the list as a no-show.
+> **There is no QR code and no self-check-in.** Attendees cannot mark themselves present; it is done from the roster by the instructor or HR. Someone nobody marks stays listed as **Registered** — HIMS does not turn an unmarked registration into a no-show, so "no-show" on a roster always means a person actively recorded it.
 
 #### Giving Feedback on a Session (all roles)
 
 1. Open the session you attended.
-2. Click **Submit Feedback**.
+2. Click **Give Feedback**, in the **Feedback Summary** panel. A panel opens over the session.
 3. Rate the session and add a comment if you want to.
-4. Click **Save**.
+4. Click **Submit Feedback**.
 
 > **The button only appears once you have been marked present.** If you attended but cannot see it, your check-in has not been recorded yet — ask the instructor or HR. You can only give feedback on your own attendance; there is no way to submit it on somebody else's behalf.
 
@@ -641,40 +657,53 @@ These are key roles that would cause significant operational risk if left vacant
 **Adding a Critical Position (Admins/HR):**
 1. Go to **Succession**.
 2. Click **Add Critical Position**.
-3. Select the department, role, and current holder.
-4. Choose the vacancy risk level — **low**, **medium**, **high**, or **critical**. This is your own judgement; the system does not calculate it. It is used to sort and highlight the positions list and the dashboard's at-risk panel.
+3. Type the **Position Title**. This is free text, not a list of existing job titles.
+4. Choose the **department**, and the **current holder** if the post is filled — leaving the holder blank records the position as **Vacant**.
+5. Choose the vacancy risk level — 🟢 **Low**, 🟡 **Medium**, 🟠 **High**, or 🔴 **Critical**. This is your own judgement; the system does not calculate it. It is used to sort and highlight the positions list and the dashboard's at-risk panel.
+6. Optionally record an **estimated vacancy date** — a planned retirement, for example — then click **Add Position**.
 
 Admins and HR Managers can record a **quarterly position review** with optional notes. HIMS stores the review time and the linked employee who recorded it. The organisation dashboard highlights high/critical-risk roles with no candidate marked **Ready Now**.
 
 #### Nominating a Successor
 
-1. From the critical positions list, click **Nominate Candidate**.
-2. Select an employee as a potential successor.
-3. Rate their **Performance** (1–5) and **Potential** (1–5). The form previews the resulting placement as you type.
-4. The system places them on the **9-Box Grid** automatically:
+There are **two nomination forms, and they do not ask for the same things.** Which one you get depends on where you start:
+
+**From the Succession page** — click **Nominate Successor**. A modal asks for the candidate, the target position, the readiness stage, an optional mentor, and free-text notes, then you click **Submit Nomination**. It has **no score fields**, so HIMS files the nomination with performance and potential both set to **3**, which places the candidate in the middle box of the grid. Edit the candidate afterwards to record the real scores.
+
+**From a critical position** — open the position and click **Nominate Candidate** (the same button appears on the Admin/HR dashboard). This is the full form:
+
+1. Select an employee as a potential successor and the **target position**.
+2. Rate their **Performance** (1–5) and **Potential** (1–5) — both required here. The form previews the resulting placement as you type.
+3. The system places them on the **9-Box Grid** automatically:
 
 | | Low Potential (1–2) | Medium Potential (3) | High Potential (4–5) |
 |---|---|---|---|
-| **High Performance (4–5)** | Solid Performer | High Performer | ⭐ Star Talent |
-| **Medium Performance (3)** | Average Performer | Core Contributor | High Potential |
+| **High Performance (4–5)** | Solid Performer | High Performer | Star |
+| **Medium Performance (3)** | Average Performer | Core Player | High Potential |
 | **Low Performance (1–2)** | Underperformer | Inconsistent | Rough Diamond |
 
-5. Set their **readiness level**: Ready Now, Ready in 1–2 Years, Ready in 2–5 Years, or Long Term.
-6. Assign a **mentor** if applicable.
-7. Click **Save**.
+4. Set their **readiness level**: Ready Now, 1–2 Years, 2–5 Years, or Long Term (5+ yrs). It defaults to 1–2 Years.
+5. Assign a **mentor** if applicable.
+6. Click **Nominate Candidate**.
 
-The 9-box placement is always recalculated from the scores, so the badge can never disagree with the numbers next to it.
+The 9-box placement is always recalculated from the scores, so the badge can never disagree with the numbers next to it. One person can be nominated for the same position only once; a second attempt is refused rather than duplicated.
+
+> The table above uses the wording on the candidate and position pages, which is where you read a placement back. The **live preview on the nomination form words four of the nine cells differently** for the same placement — Star appears as "⭐ Future Star", Solid Performer as "✅ Solid Contributor", Core Player as "👷 Core Employee", and Average Performer as "📊 Average". The scores and the box are identical; only the label text differs.
 
 #### Managing Nominations
 
-- **Edit** a candidate to revise scores, readiness, or mentor.
-- **Withdraw** a candidate to remove the nomination. This also deletes their development milestones and cannot be undone.
+Both actions live on the candidate's **edit** screen, reached from the ✏️ button in the pipeline:
+
+- Revise **scores, readiness, or mentor** and save. The 9-box placement is recomputed from the new scores.
+- **Withdraw Candidate**, at the foot of the same screen, removes the nomination. It asks you to confirm first, because it also deletes their development milestones and cannot be undone.
 
 > There is **no approval step**. Candidates stay in their initial status; nothing promotes a nomination from "proposed" to "approved."
 
 #### Candidate Pipeline
 
-Admins and HR Managers see the hospital-wide pipeline: candidate, target role, 9-box placement, readiness, development progress, mentor, and status. Supervisors see only their direct-report candidates, with the confidential rating, readiness, mentor, and status fields removed. Filter options are likewise limited to positions visible to the current user.
+The pipeline table on the Succession page lists **candidate** (with their current position beneath the name), **target position**, **readiness**, **dev progress** and **status**, plus a **View** link and — for Admins/HR — an edit (✏️) button. Supervisors see the same table with **Readiness** and **Status** removed, and only their direct-report candidates in it. The position filter above the table offers only positions you are allowed to see, and a position id typed into the URL by hand is ignored unless it is one of them.
+
+> Scores, 9-box placement and mentor are **not** columns here — they are on the candidate's own page, where they are also the fields hidden from Supervisors.
 
 #### Leadership Development Paths
 
@@ -705,18 +734,18 @@ Open a candidate and, below their milestones, two panels show what HIMS already 
 1. Go to **Recognition** in the sidebar.
 2. Click **Give Recognition**.
 3. Select the **colleague** you want to recognise.
-4. Choose a **badge** that best describes their contribution:
+4. Optionally choose a **hospital value badge**. The list shows each badge's point value, and **No badge** is a valid choice — the post is still recorded, it just carries no points:
 
-| Badge | Meaning |
-|---|---|
-| 💙 **Compassion (Kalinga)** | Exemplary patient bedside manner |
-| 🤝 **Teamwork (Bayanihan)** | Helping colleagues in understaffed shifts |
-| 💡 **Innovation (Diskarte)** | Creative solutions to problems |
-| ⭐ **Clinical Excellence** | Zero-error documentation or procedures |
+| Badge | What it is for | Points |
+|---|---|---|
+| **Compassion (Kalinga)** | Exceptional care, empathy, and attention to patients or colleagues | 5 |
+| **Teamwork (Bayanihan)** | Stepping in, sharing responsibility, helping the team deliver safely | 5 |
+| **Innovation (Diskarte)** | A practical improvement that removes friction or improves service | 5 |
+| **Clinical Excellence** | Consistently precise, safe, and evidence-based clinical work | 8 |
 
-5. Write a short message about what they did.
-6. Choose **Public** or **Private**.
-7. Click **Post**.
+5. Write a **message** about what they did (required, up to 1000 characters).
+6. Choose **Public** or **Private**. Public is preselected.
+7. Click **Post Recognition**.
 
 Your own name is excluded from the colleague list, and the server rejects a self-recognition request even if
 the form is bypassed. A post is labelled **Supervisor** only when the recipient's recorded `supervisor_id`
@@ -779,7 +808,7 @@ When you give an instruction, the assistant either:
 - **Performs it immediately** (for creates and updates), reporting what happened in the same words the web form would have used
 - **Asks you to confirm first** (for deletions and other destructive actions), naming the exact record it will affect
 
-**Confirming a destructive action:** When the assistant says it needs confirmation, reply **"confirm"**, **"yes"**, or **"proceed"** to go ahead, or type anything else to cancel. The confirmation offer expires after five minutes — if you answer after that, nothing happens and you will need to give the instruction again.
+**Confirming a destructive action:** When the assistant says it needs confirmation, reply **"confirm"**, **"confirmed"**, **"yes"**, **"proceed"**, **"do it"**, or **"go ahead"** to go ahead; anything else cancels it and is treated as a fresh instruction. The confirmation offer expires after five minutes — if you answer after that, nothing happens and you will need to give the instruction again.
 
 **If something is unclear:** The assistant will ask for the missing detail rather than guessing. For example, if you say "delete the training session" but there are three sessions with similar names, it will list them and ask which one you mean.
 
@@ -834,19 +863,23 @@ The **Reports To** list contains only active People Managers with Supervisor, HR
 
 Available to **Admins** and **HR Managers**.
 
-- **View** departments with their head and headcount
-- **Add** a new department with a name and department code
+- **View** departments with their head, headcount and code
+- **Add** a new department: a name (required and unique), an optional department code, and a **clinical** flag
 
 > Departments cannot be edited or deleted from the system once created.
 
+> **The department head cannot be set from this screen, or from anywhere else in HIMS.** `head_employee_id` is populated only by the demo seeder, so a department you create here has no head recorded — which matters because the credential-alert escalation copies the department head in. Departments added through this screen escalate to the employee and their supervisor only.
+
 ### Sidebar: 🔐 Users & Access (Admin only)
 
-- **Create** login accounts and link them to an employee record
+- **Add User** — create a login account and link it to an employee record
 - **Assign roles** (Admin, HR Manager, Supervisor, Staff)
 - **Set a new password** for a user from the edit screen
+- **Unlock** a locked account, from the button that appears on its row
 - **Delete** an account
+- **AI Data Settings** — two switches governing what leaves the hospital for the AI provider: whether supervisors' written review comments are included in gap-analysis prompts at all, and whether employee and patient names are blanked out of them first. The panel also names the provider currently configured. Both default to on (comments included, names redacted), and redaction is what HIMS falls back to if the setting cannot be read.
 
-> There is no activate/deactivate switch. After five failed password attempts, the account is locked for 15 minutes; an Administrator can also unlock it from **Users & Access**. The system will not let you remove or demote the last remaining Administrator.
+> There is no activate/deactivate switch. After five failed password attempts, the account is locked for 15 minutes; an Administrator can also unlock it earlier from **Users & Access**. The system will not let you remove or demote the last remaining Administrator.
 
 ---
 
@@ -942,16 +975,16 @@ A: The system does not issue certificates.
 A: You can't do this yourself. Ask an Administrator to remove your registration.
 
 **Q: How do I give feedback on a training session?**
-A: Open the session from the **Training** list and click **Submit Feedback**. The button only appears once the instructor has marked you present — if you attended but cannot see it, your check-in has not been recorded yet, so ask the instructor or HR.
+A: Open the session from **Learning** → **Sessions** and click **Give Feedback** in the Feedback Summary panel; the form opens on the page, and you send it with **Submit Feedback**. The button only appears once the instructor has marked you present — if you attended but cannot see it, your attendance has not been recorded yet, so ask the instructor or HR.
 
 **Q: I attended a session but it still says "registered". Why?**
-A: Attendance is marked from the session roster by the instructor or by Admin/HR, not by you. Until someone checks you in you stay listed as registered, and the feedback form stays hidden. There is no QR code and no self-check-in.
+A: Attendance is marked from the session roster by the instructor or by Admin/HR, not by you. Until someone marks you **Attended** you stay listed as *Registered*, and the feedback form stays hidden. There is no QR code and no self-check-in.
 
 **Q: I finished a course. How do I mark it complete?**
 A: You do not — someone else does. Ask your Supervisor, an HR Manager, or an Admin to open the course or its **Learning → Required Training** roster modal and click **Mark complete** on your row. Once they do, the course's CPD hours are credited automatically and already verified.
 
 **Q: How do I get my conference or webinar hours onto my CPD record?**
-A: Go to **Learning** → **CPD** → **Log CPD Activity** and enter it yourself. External activities are saved as unverified and wait for an HR Manager or Admin to approve them; in-house courses and training sessions are accepted as verified straight away. You do not need to log hours for a course somebody has already marked you complete on — those were credited at that moment, and entering them again would double-count.
+A: Go to **Learning** → **My CPD** → **Record CPD** and enter it yourself. External activities are saved as unverified and wait for an HR Manager or Admin to approve them; in-house courses and training sessions are accepted as verified straight away. You do not need to log hours for a course somebody has already marked you complete on — those were credited at that moment, and entering them again would double-count.
 
 **Q: A course appeared on my list that I never enrolled in. What is it?**
 A: It was assigned to you — by department, role, or individually — because the hospital requires it. It may carry a required-by date. Course self-enrolment is not available, so current course enrolments originate from Required Training. See [§8](#8-learning-oversight-tabs).
@@ -963,10 +996,10 @@ A: It means that at the rate you have been earning hours, you would not reach th
 A: Only verified CPD counts towards a cycle. If the activity was external it is waiting on HR approval — ask HR to verify it, and the hours will appear against the cycle. Hours credited by a course completion are verified from the start, so those move the cycle immediately.
 
 **Q: My department's compliance rate is stuck at 0%. Why?**
-A: Nobody has been recorded as finishing yet. For an assigned **course**, someone with the right role has to click **Mark complete** on each person's row; for a **session**, the instructor has to check people in on the attendance sheet. Enrolling in a course does not complete it, and the percentage counts *people finished*, not how far through the material anyone is.
+A: Nobody has been recorded as finishing yet. For an assigned **course**, someone with the right role has to click **Mark complete** on each person's row; for a **session**, the instructor has to mark people **Attended** on the session's attendance sheet. Enrolling in a course does not complete it, and the percentage counts *people finished*, not how far through the material anyone is.
 
 **Q: I do not have a HIMS login. Am I being tracked at all?**
-A: Yes. Assignments, renewal cycles, credentials, and compliance reporting all work from your employee record, not from an account. Alerts that would go to the notification bell are emailed to the address on your employee record instead, and your supervisor and department head are told as well.
+A: Yes. Assignments, renewal cycles, credentials, and compliance reporting all work from your employee record, not from an account. Your supervisor and department head are notified about your expiring credentials and due reassessments, so somebody is told even though you have no notification bell. Whether *you* also get a copy by email depends on your deployment: credential-alert email is **off by default**, and until an administrator switches it on there is nowhere for your own copy to go. You appear in the **unreachable** figure on the Account Coverage report until then.
 
 ### AI Assistant
 

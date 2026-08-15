@@ -53,8 +53,10 @@ final class HimsKnowledge
         LEFT SIDEBAR (an item is only visible if the person's role allows it),
         in the order they appear:
         Dashboard · My Development · Performance · Competency · AI Gap Analysis ·
-        Learning · Training · Succession · Recognition · Employees ·
+        Learning · Recognition · Succession · Employees ·
         Departments · Users & Access.
+        There is no "Training" sidebar item: training sessions and venues are
+        tabs inside Learning.
         "My Development" is visible to every role including staff — it opens the
         signed-in person's own development record and needs no employee id.
 
@@ -66,16 +68,19 @@ final class HimsKnowledge
           competency domains. Recording assessments and credentials: admin,
           HR manager, supervisor. Domains: admin, HR manager.
         - AI Gap Analysis: admin, HR manager, supervisor only.
-        - Learning ("Learning Management"): one module with a row of tabs across
-          the top. Everyone sees "Overview" (the "Course Catalogue", pathways and
-          recent CPD), "My CPD" and "Pathways". Supervisors, HR managers and
-          admins also see "Required Training", "Renewals" and "Reports".
+        - Learning ("Learning Management"): one module with a row of eight tabs
+          across the top. Everyone sees "Overview" (the "Course Catalogue",
+          pathways and recent CPD), "My CPD", "Pathways", "Sessions" and
+          "Venues". Supervisors, HR managers and admins also see "Required
+          Training", "Renewals" and "Reports".
           Creating and editing courses and pathways: admin, HR manager.
           Requiring training of somebody: admin, HR manager, supervisor.
           Renewal rules and account coverage: admin, HR manager.
-          There is no separate "Compliance" item — it is these three tabs.
-        - Training ("Training Management"): session list and Venues. Creating
-          sessions: admin, HR manager, supervisor. Venues: admin, HR manager.
+          Creating training sessions: admin, HR manager, supervisor.
+          Venues: admin, HR manager.
+          There is no separate "Compliance" item — it is these three tabs — and
+          no separate "Training" item; Sessions and Venues are the old Training
+          module's two screens, now tabs here.
         - Succession ("Succession Planning"): admin, HR manager, supervisor only.
         - Recognition ("Social Recognition"): open to everyone — posts,
           reactions, comments. Creating badges: admin, HR manager.
@@ -89,9 +94,9 @@ final class HimsKnowledge
           "Assign Training". If you want a course, ask your supervisor or HR to
           require it of you; there is no request button and no waiting list.
           Say this plainly rather than describing a self-enrolment flow.
-        - Registering for a training session: Training -> open the session ->
-          "Register". Refused if the session is already at capacity. Sessions
-          are the one thing you can still put yourself on.
+        - Registering for a training session: Learning -> "Sessions" -> open the
+          session -> "Register Me". Refused if the session is already at
+          capacity. Sessions are the one thing you can still put yourself on.
         - Logging CPD hours: Learning -> "My CPD" -> "Record CPD". Fill in the
           activity type, title, date, and hours. System-sourced activities
           (in-house courses or training) are auto-verified; external activities
@@ -99,9 +104,10 @@ final class HimsKnowledge
         - Checking into a training session you registered for: this is done BY
           THE INSTRUCTOR or admin/HR from the session's roster, not by the
           attendee themselves. There is no QR code or self-check-in.
-        - Submitting training feedback: Training -> open the session you
-          attended -> "Submit Feedback" (only appears after you have been marked
-          present). Rate the session and optionally leave a comment.
+        - Submitting training feedback: Learning -> "Sessions" -> open the
+          session you attended -> "Give Feedback" (only appears after you have
+          been marked present). Rate the session and optionally leave a comment,
+          then "Submit Feedback".
         All of these act on the signed-in person, and all need that account to
         be linked to an employee profile; without the link HIMS shows an error.
 
