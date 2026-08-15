@@ -14,7 +14,7 @@ This document outlines the systems architecture, MySQL database design list, and
 
 The module is an **MVC, server-rendered web application** built on **Laravel 13 / PHP 8.3**, backed by a
 **MySQL 8** relational database. Views are Blade templates styled by a single hand-authored stylesheet
-(`public/css/hims.css`, 1321 lines) served directly via `asset()` — **not** Bootstrap and **not** through the
+(`public/css/hims.css`, 1506 lines) served directly via `asset()` — **not** Bootstrap and **not** through the
 Vite/Tailwind pipeline. Data access is **raw Query Builder** (`DB::table(...)`), not Eloquent ORM.
 
 > **One consequence of loading no Bootstrap CSS is worth recording, because it caused a defect across the whole
@@ -50,7 +50,7 @@ graph TD
 
 | Layer | Implementation |
 |---|---|
-| **Frontend** | HTML5 + hand-authored `public/css/hims.css` (1321 lines) + vanilla JS. **Bootstrap Icons** (font glyphs) via CDN only — the Bootstrap CSS *framework* is not used, so no reboot/normalise layer exists and the stylesheet must declare its own element defaults (see the `.hims-table th` note in §1). Tailwind/Vite are installed but the domain UI bypasses the build (`resources/css/app.css` is 3 lines). Most domain views extend `layouts/hims`; only `profile/edit` uses Breeze's `x-app-layout`. Record creation happens in **modals** (`.hims-modal-backdrop` / `.hims-modal`, z-index 1200, transparent backdrop acting purely as a dismissal hit area) driven by one shared controller, `partials/modal-js.blade.php`, and rendered through a `@stack('modals')` outside `<main>` so their `position: fixed` resolves against the viewport rather than the animated (transformed) content wrapper; multi-select uses **checkbox lists** (`.hims-checklist`), not `<select multiple>`. Tabular data uses one `.hims-table` style, with regression tests enforcing header/data alignment. |
+| **Frontend** | HTML5 + hand-authored `public/css/hims.css` (1506 lines) + vanilla JS. **Bootstrap Icons** (font glyphs) via CDN only — the Bootstrap CSS *framework* is not used, so no reboot/normalise layer exists and the stylesheet must declare its own element defaults (see the `.hims-table th` note in §1). Tailwind/Vite are installed but the domain UI bypasses the build (`resources/css/app.css` is 3 lines). Most domain views extend `layouts/hims`; only `profile/edit` uses Breeze's `x-app-layout`. Record creation happens in **modals** (`.hims-modal-backdrop` / `.hims-modal`, z-index 1200, transparent backdrop acting purely as a dismissal hit area) driven by one shared controller, `partials/modal-js.blade.php`, and rendered through a `@stack('modals')` outside `<main>` so their `position: fixed` resolves against the viewport rather than the animated (transformed) content wrapper; multi-select uses **checkbox lists** (`.hims-checklist`), not `<select multiple>`. Tabular data uses one `.hims-table` style, with regression tests enforcing header/data alignment. Because the stylesheet and favicon are served outside the build, their URLs carry the file's own content hash (`substr(md5_file($path), 0, 8)`) from `partials/app-css.blade.php` and `partials/favicon.blade.php` — a constant URL behind `Cache-Control: max-age=14400` and Cloudflare would otherwise serve a release's new markup to clients still holding the previous CSS. |
 | **Backend** | **PHP ^8.3**, **Laravel 13.22**. Controllers + `routes/web.php` routing. |
 | **Database** | MySQL 8 (`DB_CONNECTION=mysql`). `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`; MySQL triggers auto-compute competency gap; **three statuses are derived rather than stored** — `App\Support\CredentialStatus` (credential expiry), `CycleStatus` (review cycle closed) and `ReviewStatus` (review frozen) all compute from a date on every read, in PHP and as bound SQL; 1 view. |
 | **Authentication** | Breeze v2.4 session auth on the `users` table. Login throttling = 5 attempts (`LoginRequest`), `throttle:6,1` on verification/password routes. Public self-registration is disabled — admins provision accounts via `UserController`. |
@@ -66,7 +66,7 @@ graph TD
 
 ## 2. Database Design (MySQL 8.0+)
 
-The current MySQL database contains **51 tables and 1 view**, with **29 applied migration rows**. This includes
+The current MySQL database contains **51 tables and 1 view**, with **30 applied migration rows**. This includes
 Laravel's own `users`, `sessions`, `cache`, `jobs`, `failed_jobs`, `job_batches`, `password_reset_tokens`, and
 `cache_locks` infrastructure tables plus the HIMS domain tables. All
 domain record identifiers (`PRIMARY KEY` & `FOREIGN KEY`) use standard `CHAR(36)` UUID formatting, **generated in
@@ -248,12 +248,31 @@ Two properties are load-bearing:
     rating as though somebody had written it.
 
 **Privacy consequence, stated plainly:** supervisors' verbatim written comments about a named employee
-are now sent to the configured third-party AI provider on every employee gap-analysis page load. That
-was already true of the scores; it is a materially different disclosure for free text, which can name
-patients, incidents or colleagues. It is bounded by the `admin,hr_manager,supervisor` gate on
-`competency.gap.*` and by `Controller::authorizeEmployeeAccess()`, and by the three-cycle limit and the
-300-character-per-comment cap — but it is not eliminated, and no consent or redaction step exists.
-Hospitals running this with a provider outside their data-processing agreements should set
+are sent to the configured third-party AI provider on every employee gap-analysis page load unless an
+administrator has turned that off. That was already true of the scores; it is a materially different
+disclosure for free text, which can name patients, incidents or colleagues. It is bounded by the
+`admin,hr_manager,supervisor` gate on `competency.gap.*` and by
+`Controller::authorizeEmployeeAccess()`, and by the three-cycle limit and the 300-character-per-comment
+cap.
+
+**Two administrator controls do exist, and they fail safe.** They live in the `system_settings`
+key/value table, are written by `UserController::updateAiSettings()` from the user-administration
+screen, and are read by `ReviewFeedback::promptLines()`:
+
+*   **`ai_include_comments`** — set to `'0'`, no written comment leaves the hospital at all.
+    `promptLines()` substitutes one sentence stating that comments are excluded per hospital privacy
+    settings, so the model is told the text was *withheld* rather than left to infer none was written.
+    Scores, cycle names and the deterministic analysis are unaffected.
+*   **`ai_redact_names`** — on unless explicitly `'0'`. `ReviewFeedback::redactPii()` replaces every
+    part of the subject's own name longer than two characters with `[REDACTED]`, and any
+    `Patient` / `Pt.` / `Patient #`-prefixed identifier with `[REDACTED_PATIENT]`, across strengths,
+    improvements and every KPI note.
+
+The settings read is wrapped in `try`/`catch` whose handler sets redaction **on**, so a missing table or
+a failed query redacts rather than discloses. What still does not exist is a *consent* step: the
+employee is not asked, and redaction is name-and-patient-pattern based rather than a guarantee — a
+comment naming a colleague or an incident is still forwarded. Hospitals running this with a provider
+outside their data-processing agreements should clear `ai_include_comments`, and can additionally set
 `AI_PROVIDER` to a driver with no key configured, which degrades the narrative to the `⚠️` path and
 leaves the deterministic analysis and the on-page feedback list fully intact.
 
@@ -517,7 +536,18 @@ pre-removal row. Training sessions still allow self-registration, so a null
 passed, stamping `met` or `shortfall` so the history records the outcome rather than leaving every old cycle
 `open`. It runs from the same nightly `hims:scan-credential-expiry` command as the credential sweep.
 
-### 2.11 Database Views
+### 2.11 Settings
+
+*   **`system_settings`**: A key/value table created by migration `..._000005`, `key` as the primary key
+    (`string`) and a nullable `text` `value`, with timestamps. It currently holds exactly two rows, both
+    governing what employee free text may be sent to the AI provider:
+    `ai_include_comments` and `ai_redact_names`. Written by `UserController::updateAiSettings()`, read by
+    `App\Support\ReviewFeedback::promptLines()`. See the administrator controls in
+    [§2.2.3](#223-the-written-half-of-a-review-is-the-half-that-states-a-cause) for the semantics and the
+    fail-safe default. Values are stored as the strings `'1'` / `'0'`, and `ai_redact_names` treats
+    anything other than `'0'` as on — so an absent row redacts.
+
+### 2.12 Database Views
 *   **`v_recognition_leaderboard`**: Renders monthly scoring profiles.
     ```sql
     CREATE VIEW v_recognition_leaderboard AS
@@ -537,7 +567,7 @@ passed, stamping `met` or `shortfall` so the history records the outcome rather 
     GROUP BY rp.recipient_id, e.first_name, e.last_name, e.department_id, d.name, DATE_FORMAT(rp.created_at, '%Y-%m-01');
     ```
 
-### 2.12 Subsystem MySQL Triggers
+### 2.13 Subsystem MySQL Triggers
 ```sql
 DELIMITER $$
 -- Calculates proficiency gap on assessment insert
@@ -765,7 +795,7 @@ Per-user isolation is separate and unchanged: `ai_chat_messages.session_id` carr
 [§2.8](#28-ai-assistant-subsystem)), so `AiController::ownedSession()` scopes every session read and write by
 `auth()->id()` and returns 404 — not 403 — so the response does not confirm that an id exists.
 
-Covered by `tests/Feature/AiChatSessionTest.php` (33 tests): cross-user session access, memory replay,
+Covered by `tests/Feature/AiChatSessionTest.php` (35 tests): cross-user session access, memory replay,
 refusal persistence and sanitisation, and two `#[DataProvider]` tables asserting ten blocked and ten permitted
 role/question pairs, plus that an admin is never blocked and that the scope is rebuilt per request rather than
 cached on the shared driver singleton.
@@ -837,10 +867,10 @@ return only reviews the account is part of: their own, ones they authored, or th
 `PerformanceController::scopeToVisibleReviews()` / `canViewReview()`, and it applies to admin and HR too — a
 review is visible because of a relationship to it, not because of a job title.
 
-Covered by `tests/Feature/ReviewAuthorityTest.php` (25 tests): chain-of-command creates and refusals, all three
+Covered by `tests/Feature/ReviewAuthorityTest.php` (36 tests): chain-of-command creates and refusals, all three
 exception bases with their flag/reason/audit stamping, the no-self-review rule at both create and score,
 dedupe-to-edit, scoring restricted to the named reviewer, the end-date freeze at both the GET screen and the
-write, refusing a create into an ended cycle, and the `performance.show` scoping. The three tests that drive a
+write, refusing a create into an ended cycle, and the `performance.show` scoping. The seven tests that drive a
 read screen are MySQL-gated — the listings select `CONCAT()`, which sqlite does not provide.
 
 ### 3.3 Data Protection

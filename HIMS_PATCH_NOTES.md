@@ -11,6 +11,66 @@ Entries marked 📋 are specified but not implemented.
 
 ---
 
+## v2.20.0 - 2026-08-15
+
+This release fixes two deploy-only failures — one that shipped a release's new markup to clients still holding
+the previous stylesheet, and one that turned three search deep links into 500s — and brings the as-built
+documents back in line with the measured code.
+
+### Fixed
+
+*   **The stylesheet URL is now keyed to the file's contents.** `public/css/hims.css` is served straight out of
+    `public/` with no build step, so unlike a Vite bundle its name never changes when its contents do. The
+    deployed origin sends `Cache-Control: max-age=14400` behind Cloudflare, which meant that for four hours
+    after a release both the browser and the shared edge cache kept the *previous* stylesheet while the origin
+    served the *new* HTML. The page was not unstyled — only markup whose classes were new rendered bare — which
+    is why v2.5.0-beta.3 produced two unrelated-looking reports from one stale file: Learning's and
+    Recognition's tab strips rendered as underlined links (`.hims-tabs` missing), and the AI rail (`#ai-rail`,
+    with no `position: fixed` reaching it) laid out at the foot of the document, where `openRail()`'s closing
+    `input.focus()` scrolled the page to the bottom instead of opening a panel. `.hims-modal` and
+    `.hims-checklist` shipped in the same commit and were exposed to the same staleness. The link now lives in
+    one partial,
+    `partials/app-css.blade.php`, which appends `substr(md5_file($path), 0, 8)` — so a changed stylesheet is a
+    new URL that re-fetches past both caches with no version number for anyone to remember to bump. All four
+    standalone `<head>`s (the app shell plus the three auth pages) load it through the partial. The favicon had
+    received the same treatment a release earlier; this generalises it to the file that actually changes every
+    release.
+*   **Three Global Search deep links no longer 500 the page they point at.** `GlobalSearchController` builds
+    row-level destinations by appending `#cpd-<id>`, `#competency-<id>` and `#review-goal-<id>` fragments, and
+    the matching anchors had been placed on the `<thead>` row rather than inside the loop that binds the row
+    variable. Blade compiles `{{ $cpd->cpd_id }}` to a bare PHP variable read, so an out-of-scope variable there
+    is a fatal `ErrorException` — not an empty string — and the page returned 500 on **every** visit, not only
+    when arriving from search. `learning/cpd/index`, `competency/domains/show` and `performance/show` now carry
+    the anchor on the record's own `<tr>`.
+
+### Verification and docs
+
+*   Added `Unit\AssetCacheBustingContractTest` (5 tests): the rendered link matches the running file's md5, the
+    version is computed rather than hand-written, all four standalone `<head>`s come through the partial, no view
+    writes an unversioned `asset('css/hims.css')`, and the favicon stays content-hashed.
+*   Added `Unit\SearchAnchorContractTest` (3 tests): every fragment prefix scraped from `GlobalSearchController`
+    has a view that renders it, every anchor site interpolates the variable bound by its nearest enclosing
+    `@foreach`/`@forelse`, and the scan itself is floored at 8 known anchors so a regex that stops matching
+    cannot pass as a clean run.
+*   Verified suite: **359 tests, 338 passed, 21 skipped, 1536 assertions** on sqlite `:memory:`, and **359
+    tests, 359 passed, 0 skipped, 1604 assertions** against a MySQL scratch database. The 21 sqlite skips are
+    `EmployeeProgressionTest` (5), `GapAnalysisFeedbackTest` (9) and `ReviewAuthorityTest` (7) — unchanged in
+    count since v2.18.0, so every test added since has landed on the portable side and the MySQL-gated read
+    screens carry no more coverage than they did then.
+*   Corrected measured figures that had drifted in the as-built documents: `hims.css` 1321 → **1506** lines;
+    views extending `layouts/hims` 47 → **48**; Query Builder call sites ~288 → **329** across 14 files (13
+    domain controllers plus 6 in the `Controller` base); `AiActionRegistry` 35 → **30** actions; applied
+    migration rows 29 → **30**; and the per-file counts for `AiActionRegistryTest` (15 → 16),
+    `AiChatSessionTest` (33 → 35) and `ReviewAuthorityTest` (25 → 36, of which 7 rather than 3 are MySQL-gated).
+    Verified unchanged and deliberately left alone: **20 Gates**, `resources/css/app.css` at 3 lines, 51 tables
+    + 1 view, one remaining `x-app-layout` view, and the 21-skip total.
+*   Documented two mechanisms the guidance had never described: content-hashed asset URLs, and the search-anchor
+    scoping rule above.
+*   Updated `README.md`, `HIMS_SYSTEM_DOCUMENTATION.md`, `HIMS_ARCHITECTURE_AND_SECURITY.md`, `CLAUDE.md`, and
+    these patch notes. No migration is required for this release.
+
+---
+
 ## v2.19.0 - 2026-08-15
 
 This release separates organisation-chart responsibility from HIMS permissions and makes new reporting-line assignments safe and auditable.

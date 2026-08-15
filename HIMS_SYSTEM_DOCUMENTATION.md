@@ -62,7 +62,7 @@ graph TB
 
 | Concern | Implementation |
 |---|---|
-| Styling | Hand-authored `public/css/hims.css` (1321 lines); Bootstrap **Icons** font only — no Bootstrap CSS framework, so no reboot layer: element defaults are declared in the stylesheet itself |
+| Styling | Hand-authored `public/css/hims.css` (1506 lines); Bootstrap **Icons** font only — no Bootstrap CSS framework, so no reboot layer: element defaults are declared in the stylesheet itself. Served outside the Vite build, so its URL carries the file's own content hash — see §14 |
 | Data access | Raw `DB::table()` Query Builder; `App\Models\User` is the only Eloquent model |
 | Authorisation | 20 Gates + `EnsureUserHasRole` middleware over four roles: `admin` \| `hr_manager` \| `supervisor` \| `staff` |
 | Cache / queue / session | `CACHE_STORE=database`, `SESSION_DRIVER=file`, `QUEUE_CONNECTION=database`; the app makes no cache calls |
@@ -543,7 +543,7 @@ There is no AI involvement in quizzes or training feedback at all.
 
 ### 5.1 AI Action Execution
 
-The assistant can perform any write the signed-in person could perform through the UI — 35 actions across the
+The assistant can perform any write the signed-in person could perform through the UI — 30 actions across the
 seven original domain modules — and nothing they could not. The three Learning oversight writes
 (`learning.assignments.store`, `learning.renewals.rules.store`, `learning.renewals.sync`) are **not** in the
 registry: assigning training to a whole department or opening cycles across every active employee is a bulk
@@ -611,7 +611,7 @@ others include `TrainingAssignmentService` (`assign_training`), `ComplianceContr
 recognition creation/moderation, every succession mutation, and selected employee/account/competency administration. Reads and every possible UI
 edit are not comprehensively tracked; coverage is selective. See `HIMS_ARCHITECTURE_AND_SECURITY.md` §3.4.
 
-Covered by `tests/Unit/AiActionRegistryTest.php` (15 tests — role derivation, the two-layer middleware case,
+Covered by `tests/Unit/AiActionRegistryTest.php` (16 tests — role derivation, the two-layer middleware case,
 destructive flagging), `tests/Unit/AiActionPlannerTest.php` (27 tests — malformed JSON, unpermitted keys), and
 `tests/Feature/AiActionTest.php` (18 tests — end-to-end create, the confirm gate, stale pending actions,
 partial updates, whitelist enforcement).
@@ -634,7 +634,7 @@ The relational schema is configured for **MySQL 8**. All domain primary and fore
 >     `competency_assessments.gap`, and the unique index on `(venue_id, session_date, start_time)`. There are
 >     **no generated columns** and the only genuine `ENUM` in the database is `ai_chat_messages.role`.
 
-> **Live schema baseline.** The current MySQL database contains **51 tables and 1 view** with **29 applied
+> **Live schema baseline.** The current MySQL database contains **51 tables and 1 view** with **30 applied
 > migration rows**. Earlier placeholder tables (`permissions`, `role_permissions`, `system_users`,
 > `course_modules`, `quiz_questions`, `quiz_attempts`, `training_tests`, `training_test_results`,
 > `succession_reviews`, `credential_types`) and `peer_reviews` were removed by later migrations and are not
@@ -1941,13 +1941,13 @@ Notes:
 | Topbar Notifications and Help/FAQ dropdowns | ✅ Complete *(recent read/unread feed, numeric badge, per-item read, mark-all read, access-aware destinations)* |
 | Credential, competency and renewal-cycle alerts — `hims:scan-credential-expiry`, scheduled daily | ✅ Complete *(escalates to supervisor/department head; falls back to the `employees` email when there is no login)* |
 | Development progression view — per-employee consolidation, staff-accessible | ✅ Complete |
-| Automated test suite — **341 tests, 320 passed, 21 skipped, 1467 assertions** on sqlite `:memory:` | ✅ Passing *(skips are MySQL-specific paths; the documented baseline is the latest full verification run)* |
+| Automated test suite — **359 tests, 338 passed, 21 skipped, 1536 assertions** on sqlite `:memory:`; **359 passed, 0 skipped, 1604 assertions** against MySQL | ✅ Passing *(the 21 sqlite skips are MySQL-specific read paths — `EmployeeProgressionTest` 5, `GapAnalysisFeedbackTest` 9, `ReviewAuthorityTest` 7 — and only the MySQL run exercises them)* |
 
 ---
 
 ## 14. Technology Stack & Dev Environment
 
-*   **Frontend**: HTML5, CSS3, vanilla JavaScript. Styling is a **single hand-authored stylesheet**, `public/css/hims.css` (1506 lines), loaded via `asset()` — including a hand-rolled 12-column `.row`/`.col-*` grid and 11 media queries. **Bootstrap Icons 1.11.3** (font glyphs, CDN) is the only Bootstrap artefact; the Bootstrap **CSS framework is not used**, which means there is no reboot/normalise layer and the stylesheet is responsible for its own element defaults — the omission of one such default (`.hims-table th` had no `text-align`, so browsers applied `center` to headers and `left` to data) is what left every table in the app with misaligned headers until it was declared explicitly. 47 views extend `layouts/hims`; Alpine.js + Tailwind reach only `profile/edit` via Breeze's `x-app-layout`. Interactive behaviour is two shared, `@once`-guarded partials — `partials/modal-js` (every modal) and `partials/checklist-js` (checkbox-list filtering) — plus the sidebar, dropdown, notification, Global Search, and AI-rail JavaScript inlined in the layout.
+*   **Frontend**: HTML5, CSS3, vanilla JavaScript. Styling is a **single hand-authored stylesheet**, `public/css/hims.css` (1506 lines), loaded via `asset()` — including a hand-rolled 12-column `.row`/`.col-*` grid and 11 media queries. **Bootstrap Icons 1.11.3** (font glyphs, CDN) is the only Bootstrap artefact; the Bootstrap **CSS framework is not used**, which means there is no reboot/normalise layer and the stylesheet is responsible for its own element defaults — the omission of one such default (`.hims-table th` had no `text-align`, so browsers applied `center` to headers and `left` to data) is what left every table in the app with misaligned headers until it was declared explicitly. Because the file sits outside the Vite build its name never changes when its contents do, so `partials/app-css.blade.php` appends the file's own `substr(md5_file(...), 0, 8)` to the URL — the same treatment `partials/favicon.blade.php` gives the favicon, and the reason a release's new classes reach clients rather than sitting behind a four-hour `max-age` and Cloudflare. 48 views extend `layouts/hims`; Alpine.js + Tailwind reach only `profile/edit` via Breeze's `x-app-layout`. Interactive behaviour is two shared, `@once`-guarded partials — `partials/modal-js` (every modal) and `partials/checklist-js` (checkbox-list filtering) — plus the sidebar, dropdown, notification, Global Search, and AI-rail JavaScript inlined in the layout.
 *   **Backend Framework**: **PHP ^8.3**, **Laravel 13.22**. Data access is **raw Query Builder** (`DB::table()`) — not Eloquent; `App\Models\User` is the only model.
 *   **Database**: MySQL 8 — `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`, two `BEFORE INSERT`/`BEFORE UPDATE` triggers for competency gap, and one view (`v_recognition_leaderboard`). That is the whole of the database-enforced logic: there are **no generated columns and no `CHECK` constraints**, and the only true `ENUM` is `ai_chat_messages.role`. Credential status, review status, cycle status and the 9-box label are all computed in PHP, not by the database.
 *   **Clock**: `APP_TIMEZONE=Asia/Manila`. Three statuses — credential expiry, review freeze, cycle close — are decided by comparing today's date against a stored one, so the application timezone is part of the authorisation surface rather than a formatting preference. Under Laravel's stock UTC default an ended cycle stayed writable until 8am Philippine time.
@@ -1975,8 +1975,9 @@ Notes:
 | **Recognition** | `recognition_badges`, `recognition_posts`, `recognition_reactions`, `recognition_comments`, `v_recognition_leaderboard` | Named public/private posts; private audience inherited by reactions/comments; public-only statistics/view; moderation audited. |
 | **AI** | `ai_chat_sessions`, `ai_chat_messages` | Per-user assistant conversations and their messages (`AiController`). `session_id` deliberately carries no FK — ownership is enforced in the controller. `pending_action` stores unconfirmed destructive-action plans. |
 | **Audit** | `audit_trails` | Selective attributable write history covering review lifecycle/response, succession, recognition, AI actions, employee/user/competency administration, training assignment, compliance, and completion paths. Reads and every edit are not comprehensively logged. |
-| **Laravel infrastructure** | `users`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `password_reset_tokens` | Framework tables. `users` is the real auth table, extended with `role` + nullable `employee_id` FK. |
+| **Settings** | `system_settings` | Key/value pairs, currently two: `ai_include_comments` and `ai_redact_names`. Written by `UserController::updateAiSettings()`, read by `ReviewFeedback::promptLines()` to decide whether verbatim review comments may reach the AI provider and whether names and patient identifiers are redacted first. The read fails safe — an error redacts. |
+| **Laravel infrastructure** | `users`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `password_reset_tokens` | Framework tables. `users` is the real auth table, extended with `role` + nullable `employee_id` FK, plus `failed_login_attempts` / `locked_until` for lockout. |
 
-**Current live baseline: 51 tables + 1 view, with 29 applied migration rows**, configured for MySQL 8. The
+**Current live baseline: 51 tables + 1 view, with 30 applied migration rows**, configured for MySQL 8. The
 legacy placeholder tables and `peer_reviews` named earlier in project history have been dropped. The latest
 schema additions are employee review-response fields and quarterly succession-review fields.
