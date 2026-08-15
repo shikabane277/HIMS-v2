@@ -11,6 +11,108 @@ Entries marked 📋 are specified but not implemented.
 
 ---
 
+## v2.20.2 - 2026-08-16
+
+The four defects v2.20.1 found and reported instead of guessing at. Three were unambiguous once looked at; the
+fourth — the duplicated dashboard card — needed a decision about *which* figure the empty slot was meant to hold,
+which is why it waited for one. This is a code release: it carries a migration and it changes what the
+organisation dashboard and the succession nomination form actually do.
+
+### Added
+
+*   **`succession_candidates.nomination_notes`** (`TEXT`, nullable), by migration
+    `2026_08_16_000001_add_nomination_notes_to_succession_candidates`. The nominate modal had shown a **Notes**
+    textarea since the module shipped, and it posted to nothing: there was no column, `storeCandidate()` neither
+    validated nor inserted the field, and the nominator got a green success message while their rationale was
+    thrown away. The column now exists, is validated (`nullable|string|max:2000`), is written on nomination, and is
+    rendered on the candidate page's Nomination card.
+
+    Three deliberate choices in that fix. It is a **new `TEXT` column rather than the existing
+    `development_plan`** JSON column — `development_plan` is dead schema, but a rationale is prose, not a plan, and
+    re-purposing an unused column of the wrong type to avoid a migration is how a schema stops describing itself;
+    the naming follows the precedent already in the module, `critical_positions.quarterly_review_notes`. It is
+    **confidential**: `redactConfidentialCandidate()`'s field list grew `nomination_notes` alongside the ratings,
+    because a supervisor who may not see a direct report's potential score certainly may not read HR's written
+    reasoning about them. And it is **write-once at nomination** — `updateCandidate()` does not read or clear it and
+    the edit form has no field for it, so revising a candidate's scores leaves the original rationale intact instead
+    of blanking it. The audit row records `nomination_notes_length`, not the prose, so `audit_trails` does not
+    become a second unredacted copy of a confidential judgement about a named employee.
+
+*   **`TrainingAssignmentService::overdueCount()`** — the whole-organisation count of people past an assignment's
+    `required_by` and still not finished. It exists as a service method rather than a query in the controller for
+    the reason the rest of this codebase keeps its rules in one place: `complianceFor()` already decides what
+    "overdue" means for a single assignment, and a second count written in `DashboardController` would be a second
+    definition of the same word, free to drift the first time either side changed. The rule is the same one stated
+    as two aggregates instead of a loop — `required_by` has passed and the row is not complete, with a null
+    `required_by` never overdue, since nothing was asked of those people by a date. Two queries rather than a union
+    because "complete" is a different column per subject type, exactly as in `rosterQuery()`: a course enrolment is
+    `completed`, a session registration is `attended` or has a `check_in_time`. `Y-m-d` strings are compared rather
+    than Carbon objects, which is what keeps it running on sqlite.
+
+    One inherited characteristic, stated rather than quietly diverged from: neither this count nor
+    `complianceFor()` filters on `employees.employment_status`. Assignment expansion only ever enrolls *active*
+    employees, but somebody who resigns afterwards leaves their unfinished row behind, and both the tile and the
+    Required Training tab keep counting it. That is a defensible reading — the requirement was real and was not met
+    — and more importantly it is the *same* reading on both screens. Filtering it in one place would reintroduce
+    exactly the disagreement this method exists to prevent, so if it should change it changes in `rosterQuery()`,
+    for both.
+
+### Fixed
+
+*   **The organisation dashboard no longer prints the same card twice.** `dashboard/partials/organisation.blade.php`
+    rendered **Active Enrollments** in both the first and third slots of its second row — identical label, identical
+    `$stats['active_enrollments']`, different emoji. This was not a wiring mistake with a lost query behind it:
+    every figure `organisationWideData()` computed was already on screen, so the third slot had never had a metric
+    of its own. It is now **Overdue Required Training**, reading a new `$stats['overdue_training']` that delegates
+    to `overdueCount()` above — chosen because it is the one figure on that screen a reader is expected to act on
+    the same day, and because the dashboard previously had no view of required training at all.
+*   **Two user-administration checkbox labels had an unterminated `class` attribute.**
+    `users/index.blade.php:132` and `:140` read
+    `class="form-check-label d-flex align-items-center gap-2 style="font-weight:600"` — the missing quote swallowed
+    `style="font-weight:600` into the class list, so the label was not bold and the browser carried two junk class
+    tokens. One character each.
+
+### Removed
+
+*   `resources/views/training/sessions/create.blade.php` (88 lines) and
+    `resources/views/training/sessions/feedback.blade.php` (109 lines) — **orphaned views**. Both are standalone
+    `@extends('layouts.hims')` pages superseded by `_create-modal.blade.php` and `_feedback-modal.blade.php`, whose
+    own docblocks say so; `routes/web.php` declares no GET route for either, and nothing in `app/`, `routes/` or
+    `resources/` references them. Deleted rather than left in place because an unreachable page that still looks
+    maintained is the one a future edit lands on.
+
+### Docs
+
+*   The as-built documents were updated for each of the above, per the standing rule that they describe the code
+    rather than the plan: the `succession_candidates` DDL and column list gained `nomination_notes` with its
+    write-once and confidentiality notes; the supervisor redaction field list gained it in all three places it is
+    enumerated (`HIMS_ACCESS_AND_VISIBILITY.md`, `HIMS_ARCHITECTURE_AND_SECURITY.md` §2,
+    `HIMS_SYSTEM_DOCUMENTATION.md` §9E); the organisation-dashboard diagram in `HIMS_SYSTEM_DOCUMENTATION.md`
+    §12.9 lost its `^ duplicate` annotation and the paragraph that recorded the duplicate as a known defect now
+    explains the delegation instead; and the live baseline moved from **30 to 31 applied migration rows** in the
+    four places it is stated. The table count is unchanged at **51 tables + 1 view** — this release adds a column,
+    not a table.
+*   Verified suite: **362 tests, 341 passed, 21 skipped, 1546 assertions** on sqlite `:memory:`, and **362 tests,
+    362 passed, 0 skipped, 1614 assertions** against a MySQL scratch database (`hims_align_check`, dropped
+    afterwards). Three new tests, all on the portable side, so the 21 skips and the 68-assertion MySQL surplus are
+    both unchanged:
+    `Feature\ComplianceTest::test_the_overdue_count_matches_the_per_assignment_definition` asserts the tile and the
+    Required Training row cannot disagree — a past-due unfinished row counts, a completed one does not, a null
+    `required_by` never does, and the total equals `complianceFor()`'s own `overdue` figure — and two
+    `Feature\SuccessionConfidentialityTest` cases assert a posted rationale is stored and readable by HR, and that
+    a nomination without one is still accepted. The existing redaction test was extended to assert
+    `nomination_notes === null` for a supervisor *and* that the seeded text does not appear in the rendered page;
+    its fixture now seeds a real rationale, because asserting null on a column nothing populated proves nothing.
+
+### Migration
+
+One, additive and reversible: `2026_08_16_000001_add_nomination_notes_to_succession_candidates`. `up()` adds a
+nullable `TEXT` column after `status`; `down()` drops it. No data is read, written or moved, so it is safe to run
+on a populated database — existing candidates simply have no recorded rationale, which is what the candidate page
+prints for them.
+
+---
+
 ## v2.20.1 - 2026-08-16
 
 A documentation-precision release. v2.20.0 corrected the *measured figures* in the as-built documents; this one
@@ -107,6 +209,10 @@ truth in each case — no document was made accurate by changing the application
 
 Found while verifying the above, reported rather than silently corrected — each is a product or design decision
 rather than a typo, and fixing one blind would have meant guessing at intent:
+
+> **All four were fixed in v2.20.2**, above. They are left here as the record of what this release found and
+> deliberately did not touch; the reasoning that made the dashboard card a decision rather than a fix is the same
+> reasoning that decided it.
 
 *   `dashboard/partials/organisation.blade.php` renders the **Active Enrollments** card twice in the same row of
     four (lines 39-44 and 53-58) — identical label, identical `$stats['active_enrollments']` value, different

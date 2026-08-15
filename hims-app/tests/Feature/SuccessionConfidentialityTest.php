@@ -141,7 +141,12 @@ class SuccessionConfidentialityTest extends TestCase
             ->assertViewHas('candidate', fn ($candidate) => $candidate->performance_score === null
                 && $candidate->potential_score === null
                 && $candidate->readiness_level === null
-                && $candidate->nine_box_label === null);
+                && $candidate->nine_box_label === null
+                // The fixture seeds a real rationale, so this assertion fails if
+                // the field is ever dropped from the redaction list. Asserting
+                // null on a column nothing populated proves nothing.
+                && $candidate->nomination_notes === null)
+            ->assertDontSee('Confidential HR rationale');
 
         $this->actingAs($supervisor)->get(route('succession.positions.show', $positionId))
             ->assertOk()
@@ -149,6 +154,67 @@ class SuccessionConfidentialityTest extends TestCase
             ->assertViewHas('candidates', fn ($candidates) => $candidates->count() === 1
                 && $candidates->first()->employee_id === $reportId
                 && $candidates->first()->performance_score === null);
+    }
+
+    /**
+     * The nomination modal's Notes field posted to nothing: there was no column,
+     * `storeCandidate()` neither validated nor inserted it, and the user got a
+     * success message while their rationale was discarded. This is the
+     * regression test for that, which is why it asserts the stored value rather
+     * than just a 302.
+     */
+    public function test_a_nomination_rationale_is_stored_rather_than_silently_discarded(): void
+    {
+        $department = $this->department('Pharmacy');
+        $hrEmployeeId = $this->employee($department, 'hr@example.org');
+        $candidateEmployeeId = $this->employee($department, 'nominee@example.org');
+        $hr = $this->user('hr_manager', $hrEmployeeId);
+        $positionId = $this->position($department);
+
+        $this->actingAs($hr)->post(route('succession.candidates.store'), [
+            'employee_id' => $candidateEmployeeId,
+            'position_id' => $positionId,
+            'performance_score' => 4,
+            'potential_score' => 5,
+            'readiness_level' => 'ready_now',
+            'nomination_notes' => 'Ran the ICU rota through Q3 and covered two resignations.',
+        ])->assertRedirect(route('succession.index'));
+
+        $this->assertSame(
+            'Ran the ICU rota through Q3 and covered two resignations.',
+            DB::table('succession_candidates')
+                ->where('employee_id', $candidateEmployeeId)
+                ->value('nomination_notes')
+        );
+
+        // HR wrote it, so HR can read it back.
+        $this->registerSqliteConcat();
+        $candidateId = DB::table('succession_candidates')
+            ->where('employee_id', $candidateEmployeeId)->value('candidate_id');
+
+        $this->actingAs($hr)->get(route('succession.candidates.show', $candidateId))
+            ->assertOk()
+            ->assertSee('Ran the ICU rota through Q3');
+    }
+
+    public function test_a_nomination_without_notes_is_still_accepted(): void
+    {
+        $department = $this->department('Records');
+        $hrEmployeeId = $this->employee($department, 'hr2@example.org');
+        $candidateEmployeeId = $this->employee($department, 'nominee2@example.org');
+        $hr = $this->user('hr_manager', $hrEmployeeId);
+        $positionId = $this->position($department);
+
+        $this->actingAs($hr)->post(route('succession.candidates.store'), [
+            'employee_id' => $candidateEmployeeId,
+            'position_id' => $positionId,
+        ])->assertRedirect(route('succession.index'));
+
+        $this->assertNull(
+            DB::table('succession_candidates')
+                ->where('employee_id', $candidateEmployeeId)
+                ->value('nomination_notes')
+        );
     }
 
     private function registerSqliteConcat(): void
@@ -244,6 +310,7 @@ class SuccessionConfidentialityTest extends TestCase
             'nine_box_label' => 'core',
             'readiness_level' => '1_2_years',
             'status' => 'proposed',
+            'nomination_notes' => 'Confidential HR rationale for this nomination.',
             'nominated_by' => $nominatedBy,
             'nominated_at' => now(),
         ]);

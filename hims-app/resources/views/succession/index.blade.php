@@ -181,8 +181,13 @@
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="hims-label">Notes</label>
-                    <textarea name="notes" class="hims-input" rows="3" placeholder="Nomination rationale or initial goals..."></textarea>
+                    {{-- Field name matches the column exactly. It used to be
+                         `notes`, which nothing validated and nothing inserted,
+                         so every rationale typed here was silently thrown
+                         away. --}}
+                    <label class="hims-label" for="nomination_notes">Notes</label>
+                    <textarea id="nomination_notes" name="nomination_notes" class="hims-input" rows="3" maxlength="2000" placeholder="Nomination rationale or initial goals...">{{ old('nomination_notes') }}</textarea>
+                    <p style="font-size:12px;color:#6b7280;margin:4px 0 0">Confidential HR data — hidden from supervisors, like the ratings above.</p>
                 </div>
             </div>
             <div class="hims-modal-footer">

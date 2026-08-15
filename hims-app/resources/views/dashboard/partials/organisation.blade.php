@@ -52,9 +52,10 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.12s">
-            <div class="stat-icon">📚</div>
-            <div class="stat-value">{{ $stats['active_enrollments'] ?? 0 }}</div>
-            <div class="stat-label">Active Enrollments</div>
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-value">{{ $stats['overdue_training'] ?? 0 }}</div>
+            <div class="stat-label">Overdue Required Training</div>
+            <div class="stat-change down"><i class="bi bi-clock-history"></i> Past the required-by date</div>
         </div>
     </div>
     @if(isset($system))

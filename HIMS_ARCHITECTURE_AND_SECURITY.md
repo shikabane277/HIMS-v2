@@ -66,7 +66,7 @@ graph TD
 
 ## 2. Database Design (MySQL 8.0+)
 
-The current MySQL database contains **51 tables and 1 view**, with **30 applied migration rows**. This includes
+The current MySQL database contains **51 tables and 1 view**, with **31 applied migration rows**. This includes
 Laravel's own `users`, `sessions`, `cache`, `jobs`, `failed_jobs`, `job_batches`, `password_reset_tokens`, and
 `cache_locks` infrastructure tables plus the HIMS domain tables. All
 domain record identifiers (`PRIMARY KEY` & `FOREIGN KEY`) use standard `CHAR(36)` UUID formatting, **generated in
@@ -335,7 +335,16 @@ leaves the deterministic analysis and the on-page feedback list fully intact.
     *   HR/Admin can record a quarterly review; the timestamp, linked reviewer and notes are audited. The
         organisation dashboard flags high/critical-risk positions with no `ready_now` candidate.
 27. **`succession_candidates`**: Target successor backup plans.
-    *   *Columns*: `candidate_id` (PK), `position_id` (FK), `employee_id` (FK), `performance_score` (**int, 1–5**), `potential_score` (**int, 1–5**), `nine_box_label` (`VARCHAR(30)`, written by the application), `readiness_level`, `development_plan` (JSON, unused), `mentor_id` (FK), `status`, `nominated_by` (FK), `nominated_at` (DEFAULT CURRENT_TIMESTAMP), `reviewed_at`, `approved_at`.
+    *   *Columns*: `candidate_id` (PK), `position_id` (FK), `employee_id` (FK), `performance_score` (**int, 1–5**), `potential_score` (**int, 1–5**), `nine_box_label` (`VARCHAR(30)`, written by the application), `readiness_level`, `development_plan` (JSON, unused), `mentor_id` (FK), `status`, `nomination_notes` (`TEXT`, nullable), `nominated_by` (FK), `nominated_at` (DEFAULT CURRENT_TIMESTAMP), `reviewed_at`, `approved_at`.
+    *   `nomination_notes` holds the rationale typed into the nominate modal. It is **write-once**: only
+        `storeCandidate()` writes it, `updateCandidate()` does not read or clear it, and the edit form has no
+        field for it — so revising a candidate's ratings cannot wipe the reasoning behind the nomination. It is
+        confidential and sits in `redactConfidentialCandidate()`'s field list with the ratings; the audit row
+        records `nomination_notes_length` rather than the prose, so `audit_trails` does not become a second,
+        unredacted copy of HR's judgement about a named employee. Added by
+        `2026_08_16_000001_add_nomination_notes_to_succession_candidates`; the field had existed in the modal
+        since the module shipped but posted to no column, so every rationale was silently discarded behind a
+        success message.
     *   Scores are **1–5**. There is no `CHECK` constraint in the migration; the range is enforced by
         `$request->validate(['performance_score' => 'integer|min:1|max:5'])` and by `min`/`max` on the form inputs.
     *   *9-Box logic* — computed in PHP by `SuccessionController::nineBoxLabel()`, which runs on **every**

@@ -338,6 +338,46 @@ class TrainingAssignmentService
     }
 
     /**
+     * How many people are past their assignment's due date and still not done,
+     * across every assignment — the dashboard's whole-organisation figure.
+     *
+     * This exists so the dashboard cannot disagree with the Required Training
+     * tab. `complianceFor()` decides "overdue" one assignment at a time, and a
+     * count written independently in `DashboardController` would be a second
+     * definition of the same word, free to drift the first time either changed.
+     * The rule is the same one, expressed as two aggregates instead of a loop:
+     * `required_by` has passed and the row is not complete. Rows on assignments
+     * with no `required_by` are never overdue — nothing was ever asked of them
+     * by a date.
+     *
+     * Two queries rather than a union because "complete" means a different
+     * column per subject type, exactly as in `rosterQuery()`: a course enrolment
+     * is `completed`, a session registration is `attended` or checked in.
+     * Comparing `Y-m-d` strings keeps this portable to sqlite.
+     */
+    public function overdueCount(): int
+    {
+        $today = now()->toDateString();
+
+        $courses = DB::table('course_enrollments as ce')
+            ->join('training_assignments as ta', 'ta.assignment_id', '=', 'ce.assignment_id')
+            ->whereNotNull('ta.required_by')
+            ->where('ta.required_by', '<', $today)
+            ->where('ce.status', '!=', 'completed')
+            ->count();
+
+        $sessions = DB::table('training_registrations as tr')
+            ->join('training_assignments as ta', 'ta.assignment_id', '=', 'tr.assignment_id')
+            ->whereNotNull('ta.required_by')
+            ->where('ta.required_by', '<', $today)
+            ->where('tr.status', '!=', 'attended')
+            ->whereNull('tr.check_in_time')
+            ->count();
+
+        return $courses + $sessions;
+    }
+
+    /**
      * Assignments with their compliance figures, newest first.
      */
     public function listWithCompliance(int $limit = 100): Collection

@@ -110,6 +110,18 @@
                         <div class="hims-label" style="margin-bottom:2px">Approved</div>
                         {{ $candidate->approved_at ? \Carbon\Carbon::parse($candidate->approved_at)->format('d M Y') : 'Not yet approved' }}
                     </div>
+                    {{-- The rationale typed into the nomination modal. This card
+                         is already inside @if($canSeeConfidential), and
+                         redactConfidentialCandidate() nulls the column as well —
+                         the controller is the authorization, the wrapper is not. --}}
+                    <div>
+                        <div class="hims-label" style="margin-bottom:2px">Notes</div>
+                        @if(filled($candidate->nomination_notes))
+                            <p style="white-space:pre-line;margin:0;color:#374151">{{ $candidate->nomination_notes }}</p>
+                        @else
+                            <span style="color:#9ca3af">No rationale recorded</span>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>

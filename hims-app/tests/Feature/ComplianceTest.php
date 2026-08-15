@@ -112,6 +112,59 @@ class ComplianceTest extends TestCase
         $this->assertSame(50.0, $compliance['rate']);
     }
 
+    /**
+     * The organisation dashboard's Overdue Required Training tile.
+     *
+     * It delegates to `overdueCount()` precisely so it cannot disagree with the
+     * Required Training tab, so this asserts the three cases that make the
+     * definitions match: past due and unfinished counts, past due and finished
+     * does not, and an assignment with no `required_by` never counts however old
+     * it is — nothing was asked of those people by a date.
+     */
+    public function test_the_overdue_count_matches_the_per_assignment_definition(): void
+    {
+        $dept = $this->department('ICU');
+        $late = $this->employee($dept, 'late@example.org');
+        $done = $this->employee($dept, 'done@example.org');
+        $service = app(TrainingAssignmentService::class);
+
+        $overdue = $service->assign(
+            'course', $this->course(), 'department', $dept, now()->subWeek()->toDateString(), null,
+        );
+
+        // One of the two finished it, so only the other is overdue.
+        DB::table('course_enrollments')
+            ->where('employee_id', $done)
+            ->where('assignment_id', $overdue['assignment_id'])
+            ->update(['status' => 'completed', 'completed_at' => now()]);
+
+        $this->assertSame(1, $service->overdueCount());
+
+        // A course nobody was given a deadline for is never overdue.
+        $service->assign('course', $this->course(), 'department', $dept, null, null);
+
+        $this->assertSame(1, $service->overdueCount());
+
+        // And the tile agrees with the assignment's own figure.
+        $assignment = DB::table('training_assignments')
+            ->where('assignment_id', $overdue['assignment_id'])->first();
+
+        $this->assertSame(
+            $service->complianceFor($assignment)['overdue'],
+            $service->overdueCount(),
+            'the dashboard tile and the Required Training row must not disagree'
+        );
+
+        // And it is the person who did not finish who is being counted.
+        $this->assertSame(
+            [$late],
+            DB::table('course_enrollments')
+                ->where('assignment_id', $overdue['assignment_id'])
+                ->where('status', '!=', 'completed')
+                ->pluck('employee_id')->all()
+        );
+    }
+
     public function test_a_staff_user_cannot_assign_training(): void
     {
         [$staff] = $this->user('staff');

@@ -407,8 +407,8 @@ Succession records are confidential HR data. Staff are route-blocked. Admin/HR s
 create positions, nominate/update/withdraw candidates, record quarterly position reviews, and manage all
 milestones. Supervisors see only direct-report candidates and positions containing those candidates. Their
 queries redact `performance_score`, `potential_score`, `nine_box_label`, `readiness_level`, `mentor_id`,
-candidate `status`, `vacancy_risk`, `risk_factors`, and `estimated_vacancy_date`; they may manage milestones
-only for those direct-report candidates.
+candidate `status`, `nomination_notes`, `vacancy_risk`, `risk_factors`, and `estimated_vacancy_date`; they may
+manage milestones only for those direct-report candidates.
 
 *   **Critical Role Registry**: Flagging key medical positions (e.g., Chief of Surgery, ICU Head Nurse) that present high operational risk if vacant.
 *   **9-Box Grid Placement**: Maps candidates on Performance vs. Potential. Scores are **1–5** on each axis (not 1–3), banded low (1–2) / med (3) / high (4–5) to give the nine cells:
@@ -422,7 +422,7 @@ only for those direct-report candidates.
 *   **Readiness Scale**: Categorises successors as "Ready Now," "Ready in 1–2 Years," "Ready in 2–5 Years," or "Long Term."
 *   **Candidate Pipeline**: Hospital-wide and fully rated for HR/Admin; direct-report scoped and confidentially redacted for Supervisors. Position filters cannot name a position outside the current user's visible set.
 *   **Leadership Development Paths**: Per-candidate milestones (course, assignment, mentoring, rotation, certification, project) with target dates. Each advances `not_started → in_progress → completed`; the completion date is stamped automatically and cleared if the milestone moves back. Completion drives the pipeline's Dev Progress percentage. A milestone belongs to a **candidate**, not to an employee — `leadership_development_paths` has no `employee_id`, only `candidate_id` (cascade-deleted with the nomination), which is why withdrawing a candidate removes their milestones.
-*   **Nomination Management**: Scores, readiness, and mentor can be revised after nomination (stamping `reviewed_at`); a candidate can be withdrawn, which also removes their milestones.
+*   **Nomination Management**: Scores, readiness, and mentor can be revised after nomination (stamping `reviewed_at`); a candidate can be withdrawn, which also removes their milestones. The nomination form's **Notes** field records the rationale in `succession_candidates.nomination_notes` and is shown on the candidate page's Nomination card. It is **write-once at nomination**: `updateCandidate()` neither validates nor touches the column and the edit form carries no field for it, so revising the ratings leaves the original rationale intact rather than blanking it. The prose is confidential — it is in the supervisor redaction list alongside the ratings, and `AuditTrail` records only its length, never its text.
 *   **Vacancy Risk Flagging**: Each critical position carries a `low` / `medium` / `high` / `critical` risk level set when the position is created or edited, used to sort and highlight the positions list and the dashboard's at-risk panel.
 *   **Quarterly Review Tracking**: HR/Admin can stamp `last_reviewed_at`, `last_reviewed_by`, and optional `quarterly_review_notes`; the change is audited.
 *   **Coverage Alert**: The organisation dashboard lists high/critical-risk positions with no `ready_now` candidate.
@@ -643,7 +643,7 @@ The relational schema is configured for **MySQL 8**. All domain primary and fore
 >     `competency_assessments.gap`, and the unique index on `(venue_id, session_date, start_time)`. There are
 >     **no generated columns** and the only genuine `ENUM` in the database is `ai_chat_messages.role`.
 
-> **Live schema baseline.** The current MySQL database contains **51 tables and 1 view** with **30 applied
+> **Live schema baseline.** The current MySQL database contains **51 tables and 1 view** with **31 applied
 > migration rows**. Earlier placeholder tables (`permissions`, `role_permissions`, `system_users`,
 > `course_modules`, `quiz_questions`, `quiz_attempts`, `training_tests`, `training_test_results`,
 > `succession_reviews`, `credential_types`) and `peer_reviews` were removed by later migrations and are not
@@ -1212,6 +1212,10 @@ CREATE TABLE succession_candidates (
     mentor_id           CHAR(36) REFERENCES employees(employee_id),
     status              VARCHAR(20) DEFAULT 'proposed'
         CHECK (status IN ('proposed','hr_reviewed','approved','withdrawn')),
+    -- The nomination rationale, written once by the nominate modal. Confidential:
+    -- redacted for supervisors with the ratings above. Not touched by
+    -- updateCandidate(), so editing the ratings does not blank it.
+    nomination_notes    TEXT,
     nominated_by        CHAR(36) REFERENCES employees(employee_id),
     nominated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reviewed_at         TIMESTAMP NULL DEFAULT NULL,
@@ -1497,8 +1501,8 @@ laid out as follows.
 +------------------------------------------------------------------------------------------------------+
 |  STAT CARDS:                                                                                         |
 |  [ Active Employees ] [ Reviews In Progress ] [ Expiring Licenses ] [ Critical Skill Gaps ]          |
-|  [ Active Enrollments ] [ Upcoming Sessions ] [ Active Enrollments ] [ Login Accounts ]              |
-|                                                     ^ duplicate      ^ or [ Never Assessed ]         |
+|  [ Active Enrollments ] [ Upcoming Sessions ] [ Overdue Req. Training ] [ Login Accounts ]           |
+|                                                                       ^ or [ Never Assessed ]        |
 |                                                                                                      |
 |  +--------------------------------------------------+  +-------------------------------------------+ |
 |  |  Workforce by Department                          |  | 🚀 Quick Actions                          | |
@@ -1510,10 +1514,16 @@ laid out as follows.
 
 Two things the diagram is deliberately faithful about. The **eighth card is one card, not two**: it is
 `@if(isset($system))` → *Login Accounts* and `@elseif(isset($unassessed_employees))` → *Never Assessed*, so the
-row is never nine cards wide. And the **seventh card is a defect, not a distinct metric** —
-`dashboard/partials/organisation.blade.php` prints `$stats['active_enrollments']` at both line 42 and line 56,
-so the same number appears twice under the same label. It is recorded here rather than silently omitted because
-a reader comparing screen to document would otherwise assume the document was stale.
+row is never nine cards wide. And the **seventh card delegates its figure rather than computing it** —
+*Overdue Required Training* prints `$stats['overdue_training']`, which `organisationWideData()` obtains by
+calling `TrainingAssignmentService::overdueCount()`. That indirection is the point: `complianceFor()` already
+decides what "overdue" means for one assignment, and a whole-organisation count written independently in
+`DashboardController` would be a second definition of the same word, free to drift the first time either side
+changed. `overdueCount()` expresses the same rule as two aggregates instead of a loop — `required_by` has passed
+and the row is not complete, with a null `required_by` never overdue — and runs one query per subject type
+because "complete" is `course_enrollments.status = 'completed'` for a course but `attended`-or-checked-in for a
+session, exactly as in `rosterQuery()`. `Feature\ComplianceTest::test_the_overdue_count_matches_the_per_assignment_definition`
+asserts the tile and the Required Training row agree.
 
 Every figure on this screen is a live aggregate query in `DashboardController` — none of the panels are
 placeholders. There is no recognition panel and no recognition stat card on the dashboard; recognition lives on
@@ -1967,7 +1977,7 @@ Notes:
 
 | Area | Status |
 |---|---|
-| MySQL schema & migrations (51 live tables, 1 view, 2 triggers; 30 applied migrations) | ✅ Complete |
+| MySQL schema & migrations (51 live tables, 1 view, 2 triggers; 31 applied migrations) | ✅ Complete |
 | Laravel Breeze session auth; admin-provisioned accounts, registration disabled | ✅ Complete |
 | RBAC — 20 Gates + `EnsureUserHasRole` middleware over 4 roles | ✅ Complete *(Gates, not Policies)* |
 | Performance module — cycles, named reviews, KPI scoring, employee response/acknowledgement, automatic close | ✅ Core paths |
@@ -1984,7 +1994,7 @@ Notes:
 | Topbar Notifications and Help/FAQ dropdowns | ✅ Complete *(recent read/unread feed, numeric badge, per-item read, mark-all read, access-aware destinations)* |
 | Credential, competency and renewal-cycle alerts — `hims:scan-credential-expiry`, scheduled daily | ✅ Complete *(in-app; escalates to supervisor/department head. The email fallback to the `employees` address when there is no login is gated on `CREDENTIAL_ALERT_EMAIL`, which defaults to **false**)* |
 | Development progression view — per-employee consolidation, staff-accessible | ✅ Complete |
-| Automated test suite — **359 tests, 338 passed, 21 skipped, 1537 assertions** on sqlite `:memory:`; **359 passed, 0 skipped, 1605 assertions** against MySQL | ✅ Passing *(the 21 sqlite skips are MySQL-specific read paths — `EmployeeProgressionTest` 5, `GapAnalysisFeedbackTest` 9, `ReviewAuthorityTest` 7 — and only the MySQL run exercises them)* |
+| Automated test suite — **362 tests, 341 passed, 21 skipped, 1546 assertions** on sqlite `:memory:`; **362 passed, 0 skipped, 1614 assertions** against MySQL | ✅ Passing *(the 21 sqlite skips are MySQL-specific read paths — `EmployeeProgressionTest` 5, `GapAnalysisFeedbackTest` 9, `ReviewAuthorityTest` 7 — and only the MySQL run exercises them)* |
 
 ---
 
@@ -2021,8 +2031,8 @@ Notes:
 | **Settings** | `system_settings` | Key/value pairs, currently two: `ai_include_comments` and `ai_redact_names`. Written by `UserController::updateAiSettings()`, read by `ReviewFeedback::promptLines()` to decide whether verbatim review comments may reach the AI provider and whether names and patient identifiers are redacted first. The read fails safe — an error redacts. |
 | **Laravel infrastructure** | `users`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `password_reset_tokens` | Framework tables. `users` is the real auth table, extended with `role` + nullable `employee_id` FK, plus `failed_login_attempts` / `locked_until` for lockout. |
 
-**Current live baseline: 51 tables + 1 view, with 30 applied migration rows**, configured for MySQL 8. The
+**Current live baseline: 51 tables + 1 view, with 31 applied migration rows**, configured for MySQL 8. The
 legacy placeholder tables and `peer_reviews` named earlier in project history have been dropped. The newest
-migration is `..._000030_add_people_manager_to_employees`, which added `employees.is_people_manager`; the
-additions immediately before it are the employee review-response fields and the quarterly succession-review
-fields.
+migration is `2026_08_16_000001_add_nomination_notes_to_succession_candidates`, which added
+`succession_candidates.nomination_notes`; the additions immediately before it are
+`employees.is_people_manager`, the employee review-response fields, and the quarterly succession-review fields.

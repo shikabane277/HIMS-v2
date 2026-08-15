@@ -200,7 +200,7 @@ php artisan hims:mail-test you@example.com
 ### Tests and formatting
 
 ```bash
-composer test                                    # full suite (359 tests; 21 sqlite skips)
+composer test                                    # full suite (362 tests; 21 sqlite skips)
 php artisan test --filter=test_profile_page_is_displayed
 vendor/bin/pint                                  # code formatter
 ```

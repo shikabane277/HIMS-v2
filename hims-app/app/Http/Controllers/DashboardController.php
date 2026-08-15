@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\TrainingAssignmentService;
 use App\Support\CredentialStatus;
 use App\Support\CycleStatus;
 use Illuminate\Support\Facades\DB;
@@ -126,6 +127,10 @@ class DashboardController extends Controller
                 ->where('status', 'scheduled')
                 ->whereDate('session_date', '>=', now()->toDateString())
                 ->count(),
+            // Deliberately delegated rather than written here: the Required
+            // Training tab already decides what "overdue" means, and two
+            // definitions of one word drift.
+            'overdue_training' => app(TrainingAssignmentService::class)->overdueCount(),
         ];
 
         $headcount_by_department = DB::table('departments as d')

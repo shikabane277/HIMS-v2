@@ -64,7 +64,7 @@ class SuccessionController extends Controller
             return $candidate;
         }
 
-        foreach (['performance_score', 'potential_score', 'nine_box_label', 'readiness_level', 'mentor_id', 'status'] as $field) {
+        foreach (['performance_score', 'potential_score', 'nine_box_label', 'readiness_level', 'mentor_id', 'status', 'nomination_notes'] as $field) {
             $candidate->{$field} = null;
         }
 
@@ -286,6 +286,7 @@ class SuccessionController extends Controller
             'potential_score' => 'nullable|integer|min:1|max:5',
             'readiness_level' => 'nullable|in:ready_now,1_2_years,2_5_years,long_term',
             'mentor_id' => 'nullable|string|exists:employees,employee_id',
+            'nomination_notes' => 'nullable|string|max:2000',
         ]);
 
         $this->authorizeEmployeeAccess($request->employee_id);
@@ -313,10 +314,16 @@ class SuccessionController extends Controller
             'readiness_level' => $request->readiness_level ?: '1_2_years',
             'mentor_id' => $request->mentor_id ?: null,
             'status' => 'proposed',
+            'nomination_notes' => $request->nomination_notes ?: null,
             'nominated_by' => $this->currentEmployeeId(),
             'nominated_at' => now(),
         ]);
 
+        // The notes themselves are not copied into the audit row. It records
+        // that a rationale was written and how long it was, which is what an
+        // auditor needs, without duplicating confidential prose into a second
+        // table that has its own, wider read path (/audit/history is HR/Admin,
+        // but the candidate's notes are redacted per-supervisor).
         AuditTrail::record('succession_candidate_added', 'succession_candidates', $candidateId, afterState: [
             'employee_id' => $request->employee_id,
             'position_id' => $request->position_id,
@@ -324,6 +331,7 @@ class SuccessionController extends Controller
             'potential_score' => $potScore,
             'readiness_level' => $request->readiness_level ?: '1_2_years',
             'mentor_id' => $request->mentor_id ?: null,
+            'nomination_notes_length' => mb_strlen((string) $request->nomination_notes),
         ]);
 
         return redirect()->route('succession.index')->with('success', 'Candidate nominated.');

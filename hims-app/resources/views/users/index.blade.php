@@ -129,7 +129,7 @@
             @csrf
             <div class="hims-modal-body">
                 <div class="mb-3">
-                    <label class="form-check-label d-flex align-items-center gap-2 style="font-weight:600">
+                    <label class="form-check-label d-flex align-items-center gap-2" style="font-weight:600">
                         <input type="checkbox" name="ai_include_comments" value="1" @checked(($aiSettings['ai_include_comments'] ?? '1') === '1')>
                         Include supervisors' written comments in AI gap-analysis
                     </label>
@@ -137,7 +137,7 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-check-label d-flex align-items-center gap-2 style="font-weight:600">
+                    <label class="form-check-label d-flex align-items-center gap-2" style="font-weight:600">
                         <input type="checkbox" name="ai_redact_names" value="1" @checked(($aiSettings['ai_redact_names'] ?? '1') === '1')>
                         Redact employee & patient names before sending to AI
                     </label>

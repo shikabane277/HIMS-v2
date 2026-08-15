@@ -111,7 +111,9 @@ What you can reach depends on your assigned role:
 
 The **Dashboard** is the first page you see after logging in, and it changes depending on your role.
 
-**Admins and HR Managers** see a hospital-wide view: active headcount, pending reviews, expiring and expired credentials, active enrolments, recognitions this month, critical competency gaps, upcoming training sessions, headcount by department, competency hotspots, recent reviews, at-risk critical positions, credential alerts, and recent recognitions. Admins additionally see system account totals.
+**Admins and HR Managers** see a hospital-wide view: active headcount, pending reviews, expiring and expired credentials, active enrolments, overdue required training, recognitions this month, critical competency gaps, upcoming training sessions, headcount by department, competency hotspots, recent reviews, at-risk critical positions, credential alerts, and recent recognitions. Admins additionally see system account totals.
+
+> **"Overdue Required Training" counts people, not courses.** It is every person whose assignment's *required by* date has passed and who has not finished — an unfinished course enrolment, or a session they were not marked as having attended. Required training with no date set never appears here, however long ago it was assigned, because nobody was asked for it by a particular day. The figure is the same one the Required Training tab shows per assignment, added up, so the two can never disagree; click through to **Learning → Required Training** to see who.
 
 **Supervisors** see team size, pending reviews, expiring-credential counts, critical gaps, average score, team members, competency hotspots, and recent reviews for their **direct reports**. Two supporting lists are intentionally wider: the credential-alert list is department-scoped, and upcoming training sessions are hospital-wide. If the account has no linked department, the page shows an empty supervisor state.
 
@@ -668,7 +670,9 @@ Admins and HR Managers can record a **quarterly position review** with optional 
 
 There are **two nomination forms, and they do not ask for the same things.** Which one you get depends on where you start:
 
-**From the Succession page** — click **Nominate Successor**. A modal asks for the candidate, the target position, the readiness stage, an optional mentor, and free-text notes, then you click **Submit Nomination**. It has **no score fields**, so HIMS files the nomination with performance and potential both set to **3**, which places the candidate in the middle box of the grid. Edit the candidate afterwards to record the real scores.
+**From the Succession page** — click **Nominate Successor**. A modal asks for the candidate, the target position, the readiness stage, an optional mentor, and free-text **Notes**, then you click **Submit Nomination**. It has **no score fields**, so HIMS files the nomination with performance and potential both set to **3**, which places the candidate in the middle box of the grid. Edit the candidate afterwards to record the real scores.
+
+The Notes box is where you write *why* — the rationale behind the nomination, or the first goals you have in mind. Two things to know about it. It is **confidential**, treated exactly like the ratings: HR and Admins read it on the candidate page's Nomination card, and a Supervisor opening their own direct report's page does not get that card at all. And it is **written once, at nomination** — the edit form has no Notes field, so revising somebody's scores later will not blank the reasoning you recorded here, but neither can you revise the reasoning itself. Say what you mean the first time; if the thinking changes materially, that belongs in a quarterly position review, which is editable.
 
 **From a critical position** — open the position and click **Nominate Candidate** (the same button appears on the Admin/HR dashboard). This is the full form:
 
@@ -686,6 +690,8 @@ There are **two nomination forms, and they do not ask for the same things.** Whi
 5. Assign a **mentor** if applicable.
 6. Click **Nominate Candidate**.
 
+This form has **no Notes field** — it asks for the numbers, not the reasoning. A rationale can only be recorded from the Succession page's **Nominate Successor** modal described above, and only at the moment of nomination, so if the *why* matters as much as the scores, start there and edit the scores in afterwards.
+
 The 9-box placement is always recalculated from the scores, so the badge can never disagree with the numbers next to it. One person can be nominated for the same position only once; a second attempt is refused rather than duplicated.
 
 > The table above uses the wording on the candidate and position pages, which is where you read a placement back. The **live preview on the nomination form words four of the nine cells differently** for the same placement — Star appears as "⭐ Future Star", Solid Performer as "✅ Solid Contributor", Core Player as "👷 Core Employee", and Average Performer as "📊 Average". The scores and the box are identical; only the label text differs.
@@ -694,7 +700,7 @@ The 9-box placement is always recalculated from the scores, so the badge can nev
 
 Both actions live on the candidate's **edit** screen, reached from the ✏️ button in the pipeline:
 
-- Revise **scores, readiness, or mentor** and save. The 9-box placement is recomputed from the new scores.
+- Revise **scores, readiness, or mentor** and save. The 9-box placement is recomputed from the new scores. The nomination **Notes** are not on this screen and are not touched by the save, so the rationale recorded at nomination survives every later revision — it just cannot be rewritten.
 - **Withdraw Candidate**, at the foot of the same screen, removes the nomination. It asks you to confirm first, because it also deletes their development milestones and cannot be undone.
 
 > There is **no approval step**. Candidates stay in their initial status; nothing promotes a nomination from "proposed" to "approved."
@@ -703,7 +709,7 @@ Both actions live on the candidate's **edit** screen, reached from the ✏️ bu
 
 The pipeline table on the Succession page lists **candidate** (with their current position beneath the name), **target position**, **readiness**, **dev progress** and **status**, plus a **View** link and — for Admins/HR — an edit (✏️) button. Supervisors see the same table with **Readiness** and **Status** removed, and only their direct-report candidates in it. The position filter above the table offers only positions you are allowed to see, and a position id typed into the URL by hand is ignored unless it is one of them.
 
-> Scores, 9-box placement and mentor are **not** columns here — they are on the candidate's own page, where they are also the fields hidden from Supervisors.
+> Scores, 9-box placement, mentor and the nomination **Notes** are **not** columns here — they are on the candidate's own page, where they are also the fields hidden from Supervisors.
 
 #### Leadership Development Paths
 
