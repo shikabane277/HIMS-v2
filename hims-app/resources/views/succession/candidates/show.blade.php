@@ -159,20 +159,20 @@
                     <tbody>
                         @forelse($dev_paths as $path)
                         <tr>
-                            <td>
+                            <td data-label="Milestone">
                                 <strong>{{ $path->milestone_title }}</strong>
                                 @if($path->description)
                                 <div style="font-size:11px;color:#6b7280;margin-top:3px;max-width:320px">{{ $path->description }}</div>
                                 @endif
                             </td>
-                            <td>{{ $path->milestone_type ? ucfirst(str_replace('_',' ', $path->milestone_type)) : '—' }}</td>
-                            <td>
+                            <td data-label="Type">{{ $path->milestone_type ? ucfirst(str_replace('_',' ', $path->milestone_type)) : '—' }}</td>
+                            <td data-label="Target">
                                 {{ $path->target_date ? \Carbon\Carbon::parse($path->target_date)->format('d M Y') : '—' }}
                                 @if($path->completed_date)
                                 <div style="font-size:11px;color:#16a34a">done {{ \Carbon\Carbon::parse($path->completed_date)->format('d M Y') }}</div>
                                 @endif
                             </td>
-                            <td>
+                            <td data-label="Status">
                                 {{-- Inline status change: one select that submits itself. --}}
                                 <form method="POST" action="{{ route('succession.milestones.update', [$candidate->candidate_id, $path->path_id]) }}">
                                     @csrf
@@ -186,7 +186,7 @@
                                     </select>
                                 </form>
                             </td>
-                            <td>
+                            <td data-label="Actions">
                                 <form method="POST" action="{{ route('succession.milestones.destroy', [$candidate->candidate_id, $path->path_id]) }}"
                                       onsubmit="return confirm('Remove this milestone?')">
                                     @csrf
@@ -278,16 +278,16 @@
                     <tbody>
                         @forelse($evidence['competencies']->take(10) as $competency)
                         <tr>
-                            <td>
+                            <td data-label="Competency">
                                 {{ $competency->competency_name }}
                                 <div style="font-size:11px;color:#9ca3af">
                                     assessed {{ \Carbon\Carbon::parse($competency->assessed_date)->format('d M Y') }}
                                 </div>
                             </td>
-                            <td style="font-size:11.5px;color:#6b7280">{{ $competency->jci_standard_code ?: '—' }}</td>
-                            <td><strong>{{ $competency->current_proficiency }}</strong></td>
-                            <td>{{ $competency->required_proficiency }}</td>
-                            <td>
+                            <td data-label="Standard" style="font-size:11.5px;color:#6b7280">{{ $competency->jci_standard_code ?: '—' }}</td>
+                            <td data-label="Current"><strong>{{ $competency->current_proficiency }}</strong></td>
+                            <td data-label="Required">{{ $competency->required_proficiency }}</td>
+                            <td data-label="Status">
                                 @if($competency->current_proficiency >= $competency->required_proficiency)
                                     <span class="hims-badge green">✓</span>
                                 @else

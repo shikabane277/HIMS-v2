@@ -44,7 +44,7 @@
                 </div>
             </div>
             <div class="card-body">
-                <table style="width:100%;font-size:13px">
+                <table class="hims-kv" style="width:100%;font-size:13px">
                     <tr style="border-bottom:1px solid var(--hims-border)"><td style="padding:9px 0;color:#6b7280;width:45%">Date</td><td style="padding:9px 0;font-weight:600">{{ \Carbon\Carbon::parse($session->session_date)->format('M d, Y') }}</td></tr>
                     <tr style="border-bottom:1px solid var(--hims-border)"><td style="padding:9px 0;color:#6b7280">Time</td><td style="padding:9px 0">{{ $session->start_time }} – {{ $session->end_time }}</td></tr>
                     <tr style="border-bottom:1px solid var(--hims-border)"><td style="padding:9px 0;color:#6b7280">Venue</td><td style="padding:9px 0">{{ $session->venue_name ?? 'Online' }}</td></tr>
@@ -109,10 +109,10 @@
                     <tbody>
                         @forelse($registrations ?? [] as $reg)
                         <tr>
-                            <td><strong>{{ $reg->employee_name }}</strong></td>
-                            <td>{{ $reg->department_name ?? '—' }}</td>
-                            <td><span class="hims-badge {{ $reg->status === 'attended' ? 'green' : ($reg->status === 'no_show' ? 'red' : 'yellow') }}">{{ ucfirst(str_replace('_',' ',$reg->status)) }}</span></td>
-                            <td style="font-size:12px;color:#6b7280">{{ \Carbon\Carbon::parse($reg->registration_date)->format('M d, Y') }}</td>
+                            <td data-label="Employee"><strong>{{ $reg->employee_name }}</strong></td>
+                            <td data-label="Department">{{ $reg->department_name ?? '—' }}</td>
+                            <td data-label="Status"><span class="hims-badge {{ $reg->status === 'attended' ? 'green' : ($reg->status === 'no_show' ? 'red' : 'yellow') }}">{{ ucfirst(str_replace('_',' ',$reg->status)) }}</span></td>
+                            <td data-label="Registered" style="font-size:12px;color:#6b7280">{{ \Carbon\Carbon::parse($reg->registration_date)->format('M d, Y') }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:24px">No registrations yet.</td></tr>

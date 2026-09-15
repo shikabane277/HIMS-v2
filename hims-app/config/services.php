@@ -89,11 +89,23 @@ return [
 
             // One OpenAI-compatible slot for Groq / DeepSeek / xAI / Mistral /
             // Together / OpenRouter / Ollama — set the base URL + key + model.
+            //
+            // Unlike gemini/anthropic, this slot's fallback chain comes from the
+            // environment rather than a literal here: the host behind it is not
+            // known at this point, so a hardcoded list of Groq model names would
+            // be nonsense pointed at DeepSeek or a local Ollama. It matters
+            // because these hosts retire models on a rolling basis — Groq
+            // dropped llama-3.3-70b-versatile, and with no chain to fall back
+            // through the assistant went dark on every question at once.
             'compatible' => [
                 'driver' => 'compatible',
                 'label' => env('AI_COMPATIBLE_LABEL', 'AI'),
                 'api_key' => env('AI_COMPATIBLE_API_KEY', ''),
                 'model' => env('AI_COMPATIBLE_MODEL', ''),
+                'fallback_models' => array_values(array_filter(array_map(
+                    'trim',
+                    explode(',', (string) env('AI_COMPATIBLE_FALLBACK_MODELS', ''))
+                ), fn (string $m): bool => $m !== '')),
                 'base_url' => env('AI_COMPATIBLE_BASE_URL', ''),
             ],
         ],

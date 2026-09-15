@@ -62,7 +62,7 @@ graph TB
 
 | Concern | Implementation |
 |---|---|
-| Styling | Hand-authored `public/css/hims.css` (1506 lines); Bootstrap **Icons** font only — no Bootstrap CSS framework, so no reboot layer: element defaults are declared in the stylesheet itself. Served outside the Vite build, so its URL carries the file's own content hash — see §14 |
+| Styling | Hand-authored `public/css/hims.css` (1808 lines); Bootstrap **Icons** font only — no Bootstrap CSS framework, so no reboot layer: element defaults are declared in the stylesheet itself. Served outside the Vite build, so its URL carries the file's own content hash — see §14 |
 | Data access | Raw `DB::table()` Query Builder; `App\Models\User` is the only Eloquent model |
 | Authorisation | 20 Gates + `EnsureUserHasRole` middleware over four roles: `admin` \| `hr_manager` \| `supervisor` \| `staff` |
 | Cache / queue / session | `CACHE_STORE=database`, `SESSION_DRIVER=file`, `QUEUE_CONNECTION=database`; the app makes no cache calls |
@@ -532,7 +532,7 @@ the `App\Contracts\AiProvider` interface (one method: `ask(string $prompt, array
 | **Default** | `gemini` — an existing `GEMINI_API_KEY` keeps working with no other change |
 | **Drivers** | `GeminiProvider` · `OpenAiProvider` · `AnthropicProvider` · `compatible` (reuses `OpenAiProvider` with a custom label + `base_url` for Groq / DeepSeek / xAI / Mistral / Together / OpenRouter / Ollama) |
 | **Transport** | Raw `Http::` calls — no vendor SDKs |
-| **Model fallback** | The active model is env-configurable per provider (`GEMINI_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `AI_COMPATIBLE_MODEL`); the fallback chains are **not** — they are hardcoded literal arrays in `config/services.php`. Only `gemini` and `anthropic` define a `fallback_models` key at all; `openai` and `compatible` have none, so a bad model there is a hard failure rather than a downgrade. Where a chain exists, a 404/model error advances to the next candidate |
+| **Model fallback** | The active model is env-configurable per provider (`GEMINI_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `AI_COMPATIBLE_MODEL`); where the chain comes from differs by slot. `gemini` and `anthropic` carry hardcoded literal arrays in `config/services.php` — the vendor is known, so the names can be. `compatible` reads `AI_COMPATIBLE_FALLBACK_MODELS`, a comma-separated list parsed into a clean array (blanks and stray spaces dropped), because the host behind that slot is not known at config time and a literal list of Groq model names would be nonsense pointed at DeepSeek or a local Ollama. `openai` still has no chain, so a bad model there is a hard failure. Where a chain exists, a 404/400 naming the model advances to the next candidate; any other status stops the walk, since re-sending the same auth or quota rejection under a different model name learns nothing |
 | **Failure contract** | `ask()` **never throws** on an API or config error — it returns a `⚠️`-prefixed string that callers detect and degrade on |
 | **Conversation memory** | `$history` is the current chat session's earlier turns, oldest first. Drivers map the stored `ai` role to their own wire role (`assistant` for OpenAI/Anthropic, `model` for Gemini) and must not trust the list — `AbstractAiProvider::sanitiseHistory()` cleans and caps it first. |
 | **Access scope** | `$scope` is a per-request role instruction from `AiAccessPolicy::scopeFor()`, appended to the system prompt. Passed per call rather than read from `auth()` inside a driver, because `AiManager` shares each driver as a memoised singleton — state stored on one would leak into the next request. |
@@ -541,6 +541,7 @@ the `App\Contracts\AiProvider` interface (one method: `ask(string $prompt, array
 **Live AI features:**
 *   **In-app assistant** (`AiController` → `POST /ai/query`): conversational queries in English/Tagalog/Taglish, presented as a docked right-hand rail. Conversations are organised into sessions (`ai_chat_sessions` + `ai_chat_messages`), and the current session's earlier turns are replayed to the provider so follow-up questions carry context. The conversation list is visible when the rail opens, can be collapsed without deletion, and is owner-only; an owner can also find a saved session through Global Search and reopen it through `?ai_session=<uuid>`. Access is bounded by subject matter, not by route — `AiAccessPolicy` refuses questions on topics the asker's role cannot reach.
 *   **Action execution** (`AiActionPlanner` → `AiActionExecutor`): the assistant performs writes, not just describes them. "Create a 2027 annual review cycle" creates one; "delete the user bob@hospital.ph" asks for confirmation first, then deletes. Every action is bounded by the signed-in person's role, and every successful one writes an `audit_trails` row. See [§5.1](#51-ai-action-execution).
+*   **Spelling tolerance** (`AiTypoCorrector` → `App\Support\FuzzyMatch`): a mistyped instruction still works, and the assistant says how it read the message. "Crate a 2027 annual review cycle" creates the cycle and opens its reply with *Read “Crate” as “Create”.*; "Close the 2026 Anual Performance Review" answers `did you mean "2026 Annual Performance Review"?` instead of a bare not-found. Local string work only — no extra AI call, and the provider, the transcript and the audit all keep the person's own words. The one thing never guessed at is a destructive confirmation: `confrim` cancels. See [§5.1](#51-ai-action-execution).
 *   **Competency gap-analysis narratives** (`CompetencyGapAnalysisService`): AI-generated summaries and development recommendations over assessment data, surfaced by `GapAnalysisController`. This caller passes no history and no access scope — it is a one-shot question. The employee report additionally sends the **written feedback** from the last three performance-review cycles verbatim — `strengths_text`, `improvements_text` and every per-KPI `comments` note — and asks the model to summarise it as `feedback_summary`.
 
 These are the only places the AI layer is called, and it is **read-only over performance data**: the
@@ -585,20 +586,26 @@ the first would hand supervisors the delete.
 1.  **`AiAccessPolicy::deniedTopic()`** — first, and ahead of everything else. A refusal must not depend on the
     model choosing to comply, a blocked question should cost nothing, and a topic the role cannot discuss is one
     it certainly cannot act on. Steps 2–8 all run inside the `else` branch of this check, in
-    `resolveAction()`.
+    `resolveAction()`. Since v2.22.0 the check is made twice: on the message as typed, then on
+    `AiTypoCorrector`'s reading of it when the two differ. The second pass can only add a refusal.
 2.  **Pending confirmation?** If `pending_action` is set and under five minutes old, `confirm`/`yes`/`proceed`
-    executes it; anything else clears it and replies "Cancelled — nothing was changed."
+    executes it; anything else clears it and replies "Cancelled — nothing was changed." Matched against the
+    **raw** message and never fuzzy-matched: a mistyped `confrim` cancels, and the reply says why.
 3.  **Verb pre-filter.** Only messages containing an action verb reach the classifier, so a question costs one
-    AI call as it always did and a command costs two.
+    AI call as it always did and a command costs two. Tested against the corrected reading, which is what makes
+    *"crate a cycle"* an instruction rather than a question about instructions.
 4.  **Plan.** `AiActionPlanner` returns `{"action","params","missing","summary"}`. An unmappable instruction or
-    a key outside `availableTo()` falls through to normal conversation.
+    a key outside `availableTo()` falls through to normal conversation. It too receives the corrected reading.
 5.  **Anything missing is asked for, not invented** — the planner reports the gaps and the reply names them.
 6.  **Resolve.** `AiEntityResolver` turns names, codes and emails into UUIDs. Ambiguous or missing targets are
-    reported as a question; nothing executes.
+    reported as a question; nothing executes. A target that matched nothing carries the nearest scoped record as
+    a suggestion — `no cycle matching "2026 Anual Performance Review" — did you mean "2026 Annual Performance
+    Review"?` — which distinguishes a misspelling from a record that is absent or out of reach.
 7.  **Destructive?** The target is resolved and named back ("⚠️ Delete an employee record: **Maria Santos
     (EMP-0001)**"), stored in `pending_action`, and the turn ends. Otherwise execute now.
 8.  **Execute, audit, reply** with the controller's own flash message — so the chat says exactly what the web
-    form would have said.
+    form would have said. When the message was read differently from how it was typed, the reply opens with
+    *"Read “crate” as “create”."* so the guess is visible.
 
 **Partial updates are filled from the current row.** Update controllers are written against a web form that
 posts the whole record: every field `required`, every column overwritten. A chat instruction names one thing, so
@@ -613,6 +620,9 @@ The rule still runs — it simply cannot fail this way.
 
 **Audit.** Every successful action writes an `audit_trails` row via `App\Support\AuditTrail::record()`, holding
 the actor, the action, before/after state, the IP, and a metadata blob with the verbatim prompt and session id.
+Since v2.22.0 the blob also carries `prompt_corrected`, **present only when `AiTypoCorrector` read the message
+differently from the way it was typed** — so an auditor can see both the words the person used and the reading
+the write was actually made from, and a row without the key is proof nothing was re-read.
 Failed and rejected actions write nothing. `AiActionExecutor` is one of several caller locations for `record()` —
 others include `TrainingAssignmentService` (`assign_training`), `ComplianceController`, `LearningController`,
 `PerformanceController`, `RecognitionController`, `SuccessionController`, `EmployeeController`,
@@ -624,6 +634,19 @@ Covered by `tests/Unit/AiActionRegistryTest.php` (16 tests — role derivation, 
 destructive flagging), `tests/Unit/AiActionPlannerTest.php` (27 tests — malformed JSON, unpermitted keys), and
 `tests/Feature/AiActionTest.php` (18 tests — end-to-end create, the confirm gate, stale pending actions,
 partial updates, whitelist enforcement).
+
+The spelling layer adds three files, 50 test methods expanding to 686 cases through their data providers:
+`tests/Unit/FuzzyMatchTest.php` (19 — the transposition price against `levenshtein()`, mb-safety, the
+length-scaled ceiling, and the strict-versus-preferred tie rules), `tests/Unit/AiTypoCorrectorTest.php` (19 — a
+corpus of ~450 common English words, ~60 lowercase Filipino names, 26 correctly-spelt HIMS messages and the
+confirmation keywords, each of which must survive **untouched**, plus 20 misspelt instructions that must be
+repaired, the exemptions, and a reflection-based contract asserting every verb in `AiController::ACTION_VERBS`
+is in the corrector's vocabulary), and `tests/Feature/AiTypoRecoveryTest.php` (12 — a typo'd verb reaching the
+planner, the raw text reaching the provider, both halves of the audit metadata, the topic-gate re-check in both
+directions, the suggestion on an unresolvable name, and a mistyped confirmation cancelling). The corpus is not
+decoration: six vocabulary entries and four stop-list entries exist because sweeping that exact text found the
+corrector misreading *manage* as *manager*, *ending* as *pending* and *deletion* as *deleting*. Widening either
+list safely means widening the corpus first.
 
 ---
 
@@ -1988,19 +2011,20 @@ Notes:
 | Succession module — confidential positions/candidates, 9-box, quarterly reviews, direct-report milestone scope, alerts | ✅ Complete except approval workflow |
 | Recognition module — named public/private posts, audience-limited interaction, moderation, public leaderboard | ✅ Complete |
 | Employees / Departments / Users administration | ✅ Complete |
-| AI assistant + provider-agnostic AI layer (4 providers, hardcoded fallback chains on two of them, owner-only saved history) | ✅ Complete |
-| UI shell, permission-aware Global Search, design system, full mobile-responsive support | ✅ Complete |
+| AI assistant + provider-agnostic AI layer (4 providers, fallback chains on three of them — literal for `gemini`/`anthropic`, env-driven for `compatible` — owner-only saved history) | ✅ Complete |
+| UI shell, permission-aware Global Search, design system | ✅ Complete |
+| Mobile layout below 768px — off-canvas sidebar, viewport-pinned topbar panels, wrapping tab strip, wrapped action rows, a full-width row for the page title, and every `.hims-table` restacked into labelled record cards | ✅ Complete *(the contract is that no value needs a sideways swipe: `thead` is hidden, each row becomes a bordered card and each cell prints its own heading from `content: attr(data-label)`, so a `td` belonging to a column must carry that attribute and a `colspan` cell must not — pinned by `Unit\ResponsiveTableContractTest`. The former `.hims-table { min-width: 520px }` and the horizontal scroll on `.hims-card .card-body` are gone. Rows of buttons wrap by name — `justify-content-between`, `.hims-card .card-header` and the `.gap-1`…`.gap-4` utilities — because a nested action group left unwrapped puts a primary button past the right edge; and `display: contents` on `.topbar-left` promotes the page title to its own bar row beside a 84px `--hims-topbar-h`, since clamping it to two lines inside a 64px bar cut every title over ~22 characters at 320px)* |
 | Password reset by email — request, delivery, tokenised reset, single-use enforcement | ✅ Complete *(needs mail credentials + a correct `APP_URL`; see "Outbound Mail" in `HIMS_ARCHITECTURE_AND_SECURITY.md`)* |
 | Topbar Notifications and Help/FAQ dropdowns | ✅ Complete *(recent read/unread feed, numeric badge, per-item read, mark-all read, access-aware destinations)* |
 | Credential, competency and renewal-cycle alerts — `hims:scan-credential-expiry`, scheduled daily | ✅ Complete *(in-app; escalates to supervisor/department head. The email fallback to the `employees` address when there is no login is gated on `CREDENTIAL_ALERT_EMAIL`, which defaults to **false**)* |
 | Development progression view — per-employee consolidation, staff-accessible | ✅ Complete |
-| Automated test suite — **362 tests, 341 passed, 21 skipped, 1546 assertions** on sqlite `:memory:`; **362 passed, 0 skipped, 1614 assertions** against MySQL | ✅ Passing *(the 21 sqlite skips are MySQL-specific read paths — `EmployeeProgressionTest` 5, `GapAnalysisFeedbackTest` 9, `ReviewAuthorityTest` 7 — and only the MySQL run exercises them)* |
+| Automated test suite — **1080 tests, 1059 passed, 21 skipped, 2935 assertions** on sqlite `:memory:`; **1080 passed, 0 skipped, 3003 assertions** against MySQL | ✅ Passing *(the 21 sqlite skips are MySQL-specific read paths — `EmployeeProgressionTest` 5, `GapAnalysisFeedbackTest` 9, `ReviewAuthorityTest` 7 — and only the MySQL run exercises them. The headline is PHPUnit's case count: `Unit\AiTypoCorrectorTest`'s 19 methods expand to 646 cases through their data providers)* |
 
 ---
 
 ## 14. Technology Stack & Dev Environment
 
-*   **Frontend**: HTML5, CSS3, vanilla JavaScript. Styling is a **single hand-authored stylesheet**, `public/css/hims.css` (1506 lines), loaded via `asset()` — including a hand-rolled 12-column `.row`/`.col-*` grid and 11 media queries. **Bootstrap Icons 1.11.3** (font glyphs, CDN) is the only Bootstrap artefact; the Bootstrap **CSS framework is not used**, which means there is no reboot/normalise layer and the stylesheet is responsible for its own element defaults — the omission of one such default (`.hims-table th` had no `text-align`, so browsers applied `center` to headers and `left` to data) is what left every table in the app with misaligned headers until it was declared explicitly. Because the file sits outside the Vite build its name never changes when its contents do, so `partials/app-css.blade.php` appends the file's own `substr(md5_file(...), 0, 8)` to the URL — the same treatment `partials/favicon.blade.php` gives the favicon, and the reason a release's new classes reach clients rather than sitting behind a four-hour `max-age` and Cloudflare. 48 views extend `layouts/hims`; Alpine.js + Tailwind reach only `profile/edit` via Breeze's `x-app-layout`. Interactive behaviour is two shared, `@once`-guarded partials — `partials/modal-js` (every modal) and `partials/checklist-js` (checkbox-list filtering) — plus the sidebar, dropdown, notification, Global Search, and AI-rail JavaScript inlined in the layout.
+*   **Frontend**: HTML5, CSS3, vanilla JavaScript. Styling is a **single hand-authored stylesheet**, `public/css/hims.css` (1808 lines), loaded via `asset()` — including a hand-rolled 12-column `.row`/`.col-*` grid and 12 media queries. **Bootstrap Icons 1.11.3** (font glyphs, CDN) is the only Bootstrap artefact; the Bootstrap **CSS framework is not used**, which means there is no reboot/normalise layer and the stylesheet is responsible for its own element defaults — the omission of one such default (`.hims-table th` had no `text-align`, so browsers applied `center` to headers and `left` to data) is what left every table in the app with misaligned headers until it was declared explicitly. Because the file sits outside the Vite build its name never changes when its contents do, so `partials/app-css.blade.php` appends the file's own `substr(md5_file(...), 0, 8)` to the URL — the same treatment `partials/favicon.blade.php` gives the favicon, and the reason a release's new classes reach clients rather than sitting behind a four-hour `max-age` and Cloudflare. 48 views extend `layouts/hims`; Alpine.js + Tailwind reach only `profile/edit` via Breeze's `x-app-layout`. Interactive behaviour is two shared, `@once`-guarded partials — `partials/modal-js` (every modal) and `partials/checklist-js` (checkbox-list filtering) — plus the sidebar, dropdown, notification, Global Search, and AI-rail JavaScript inlined in the layout.
 *   **Backend Framework**: **PHP ^8.3**, **Laravel 13.22**. Data access is **raw Query Builder** (`DB::table()`) — not Eloquent; `App\Models\User` is the only model.
 *   **Database**: MySQL 8 — `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`, two `BEFORE INSERT`/`BEFORE UPDATE` triggers for competency gap, and one view (`v_recognition_leaderboard`). That is the whole of the database-enforced logic: there are **no generated columns and no `CHECK` constraints**, and the only true `ENUM` is `ai_chat_messages.role`. Credential status, review status, cycle status and the 9-box label are all computed in PHP, not by the database.
 *   **Clock**: `APP_TIMEZONE=Asia/Manila`. Three statuses — credential expiry, review freeze, cycle close — are decided by comparing today's date against a stored one, so the application timezone is part of the authorisation surface rather than a formatting preference. Under Laravel's stock UTC default an ended cycle stayed writable until 8am Philippine time.

@@ -178,10 +178,10 @@
                     <tbody>
                         @foreach($ai['development_plan'] as $step)
                         <tr>
-                            <td><strong>{{ $step['step'] ?? '—' }}</strong></td>
-                            <td><span class="hims-badge blue">{{ ucfirst(str_replace('_',' ', $step['method'] ?? '—')) }}</span></td>
-                            <td style="font-size:12px">{{ $step['timeframe'] ?? '—' }}</td>
-                            <td style="font-size:12px;color:#6b7280">{{ $step['success_measure'] ?? '—' }}</td>
+                            <td data-label="Step"><strong>{{ $step['step'] ?? '—' }}</strong></td>
+                            <td data-label="Method"><span class="hims-badge blue">{{ ucfirst(str_replace('_',' ', $step['method'] ?? '—')) }}</span></td>
+                            <td data-label="Timeframe" style="font-size:12px">{{ $step['timeframe'] ?? '—' }}</td>
+                            <td data-label="Success Measure" style="font-size:12px;color:#6b7280">{{ $step['success_measure'] ?? '—' }}</td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -233,23 +233,23 @@
             <tbody>
                 @forelse($gaps as $gap)
                 <tr>
-                    <td>
+                    <td data-label="Competency">
                         <strong>{{ $gap['competency_name'] }}</strong>
                         <div style="font-size:11px;color:#9ca3af">{{ $gap['competency_code'] }}</div>
                         @if($gap['is_mandatory'])<span class="hims-badge red">Mandatory</span>@endif
                         @if($gap['is_critical'])<span class="hims-badge yellow">Critical to role</span>@endif
                     </td>
-                    <td style="font-size:12px;color:#6b7280">{{ $gap['domain'] ?? '—' }}</td>
-                    <td>{{ $gap['required'] }}/5</td>
-                    <td>{{ $gap['current'] !== null ? $gap['current'].'/5' : '—' }}</td>
-                    <td>
+                    <td data-label="Domain" style="font-size:12px;color:#6b7280">{{ $gap['domain'] ?? '—' }}</td>
+                    <td data-label="Required">{{ $gap['required'] }}/5</td>
+                    <td data-label="Current">{{ $gap['current'] !== null ? $gap['current'].'/5' : '—' }}</td>
+                    <td data-label="Gap">
                         @if($gap['gap'] === null)
                             <span class="hims-badge gray">n/a</span>
                         @else
                             <span class="gap-chip {{ $gap['gap'] >= 0 ? 'positive' : 'negative' }}">{{ $gap['gap'] >= 0 ? '+' : '' }}{{ $gap['gap'] }}</span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Status">
                         @php
                             $badge = match($gap['status']) {
                                 'met' => 'green',
@@ -261,7 +261,7 @@
                             {{ $gap['status'] === 'unassessed' ? 'Not assessed' : ($gap['status'] === 'met' ? 'Met' : ucfirst($gap['severity']).' gap') }}
                         </span>
                     </td>
-                    <td style="font-size:11.5px;color:#6b7280;max-width:260px">{{ $gap['note'] }}</td>
+                    <td data-label="Notes" style="font-size:11.5px;color:#6b7280;max-width:260px">{{ $gap['note'] }}</td>
                 </tr>
                 @empty
                 <tr><td colspan="7" class="text-center" style="color:#9ca3af;padding:32px">
@@ -345,7 +345,7 @@
                     <tbody>
                         @forelse($analysis['recommendations'] as $rec)
                         <tr>
-                            <td>
+                            <td data-label="Item">
                                 @if($rec['type'] === 'course')
                                     <a href="{{ route('learning.courses.show', $rec['id']) }}" style="font-weight:700;color:var(--hims-primary)">{{ $rec['title'] }}</a>
                                 @else
@@ -360,9 +360,9 @@
                                 </div>
                                 @endif
                             </td>
-                            <td><span class="hims-badge blue">{{ $rec['type'] === 'course' ? 'Course' : 'Session' }}</span></td>
-                            <td>{{ $rec['cpd_hours'] ?? '—' }}</td>
-                            <td style="font-size:11.5px;color:#6b7280">{{ $rec['reason'] }}</td>
+                            <td data-label="Type"><span class="hims-badge blue">{{ $rec['type'] === 'course' ? 'Course' : 'Session' }}</span></td>
+                            <td data-label="CPD">{{ $rec['cpd_hours'] ?? '—' }}</td>
+                            <td data-label="Why" style="font-size:11.5px;color:#6b7280">{{ $rec['reason'] }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:28px">
@@ -385,9 +385,9 @@
                     <tbody>
                         @forelse($analysis['performance']['weak_kpis'] as $kpi)
                         <tr>
-                            <td><strong>{{ $kpi->kpi_name }}</strong></td>
-                            <td style="font-size:12px;color:#6b7280">{{ ucfirst($kpi->kpi_category) }}</td>
-                            <td><span class="gap-chip negative">{{ number_format((float) $kpi->weighted_score, 2) }}</span></td>
+                            <td data-label="KPI"><strong>{{ $kpi->kpi_name }}</strong></td>
+                            <td data-label="Category" style="font-size:12px;color:#6b7280">{{ ucfirst($kpi->kpi_category) }}</td>
+                            <td data-label="Score"><span class="gap-chip negative">{{ number_format((float) $kpi->weighted_score, 2) }}</span></td>
                         </tr>
                         @empty
                         <tr><td colspan="3" class="text-center" style="color:#9ca3af;padding:22px">No weak KPIs recorded.</td></tr>

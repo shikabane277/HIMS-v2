@@ -52,7 +52,7 @@
                 <div style="font-size:12.5px;color:#6b7280;margin-top:3px">{{ $review->position_title }}</div>
             </div>
             <div class="card-body">
-                <table style="width:100%;font-size:13px">
+                <table class="hims-kv" style="width:100%;font-size:13px">
                     <tr style="border-bottom:1px solid var(--hims-border)">
                         <td style="padding:9px 0;color:#6b7280;width:45%">Cycle</td>
                         <td style="padding:9px 0;font-weight:600">{{ $review->cycle_name }}</td>
@@ -144,11 +144,11 @@
                     <tbody>
                         @forelse($kpi_scores ?? [] as $k)
                         <tr>
-                            <td><strong>{{ $k->kpi_name ?? '—' }}</strong></td>
-                            <td>{{ $k->supervisor_score ?? '—' }}</td>
+                            <td data-label="KPI"><strong>{{ $k->kpi_name ?? '—' }}</strong></td>
+                            <td data-label="Rating">{{ $k->supervisor_score ?? '—' }}</td>
                             {{-- The raw weight said nothing on its own; this is the same
                                  figure expressed as the influence it actually carries. --}}
-                            <td>
+                            <td data-label="Share of final score">
                                 @if(isset($weight_shares[$k->score_id]))
                                     <strong>{{ $weight_shares[$k->score_id] }}%</strong>
                                 @else
@@ -175,10 +175,10 @@
                         {{-- Global search deep-links a goal hit to #review-goal-<id>; the
                              anchor has to sit on the goal's own row. --}}
                         <tr id="review-goal-{{ $g->goal_id }}" style="scroll-margin-top:84px">
-                            <td>{{ $g->goal_description }}</td>
-                            <td>{{ $g->target_value ?? '—' }}</td>
-                            <td>{{ $g->achievement_value ?? '—' }}</td>
-                            <td><span class="hims-badge {{ $g->status === 'achieved' ? 'green' : ($g->status === 'not_achieved' ? 'red' : 'yellow') }}">{{ ucfirst(str_replace('_',' ',$g->status)) }}</span></td>
+                            <td data-label="Goal">{{ $g->goal_description }}</td>
+                            <td data-label="Target">{{ $g->target_value ?? '—' }}</td>
+                            <td data-label="Achievement">{{ $g->achievement_value ?? '—' }}</td>
+                            <td data-label="Status"><span class="hims-badge {{ $g->status === 'achieved' ? 'green' : ($g->status === 'not_achieved' ? 'red' : 'yellow') }}">{{ ucfirst(str_replace('_',' ',$g->status)) }}</span></td>
                         </tr>
                         @empty
                         <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:24px">No goals set.</td></tr>

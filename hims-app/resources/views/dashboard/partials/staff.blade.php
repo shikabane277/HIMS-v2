@@ -54,11 +54,11 @@
                     <tbody>
                         @forelse($my_gaps ?? [] as $gap)
                         <tr>
-                            <td><strong>{{ $gap->competency_name }}</strong></td>
-                            <td>{{ $gap->required_proficiency }}/5</td>
-                            <td>{{ $gap->current_proficiency }}/5</td>
-                            <td><span class="gap-chip negative">{{ $gap->gap }}</span></td>
-                            <td style="font-size:12px;color:#6b7280">{{ $gap->assessed_date }}</td>
+                            <td data-label="Competency"><strong>{{ $gap->competency_name }}</strong></td>
+                            <td data-label="Required">{{ $gap->required_proficiency }}/5</td>
+                            <td data-label="Current">{{ $gap->current_proficiency }}/5</td>
+                            <td data-label="Gap"><span class="gap-chip negative">{{ $gap->gap }}</span></td>
+                            <td data-label="Assessed" style="font-size:12px;color:#6b7280">{{ $gap->assessed_date }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:28px">No open gaps — you meet every assessed requirement ✅</td></tr>
@@ -108,12 +108,12 @@
                     <tbody>
                         @forelse($my_reviews ?? [] as $review)
                         <tr>
-                            <td>
+                            <td data-label="Cycle">
                                 <a href="{{ route('performance.show', $review->review_id) }}" style="font-weight:600;color:var(--hims-primary);text-decoration:none">{{ $review->cycle_name }}</a>
                             </td>
                             @php $rs = \App\Support\ReviewStatus::of($review->status, $review->end_date); @endphp
-                            <td><span class="hims-badge {{ \App\Support\ReviewStatus::badgeClass($rs) }}">{{ \App\Support\ReviewStatus::label($rs) }}</span></td>
-                            <td>{{ $review->overall_score ? number_format($review->overall_score,2) : '—' }}</td>
+                            <td data-label="Status"><span class="hims-badge {{ \App\Support\ReviewStatus::badgeClass($rs) }}">{{ \App\Support\ReviewStatus::label($rs) }}</span></td>
+                            <td data-label="Score">{{ $review->overall_score ? number_format($review->overall_score,2) : '—' }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="3" class="text-center" style="color:#9ca3af;padding:24px">No reviews yet.</td></tr>
@@ -163,11 +163,11 @@
             <tbody>
                 @foreach($upcoming_sessions as $session)
                 <tr>
-                    <td><strong>{{ $session->title }}</strong></td>
-                    <td>{{ $session->session_date }}</td>
-                    <td>{{ $session->venue_name ?? '—' }}</td>
-                    <td>{{ $session->cpd_hours }}</td>
-                    <td><a href="{{ route('training.sessions.show', $session->session_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a></td>
+                    <td data-label="Session"><strong>{{ $session->title }}</strong></td>
+                    <td data-label="Date">{{ $session->session_date }}</td>
+                    <td data-label="Venue">{{ $session->venue_name ?? '—' }}</td>
+                    <td data-label="CPD">{{ $session->cpd_hours }}</td>
+                    <td data-label="Actions"><a href="{{ route('training.sessions.show', $session->session_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a></td>
                 </tr>
                 @endforeach
             </tbody>

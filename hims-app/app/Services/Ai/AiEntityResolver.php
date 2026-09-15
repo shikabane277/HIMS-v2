@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Models\User;
+use App\Support\FuzzyMatch;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -17,6 +18,26 @@ use Illuminate\Support\Facades\DB;
  * called "Santos" is exactly the mistake that must never happen when the next
  * step is a delete. resolve() returns a result struct rather than throwing so
  * the caller can turn either failure into an ordinary chat reply.
+ *
+ * A ZERO-MATCH ANSWER CARRIES A SUGGESTION, AND SUGGESTING IS NOT RESOLVING
+ *
+ * The lookups above are substring LIKE and nothing else, so one wrong letter in
+ * a surname is indistinguishable from a person who does not exist: "no employee
+ * matching "Delacruze" that you have access to" was the whole of the answer, and
+ * a reader has no way to tell a typo from a permissions boundary. So each
+ * not-found error now appends "did you mean X?", found by fuzzy-matching the
+ * typed value against the labels the caller was *already allowed to see*.
+ *
+ * Two properties keep that safe. It runs only after the real query returned
+ * nothing, so it cannot widen a successful match or change which row resolves —
+ * the action still stops. And the candidate pool is the scoped pool: a
+ * suggestion can never name a person the caller could not have found by typing
+ * the name correctly, which would leak the existence of a record through a
+ * spelling mistake.
+ *
+ * The strict rule applies here too: FuzzyMatch::closestOf() returns null when two
+ * different labels tie, so an ambiguous near-miss produces no suggestion rather
+ * than half of one.
  *
  * Employee lookups are scoped: a supervisor searching "Maria" only matches
  * within their own department. Someone they cannot see reads as not-found.
@@ -45,6 +66,16 @@ final class AiEntityResolver
         'position' => ['critical_positions', 'position_id', ['position_title'], 'position_title'],
         'department' => ['departments', 'department_id', ['name', 'department_code'], 'name'],
     ];
+
+    /**
+     * How many rows a suggestion may be searched across.
+     *
+     * The pool is only read after a lookup has already failed, so this bounds a
+     * cost nothing normally pays. It is large enough to cover this hospital
+     * whole and small enough that a pathological table cannot turn one chat
+     * message into a table scan plus a few thousand DP matrices.
+     */
+    private const SUGGEST_POOL = 500;
 
     /**
      * Resolve one value of the given type.
@@ -99,7 +130,11 @@ final class AiEntityResolver
         $rows = $query->limit(6)->get();
 
         if ($rows->isEmpty()) {
-            return ['ok' => false, 'error' => "no employee matching \"{$value}\" that you have access to"];
+            return [
+                'ok' => false,
+                'error' => "no employee matching \"{$value}\" that you have access to"
+                    .$this->employeeSuggestion($value, $user),
+            ];
         }
 
         if ($rows->count() > 1) {
@@ -133,7 +168,10 @@ final class AiEntityResolver
             ->get();
 
         if ($rows->isEmpty()) {
-            return ['ok' => false, 'error' => "no login account matching \"{$value}\""];
+            return [
+                'ok' => false,
+                'error' => "no login account matching \"{$value}\"".$this->userSuggestion($value),
+            ];
         }
 
         if ($rows->count() > 1) {
@@ -172,7 +210,10 @@ final class AiEntityResolver
         $rows = $query->limit(6)->get();
 
         if ($rows->isEmpty()) {
-            return ['ok' => false, 'error' => "no {$type} matching \"{$value}\""];
+            return [
+                'ok' => false,
+                'error' => "no {$type} matching \"{$value}\"".$this->simpleSuggestion($type, $value),
+            ];
         }
 
         if ($rows->count() > 1) {
@@ -193,6 +234,111 @@ final class AiEntityResolver
         $row = $rows->first();
 
         return ['ok' => true, 'id' => (string) $row->{$pk}, 'label' => (string) $row->{$labelCol}];
+    }
+
+    /**
+     * "did you mean" for a surname or code that matched nobody visible.
+     *
+     * The names are assembled in PHP rather than by CONCAT, unlike the lookup
+     * above: the suggestion path is the part of this class that tests can reach
+     * on sqlite, and there is no reason to make it MySQL-only too.
+     */
+    private function employeeSuggestion(string $value, User $user): string
+    {
+        if ($this->looksLikeUuid($value)) {
+            return '';
+        }
+
+        $query = DB::table('employees as e')
+            ->select('e.employee_code', 'e.first_name', 'e.last_name');
+
+        // The same scope the failed lookup used, so a suggestion cannot name
+        // someone this caller was never allowed to find.
+        $this->scopeEmployees($query, $user);
+
+        $labelled = [];
+
+        foreach ($query->limit(self::SUGGEST_POOL)->get() as $row) {
+            $name = trim("{$row->first_name} {$row->last_name}");
+
+            if ($name === '') {
+                continue;
+            }
+
+            $label = $name.($row->employee_code ? " ({$row->employee_code})" : '');
+
+            // Every way a person might have typed this employee points at the
+            // one label, so three aliases of one person are not a tie.
+            foreach ([$name, (string) $row->last_name, (string) $row->first_name, (string) $row->employee_code] as $alias) {
+                if (trim($alias) !== '') {
+                    $labelled[$alias] = $label;
+                }
+            }
+        }
+
+        return $this->phrase(FuzzyMatch::closestOf($value, $labelled));
+    }
+
+    /** "did you mean" for a login account. */
+    private function userSuggestion(string $value): string
+    {
+        $labelled = [];
+
+        foreach (DB::table('users')->select('name', 'email')->limit(self::SUGGEST_POOL)->get() as $row) {
+            $label = "{$row->name} <{$row->email}>";
+
+            // The address's local part counts as a way of naming the account —
+            // "j.reyez" should reach j.reyes@hospital.ph.
+            foreach ([(string) $row->name, (string) $row->email, strstr((string) $row->email, '@', true) ?: ''] as $alias) {
+                if (trim($alias) !== '') {
+                    $labelled[$alias] = $label;
+                }
+            }
+        }
+
+        return $this->phrase(FuzzyMatch::closestOf($value, $labelled));
+    }
+
+    /** "did you mean" for the LOOKUPS types — a cycle, course, department, … */
+    private function simpleSuggestion(string $type, string $value): string
+    {
+        if (! isset(self::LOOKUPS[$type]) || $this->looksLikeUuid($value)) {
+            return '';
+        }
+
+        [$table, , $searchCols, $labelCol] = self::LOOKUPS[$type];
+
+        $columns = array_values(array_unique(array_merge([$labelCol], $searchCols)));
+        $labelled = [];
+
+        foreach (DB::table($table)->select($columns)->limit(self::SUGGEST_POOL)->get() as $row) {
+            $label = (string) $row->{$labelCol};
+
+            if (trim($label) === '') {
+                continue;
+            }
+
+            foreach ($columns as $column) {
+                $alias = (string) ($row->{$column} ?? '');
+
+                if (trim($alias) !== '') {
+                    $labelled[$alias] = $label;
+                }
+            }
+        }
+
+        return $this->phrase(FuzzyMatch::closestOf($value, $labelled));
+    }
+
+    /**
+     * The clause appended to a not-found error, or nothing at all.
+     *
+     * Straight quotes, and it reads as a question: this is a guess offered to the
+     * person, not a decision the resolver has taken on their behalf.
+     */
+    private function phrase(?string $suggestion): string
+    {
+        return $suggestion === null ? '' : " — did you mean \"{$suggestion}\"?";
     }
 
     /**

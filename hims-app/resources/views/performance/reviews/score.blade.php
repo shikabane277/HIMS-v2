@@ -78,7 +78,7 @@
                 <tbody>
                     @forelse($scores as $score)
                     <tr>
-                        <td>
+                        <td data-label="KPI">
                             <strong>{{ $score->kpi_name }}</strong>
                             <div style="font-size:11px;color:#9ca3af">
                                 {{ ucfirst(str_replace('_',' ',$score->kpi_category)) }}
@@ -99,12 +99,12 @@
                             <div style="font-size:11px;color:#6b7280;margin-top:3px;max-width:280px">{{ $score->description }}</div>
                             @endif
                         </td>
-                        <td>
+                        <td data-label="Rating">
                             <input type="number" step="0.01" min="1" max="5" class="hims-input"
                                    name="scores[{{ $score->score_id }}][supervisor_score]"
                                    value="{{ old('scores.'.$score->score_id.'.supervisor_score', $score->supervisor_score) }}" placeholder="1–5">
                         </td>
-                        <td>
+                        <td data-label="Comments">
                             <input type="text" class="hims-input"
                                    name="scores[{{ $score->score_id }}][comments]"
                                    value="{{ old('scores.'.$score->score_id.'.comments', $score->comments) }}"

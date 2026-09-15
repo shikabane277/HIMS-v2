@@ -97,7 +97,7 @@
             <tbody>
                 @forelse($employees as $emp)
                 <tr>
-                    <td>
+                    <td data-label="Employee">
                         <div style="display:flex;align-items:center;gap:10px">
                             <div style="width:36px;height:36px;background:var(--hims-primary-xlight);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--hims-primary-dark);flex-shrink:0">
                                 {{ strtoupper(substr($emp->first_name,0,1)) }}
@@ -108,21 +108,21 @@
                             </div>
                         </div>
                     </td>
-                    <td style="font-size:12.5px;color:#6b7280;font-family:monospace">{{ $emp->employee_code }}</td>
-                    <td>
+                    <td data-label="Code" style="font-size:12.5px;color:#6b7280;font-family:monospace">{{ $emp->employee_code }}</td>
+                    <td data-label="Department">
                         <span class="hims-badge green">{{ $emp->department_name }}</span>
                     </td>
-                    <td style="font-size:13px">{{ $emp->role_name }}</td>
-                    <td style="font-size:12.5px;color:#6b7280">
+                    <td data-label="Role" style="font-size:13px">{{ $emp->role_name }}</td>
+                    <td data-label="Hire Date" style="font-size:12.5px;color:#6b7280">
                         {{ \Carbon\Carbon::parse($emp->hire_date)->format('M d, Y') }}
                     </td>
-                    <td>
+                    <td data-label="Status">
                         <span class="hims-badge {{ $emp->employment_status === 'active' ? 'green' : 'gray' }}">
                             <span class="status-dot {{ $emp->employment_status === 'active' ? 'active' : 'inactive' }}"></span>
                             {{ ucfirst($emp->employment_status) }}
                         </span>
                     </td>
-                    <td>
+                    <td data-label="Actions">
                         <div style="display:flex;gap:6px;align-items:center">
                             <a href="{{ route('employees.show', $emp->employee_id) }}" class="btn-hims btn-hims-ghost btn-sm">
                                 <i class="bi bi-eye"></i> View

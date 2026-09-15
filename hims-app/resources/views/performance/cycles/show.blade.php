@@ -93,14 +93,14 @@
             <tbody>
                 @forelse($reviews as $review)
                 <tr>
-                    <td>
+                    <td data-label="Employee">
                         <strong>{{ $review->employee_name }}</strong>
                         <div style="font-size:11px;color:#9ca3af">{{ $review->position_title ?? '—' }}</div>
                     </td>
-                    <td>{{ $review->department_name }}</td>
-                    <td>{{ trim($review->reviewer_name) ?: '—' }}</td>
-                    <td>{{ ucfirst(str_replace('_',' ', $review->review_type ?? 'standard')) }}</td>
-                    <td>
+                    <td data-label="Department">{{ $review->department_name }}</td>
+                    <td data-label="Reviewer">{{ trim($review->reviewer_name) ?: '—' }}</td>
+                    <td data-label="Type">{{ ucfirst(str_replace('_',' ', $review->review_type ?? 'standard')) }}</td>
+                    <td data-label="Status">
                         <span class="hims-badge {{ ReviewStatus::badgeClass($review->effective_status) }}">
                             {{ ReviewStatus::label($review->effective_status) }}
                         </span>
@@ -110,7 +110,7 @@
                         </span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Overall">
                         @if($review->overall_score !== null)
                             <span class="gap-chip {{ (float) $review->overall_score >= 3.5 ? 'positive' : 'negative' }}">
                                 {{ number_format((float) $review->overall_score, 2) }}
@@ -119,7 +119,7 @@
                             <span style="color:#9ca3af">—</span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Actions">
                         <a href="{{ route('performance.show', $review->review_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
                         {{-- Offered only on the rows this account is the reviewer
                              on, not on every row a role can see. --}}

@@ -120,11 +120,11 @@
                     <tbody>
                         @forelse($competency_hotspots ?? [] as $row)
                         <tr>
-                            <td><strong>{{ $row->competency_name }}</strong></td>
-                            <td>{{ $row->required_proficiency }}/5</td>
-                            <td>{{ number_format((float) $row->avg_proficiency, 2) }}</td>
-                            <td><span class="gap-chip negative">{{ number_format((float) $row->avg_gap, 2) }}</span></td>
-                            <td>{{ $row->assessed }}</td>
+                            <td data-label="Competency"><strong>{{ $row->competency_name }}</strong></td>
+                            <td data-label="Required">{{ $row->required_proficiency }}/5</td>
+                            <td data-label="Avg">{{ number_format((float) $row->avg_proficiency, 2) }}</td>
+                            <td data-label="Gap"><span class="gap-chip negative">{{ number_format((float) $row->avg_gap, 2) }}</span></td>
+                            <td data-label="Assessed">{{ $row->assessed }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:28px">No gaps recorded — every assessed competency meets its requirement.</td></tr>
@@ -149,15 +149,15 @@
                     <tbody>
                         @forelse($recent_reviews ?? [] as $review)
                         <tr>
-                            <td><strong>{{ $review->employee_name ?? 'N/A' }}</strong></td>
-                            <td>{{ $review->cycle_name ?? '—' }}</td>
-                            <td>
+                            <td data-label="Employee"><strong>{{ $review->employee_name ?? 'N/A' }}</strong></td>
+                            <td data-label="Cycle">{{ $review->cycle_name ?? '—' }}</td>
+                            <td data-label="Status">
                                 <span class="hims-badge {{ $review->status === 'completed' ? 'green' : ($review->status === 'draft' ? 'gray' : 'yellow') }}">
                                     {{ ucfirst(str_replace('_',' ',$review->status ?? 'draft')) }}
                                 </span>
                             </td>
-                            <td>{{ $review->overall_score ? number_format($review->overall_score,2).'/5.00' : '—' }}</td>
-                            <td><a href="{{ route('performance.show', $review->review_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a></td>
+                            <td data-label="Score">{{ $review->overall_score ? number_format($review->overall_score,2).'/5.00' : '—' }}</td>
+                            <td data-label="Action"><a href="{{ route('performance.show', $review->review_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a></td>
                         </tr>
                         @empty
                         <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:32px">No reviews yet.</td></tr>
@@ -207,16 +207,16 @@
                     <tbody>
                         @forelse($risk_positions ?? [] as $pos)
                         <tr>
-                            <td>
+                            <td data-label="Position">
                                 <strong>{{ $pos->position_title }}</strong>
                                 <div style="font-size:11px;color:#9ca3af">{{ $pos->department_name ?? '—' }}</div>
                             </td>
-                            <td>
+                            <td data-label="Risk">
                                 <span class="hims-badge {{ $pos->vacancy_risk === 'critical' ? 'red' : ($pos->vacancy_risk === 'high' ? 'yellow' : 'green') }}">
                                     {{ ucfirst($pos->vacancy_risk) }}
                                 </span>
                             </td>
-                            <td>
+                            <td data-label="Ready">
                                 <span class="hims-badge {{ ($pos->candidates ?? 0) > 0 ? 'green' : 'red' }}">
                                     {{ $pos->ready_successors ?? 0 }}
                                 </span>

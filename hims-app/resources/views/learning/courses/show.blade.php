@@ -182,14 +182,14 @@
                     <tbody>
                         @forelse($enrollments as $enrollment)
                         <tr>
-                            <td><strong>{{ $enrollment->employee_name }}</strong></td>
-                            <td>
+                            <td data-label="Employee"><strong>{{ $enrollment->employee_name }}</strong></td>
+                            <td data-label="Enrolled">
                                 {{ $enrollment->enrollment_date ? \Carbon\Carbon::parse($enrollment->enrollment_date)->format('d M Y') : '—' }}
                                 @if($enrollment->due_date)
                                 <div style="font-size:11px;color:#9ca3af">due {{ \Carbon\Carbon::parse($enrollment->due_date)->format('d M Y') }}</div>
                                 @endif
                             </td>
-                            <td>
+                            <td data-label="Status">
                                 <span class="hims-badge {{ $enrollment->status === 'completed' ? 'green' : ($enrollment->status === 'in_progress' ? 'yellow' : 'gray') }}">
                                     {{ ucfirst(str_replace('_',' ', (string) $enrollment->status)) }}
                                 </span>
@@ -197,18 +197,18 @@
                                 <div style="font-size:11px;color:#b45309;margin-top:2px">Required</div>
                                 @endif
                             </td>
-                            <td>
+                            <td data-label="Progress">
                                 <div style="background:#eef2ff;border-radius:99px;height:8px;overflow:hidden">
                                     <div style="background:var(--hims-primary);height:100%;width:{{ max(0, min(100, (int) $enrollment->progress_pct)) }}%"></div>
                                 </div>
                                 <div style="font-size:11px;color:#6b7280;margin-top:3px">{{ (int) $enrollment->progress_pct }}%</div>
                             </td>
-                            <td>{{ (float) $enrollment->cpd_hours_earned }}</td>
+                            <td data-label="CPD Earned">{{ (float) $enrollment->cpd_hours_earned }}</td>
                             {{-- Completion is recorded about somebody, never by
                                  them, so this column is hidden from staff
                                  entirely rather than shown and refused. --}}
                             @can('record-completion')
-                            <td class="text-end" style="white-space:nowrap">
+                            <td data-label="Actions" class="text-end" style="white-space:nowrap">
                                 @if($enrollment->status !== 'completed')
                                     <form method="POST" action="{{ route('learning.enrollments.complete', $enrollment->enrollment_id) }}" style="display:inline">
                                         @csrf

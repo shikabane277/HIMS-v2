@@ -22,7 +22,7 @@
             <tbody>
                 @forelse($reviews as $r)
                 <tr>
-                    <td>
+                    <td data-label="Employee">
                         <div style="display:flex;align-items:center;gap:9px">
                             <div style="width:32px;height:32px;background:var(--hims-primary-xlight);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--hims-primary-dark)">
                                 {{ strtoupper(substr($r->employee_name ?? 'U',0,1)) }}
@@ -33,10 +33,10 @@
                             </div>
                         </div>
                     </td>
-                    <td style="font-size:13px">{{ trim($r->reviewer_name ?? '') ?: '—' }}</td>
-                    <td style="font-size:13px">{{ $r->cycle_name }}</td>
-                    <td><span class="hims-badge gray">{{ ucfirst($r->review_type ?? 'standard') }}</span></td>
-                    <td>
+                    <td data-label="Reviewer" style="font-size:13px">{{ trim($r->reviewer_name ?? '') ?: '—' }}</td>
+                    <td data-label="Cycle" style="font-size:13px">{{ $r->cycle_name }}</td>
+                    <td data-label="Type"><span class="hims-badge gray">{{ ucfirst($r->review_type ?? 'standard') }}</span></td>
+                    <td data-label="Status">
                         <span class="hims-badge {{ ReviewStatus::badgeClass($r->effective_status) }}">{{ ReviewStatus::label($r->effective_status) }}</span>
                         @if($r->is_exception_review)
                         <span class="hims-badge yellow" style="margin-left:4px" title="{{ $r->exception_reason }}">
@@ -44,15 +44,15 @@
                         </span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Score">
                         @if($r->overall_score)
                             <span style="font-weight:700;color:{{ $r->overall_score >= 4 ? 'var(--hims-primary)' : ($r->overall_score < 2.5 ? 'var(--hims-danger)' : '#d97706') }}">
                                 {{ number_format($r->overall_score,2) }}/5.00
                             </span>
                         @else <span style="color:#9ca3af">—</span> @endif
                     </td>
-                    <td style="font-size:12px;color:#6b7280">{{ \Carbon\Carbon::parse($r->updated_at)->format('M d, Y') }}</td>
-                    <td>
+                    <td data-label="Updated" style="font-size:12px;color:#6b7280">{{ \Carbon\Carbon::parse($r->updated_at)->format('M d, Y') }}</td>
+                    <td data-label="Actions">
                         <a href="{{ route('performance.show', $r->review_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
                         @if($r->can_score)
                         <a href="{{ route('performance.reviews.score', $r->review_id) }}" class="btn-hims btn-hims-outline btn-sm">Score</a>

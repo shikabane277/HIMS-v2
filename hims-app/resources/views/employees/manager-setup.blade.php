@@ -44,11 +44,11 @@
             <tbody>
                 @forelse($section['rows'] as $employee)
                     <tr>
-                        <td><strong>{{ $employee->first_name }} {{ $employee->last_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $employee->employee_code }}</div></td>
-                        <td>{{ $employee->position_title ?: 'No position title' }}</td>
-                        <td>{{ $employee->department_name }}</td>
-                        <td><span class="hims-badge {{ $employee->employment_status === 'active' ? 'green' : 'gray' }}">{{ ucfirst(str_replace('_', ' ', $employee->employment_status)) }}</span></td>
-                        <td><a href="{{ route('employees.edit', $employee->employee_id) }}" class="btn-hims btn-hims-outline btn-sm">Edit Employee</a></td>
+                        <td data-label="Employee"><strong>{{ $employee->first_name }} {{ $employee->last_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $employee->employee_code }}</div></td>
+                        <td data-label="Position">{{ $employee->position_title ?: 'No position title' }}</td>
+                        <td data-label="Department">{{ $employee->department_name }}</td>
+                        <td data-label="Status"><span class="hims-badge {{ $employee->employment_status === 'active' ? 'green' : 'gray' }}">{{ ucfirst(str_replace('_', ' ', $employee->employment_status)) }}</span></td>
+                        <td data-label="Action"><a href="{{ route('employees.edit', $employee->employee_id) }}" class="btn-hims btn-hims-outline btn-sm">Edit Employee</a></td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="text-center" style="padding:28px;color:#6b7280">{{ $section['message'] }}</td></tr>
@@ -67,10 +67,10 @@
             <tbody>
                 @forelse($inactiveManagersWithActiveReports as $manager)
                     <tr>
-                        <td><strong>{{ $manager->first_name }} {{ $manager->last_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $manager->department_name }}</div></td>
-                        <td><span class="hims-badge gray">{{ ucfirst(str_replace('_', ' ', $manager->employment_status)) }}</span></td>
-                        <td>{{ $manager->active_direct_reports->map(fn($report) => $report->first_name.' '.$report->last_name)->implode(', ') }}</td>
-                        <td><a href="{{ route('employees.edit', $manager->employee_id) }}" class="btn-hims btn-hims-outline btn-sm">Edit Manager</a></td>
+                        <td data-label="Manager"><strong>{{ $manager->first_name }} {{ $manager->last_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $manager->department_name }}</div></td>
+                        <td data-label="Status"><span class="hims-badge gray">{{ ucfirst(str_replace('_', ' ', $manager->employment_status)) }}</span></td>
+                        <td data-label="Active Direct Reports">{{ $manager->active_direct_reports->map(fn($report) => $report->first_name.' '.$report->last_name)->implode(', ') }}</td>
+                        <td data-label="Action"><a href="{{ route('employees.edit', $manager->employee_id) }}" class="btn-hims btn-hims-outline btn-sm">Edit Manager</a></td>
                     </tr>
                 @empty
                     <tr><td colspan="4" class="text-center" style="padding:28px;color:#6b7280">No inactive People Manager has active direct reports.</td></tr>
@@ -88,10 +88,10 @@
             <tbody>
                 @forelse($employeesWithoutManagers as $employee)
                     <tr>
-                        <td><strong>{{ $employee->first_name }} {{ $employee->last_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $employee->employee_code }}</div></td>
-                        <td>{{ $employee->position_title ?: 'No position title' }}</td>
-                        <td>{{ $employee->department_name }}</td>
-                        <td><a href="{{ route('employees.edit', $employee->employee_id) }}" class="btn-hims btn-hims-outline btn-sm">Assign Manager</a></td>
+                        <td data-label="Employee"><strong>{{ $employee->first_name }} {{ $employee->last_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $employee->employee_code }}</div></td>
+                        <td data-label="Position">{{ $employee->position_title ?: 'No position title' }}</td>
+                        <td data-label="Department">{{ $employee->department_name }}</td>
+                        <td data-label="Action"><a href="{{ route('employees.edit', $employee->employee_id) }}" class="btn-hims btn-hims-outline btn-sm">Assign Manager</a></td>
                     </tr>
                 @empty
                     <tr><td colspan="4" class="text-center" style="padding:28px;color:#6b7280">Every active employee has a manager.</td></tr>

@@ -48,7 +48,7 @@
                     };
                 @endphp
                 <tr>
-                    <td>
+                    <td data-label="Position">
                         <strong>{{ $position->position_title }}</strong>
                         @if($position->is_critical)
                             <span class="hims-badge red" style="margin-left:6px">Critical</span>
@@ -57,17 +57,17 @@
                         <div style="font-size:11px;color:#6b7280;margin-top:3px;max-width:320px">{{ $position->impact_description }}</div>
                         @endif
                     </td>
-                    <td>{{ $position->department_name }}</td>
-                    <td>{{ trim((string) $position->current_holder_name) ?: '— vacant —' }}</td>
-                    @if($canSeeConfidential)<td><span class="hims-badge {{ $riskColour }}">{{ ucfirst($risk ?: 'unknown') }}</span></td>
-                    <td>
+                    <td data-label="Department">{{ $position->department_name }}</td>
+                    <td data-label="Current Holder">{{ trim((string) $position->current_holder_name) ?: '— vacant —' }}</td>
+                    @if($canSeeConfidential)<td data-label="Vacancy Risk"><span class="hims-badge {{ $riskColour }}">{{ ucfirst($risk ?: 'unknown') }}</span></td>
+                    <td data-label="Est. Vacancy">
                         @if($position->estimated_vacancy_date)
                             {{ \Carbon\Carbon::parse($position->estimated_vacancy_date)->format('d M Y') }}
                         @else
                             <span style="color:#9ca3af">—</span>
                         @endif
                     </td>@endif
-                    <td>
+                    <td data-label="Actions">
                         <a href="{{ route('succession.positions.show', $position->position_id) }}" class="btn-hims btn-hims-outline btn-sm">View</a>
                     </td>
                 </tr>

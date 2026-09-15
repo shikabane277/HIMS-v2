@@ -15,14 +15,31 @@ use Illuminate\Support\Facades\Log;
  */
 class OpenAiProvider extends AbstractAiProvider
 {
-    public function __construct(array $config = [], private string $label = 'OpenAI')
-    {
+    /**
+     * @param  string  $label  host name for error messages ("OpenAI", "Groq", …)
+     * @param  string  $envKeys  the .env keys this slot reads its model from —
+     *                           supplied by AiManager, which is the only place
+     *                           that knows whether this instance is the `openai`
+     *                           slot or the `compatible` one. Guessing from the
+     *                           label would be wrong the moment someone sets
+     *                           AI_COMPATIBLE_LABEL=OpenAI.
+     */
+    public function __construct(
+        array $config = [],
+        private string $label = 'OpenAI',
+        private string $envKeys = 'OPENAI_MODEL',
+    ) {
         parent::__construct($config);
     }
 
     protected function label(): string
     {
         return $this->label;
+    }
+
+    protected function modelEnvKeys(): string
+    {
+        return $this->envKeys;
     }
 
     public function ask(string $prompt, array $history = [], ?string $scope = null): string
@@ -34,6 +51,15 @@ class OpenAiProvider extends AbstractAiProvider
         $base = rtrim((string) ($this->config['base_url'] ?? 'https://api.openai.com/v1'), '/');
 
         $messages = $this->buildMessages($prompt, $history, $scope);
+
+        // Why the reason is carried out of the loop: a rejected model is the one
+        // failure this driver diagnoses and then used to throw the diagnosis
+        // away. Groq retiring llama-3.3-70b-versatile produced "Check the
+        // model/API key in .env" — two suspects, one of them working fine, and
+        // no way to tell from the reply which. The host had already said
+        // `model_not_found` and named the model.
+        /** @var array<string, string> $rejected model name => the host's reason */
+        $rejected = [];
 
         foreach ($this->models() as $model) {
             try {
@@ -53,6 +79,9 @@ class OpenAiProvider extends AbstractAiProvider
 
                 // 404 (unknown model) or 400 with a model hint — try the next model.
                 if (in_array($response->status(), [400, 404], true) && $this->looksLikeModelError($response->json())) {
+                    $rejected[$model] = trim((string) ($response->json('error.message') ?: 'rejected as unknown'));
+                    Log::warning($this->label().' rejected model', ['model' => $model, 'status' => $response->status()]);
+
                     continue;
                 }
 
@@ -67,7 +96,7 @@ class OpenAiProvider extends AbstractAiProvider
             }
         }
 
-        return "⚠️ Unable to reach {$this->label()} with the configured models. Check the model/API key in .env.";
+        return $this->noUsableModel($rejected);
     }
 
     /**

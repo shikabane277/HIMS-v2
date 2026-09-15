@@ -806,6 +806,8 @@ You can drag the panel's left edge to make it wider or narrower, and close it wi
 
 > **Check its step-by-step instructions against the screen.** The assistant has been given a description of how HIMS is actually laid out, so its directions are usually right. But it cannot see the page you are on, and if you ask about something HIMS does not do, it may still describe a plausible-sounding way to do it. If it names a button, tab or field you cannot find, it is very likely not there — trust the screen over the assistant, and check this guide or ask HR.
 
+> **A reply beginning ⚠️ is a system problem, not a mistake you made.** It means the assistant could not reach the AI service, and the rest of the line says which part is wrong — most often that the AI provider has retired the model HIMS was configured to use, in which case the message names that model and states that the account credentials are still working. Nothing you typed caused it and retyping it will not help. Copy the whole ⚠️ line to your system administrator: it names exactly what needs changing. Every other part of HIMS keeps working while the assistant is down, including the AI Gap Analysis pages — only the AI-written commentary is missing.
+
 ### Commanding the Assistant
 
 The assistant can perform a defined catalogue of create, update, and delete actions through the same controllers used by the web pages. It does **not** expose every form operation. **It follows the same permission rules you do:** an action your role cannot perform through the routes and controllers is refused in chat too.
@@ -816,7 +818,13 @@ When you give an instruction, the assistant either:
 
 **Confirming a destructive action:** When the assistant says it needs confirmation, reply **"confirm"**, **"confirmed"**, **"yes"**, **"proceed"**, **"do it"**, or **"go ahead"** to go ahead; anything else cancels it and is treated as a fresh instruction. The confirmation offer expires after five minutes — if you answer after that, nothing happens and you will need to give the instruction again.
 
+> **A mistyped confirmation always cancels.** This is the one place where the assistant will not work out what you meant. If you type "confrim", nothing is deleted — the reply says *"Cancelled — nothing was changed. If you meant “confirm”, send the instruction again"*, and you start over. Approving a deletion by accident is not a mistake worth being helpful about.
+
 **If something is unclear:** The assistant will ask for the missing detail rather than guessing. For example, if you say "delete the training session" but there are three sessions with similar names, it will list them and ask which one you mean.
+
+**Typing mistakes are read through, and the assistant tells you how it read them.** "Crate a 2027 annual review cycle" creates the cycle, and the reply opens with *Read “Crate” as “Create”.* so you can see what it acted on — if that reading is wrong, you know immediately rather than wondering why the wrong thing happened. Two limits are deliberate. A **name** is never second-guessed, because an employee called Cruze is not a mistyped word: if a name matches nobody you can see, the assistant answers with the nearest real record as a question — *no cycle matching "2026 Anual Performance Review" — did you mean "2026 Annual Performance Review"?* — and does nothing until you say. And it will re-read at most three words in one message; if more than that looks wrong, the message is more likely to have been misunderstood than mistyped, so it is answered as written.
+
+> **A suggested name is only ever a record you could have found yourself.** The assistant looks for near-misses among the same records your role can already reach, so a "did you mean" can never tell you that someone exists whose page you are not allowed to open.
 
 ### Conversations and Memory
 
@@ -1019,13 +1027,19 @@ A: Trust the screen, not the assistant. It has been given a description of how H
 A: Yes, as long as your role allows them. It can create records, update them, and delete them (with confirmation), using the same permissions you have when working through the forms. An admin can command the assistant to create a review cycle or delete a user; a supervisor cannot.
 
 **Q: What happens if I tell it to delete something important?**
-A: The assistant asks you to confirm first, and names the exact record it will affect. You reply "confirm" to proceed or anything else to cancel. The confirmation offer expires after five minutes.
+A: The assistant asks you to confirm first, and names the exact record it will affect. You reply "confirm" to proceed or anything else to cancel. The confirmation offer expires after five minutes. A **misspelt** confirmation counts as "anything else" — type "confrim" and the deletion is cancelled, not carried out.
+
+**Q: Does it matter if I make a typing mistake?**
+A: Usually not. "Crate a 2027 annual review cycle" creates the cycle, and the reply tells you how your message was read — *Read “Crate” as “Create”.* — so you can check. Names are the exception: rather than guessing at one, the assistant offers the nearest record it can find as a question (*did you mean "2026 Annual Performance Review"?*) and waits. See [§12](#12-ai-assistant).
 
 **Q: Is the AI assistant available in Filipino/Tagalog?**
 A: Yes. Type in English, Tagalog, or Taglish and it will reply in the same language.
 
 **Q: Does the assistant remember what I asked earlier?**
 A: Within one conversation, yes — so follow-up questions work naturally. It does not carry memory between conversations, so clicking **New chat** starts it fresh.
+
+**Q: The assistant replied with a ⚠️ line instead of an answer.**
+A: The AI service could not be reached, and the line tells you which part is at fault. The usual cause is that the AI provider has retired the model HIMS was set up to use; when that happens the message names the retired model and confirms the account credentials still work, so your administrator knows to update the model rather than the key. Nothing you typed caused it, and asking again will produce the same line. Send the whole message to your system administrator. See [§12](#12-ai-assistant).
 
 **Q: The assistant said a question is outside my access. Why?**
 A: It follows the same role-based rules as the rest of HIMS, so it will not discuss subjects your role cannot open a page for — succession planning, other employees' records, department administration, hospital-wide analytics, or user accounts, depending on your role. See the table in [§12](#12-ai-assistant). Ask your supervisor or HR if you need that information for your work.

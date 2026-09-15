@@ -53,20 +53,20 @@
             <tbody>
                 @forelse($employees as $employee)
                 <tr>
-                    <td>
+                    <td data-label="Employee">
                         <div style="font-weight:600">{{ $employee->last_name }}, {{ $employee->first_name }}</div>
                         <div style="font-size:11px;color:#9ca3af">
                             {{ $employee->employee_code }}
                             @if($employee->position_title) · {{ $employee->position_title }} @endif
                         </div>
                     </td>
-                    <td>{{ $employee->department_name ?? '—' }}</td>
-                    <td>
+                    <td data-label="Department">{{ $employee->department_name ?? '—' }}</td>
+                    <td data-label="Employment">
                         <span class="hims-badge {{ $employee->employment_status === 'active' ? 'green' : 'gray' }}">
                             {{ ucfirst(str_replace('_', ' ', $employee->employment_status)) }}
                         </span>
                     </td>
-                    <td>
+                    <td data-label="Account">
                         @if($employee->user_id)
                             <span class="hims-badge blue">Linked</span>
                             @if(! $employee->email_verified_at)
@@ -76,8 +76,8 @@
                             <span class="hims-badge gray">Proxy-tracked</span>
                         @endif
                     </td>
-                    <td>{{ $employee->role ? ucfirst(str_replace('_', ' ', $employee->role)) : '—' }}</td>
-                    <td>
+                    <td data-label="Role">{{ $employee->role ? ucfirst(str_replace('_', ' ', $employee->role)) : '—' }}</td>
+                    <td data-label="Reachable At">
                         @if($employee->account_email && $employee->account_email !== $employee->email)
                             <div style="font-size:12px">{{ $employee->account_email }}</div>
                             <div style="font-size:11px;color:#9ca3af">employee record: {{ $employee->email ?: 'none' }}</div>
@@ -110,10 +110,10 @@
             <tbody>
                 @foreach($orphanAccounts as $account)
                 <tr>
-                    <td style="font-weight:600">{{ $account->name }}</td>
-                    <td>{{ $account->email }}</td>
-                    <td><span class="hims-badge purple">{{ ucfirst(str_replace('_', ' ', $account->role)) }}</span></td>
-                    <td>
+                    <td data-label="Name" style="font-weight:600">{{ $account->name }}</td>
+                    <td data-label="Email">{{ $account->email }}</td>
+                    <td data-label="Role"><span class="hims-badge purple">{{ ucfirst(str_replace('_', ' ', $account->role)) }}</span></td>
+                    <td data-label="Actions">
                         {{-- User management is admin-only, a tier tighter than this page.
                              Editing a user is a modal on the user list, and a button on
                              this page cannot open a modal on that one — so this is a

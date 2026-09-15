@@ -101,23 +101,23 @@
                     <tbody>
                         @forelse($courses ?? [] as $course)
                         <tr>
-                            <td>
+                            <td data-label="Course">
                                 {{-- The catalogue no longer has a View button, so the
                                      title is the way through to the course page. --}}
                                 <a href="{{ route('learning.courses.show', $course->course_id) }}"
                                    style="font-weight:600;color:var(--hims-text-dark);text-decoration:none">{{ $course->title }}</a>
                                 <div style="font-size:11px;color:#9ca3af">{{ $course->course_code ?? '' }}{{ $course->course_code && $course->estimated_duration ? ' · ' : '' }}{{ $course->estimated_duration ? $course->estimated_duration.' mins' : '' }}</div>
                             </td>
-                            <td><span class="hims-badge {{ $course->category === 'clinical' ? 'blue' : ($course->category === 'compliance' ? 'red' : 'green') }}">{{ ucfirst(str_replace('_',' ',$course->category)) }}</span></td>
-                            <td><strong>{{ $course->cpd_hours }}</strong> hrs</td>
-                            <td>
+                            <td data-label="Category"><span class="hims-badge {{ $course->category === 'clinical' ? 'blue' : ($course->category === 'compliance' ? 'red' : 'green') }}">{{ ucfirst(str_replace('_',' ',$course->category)) }}</span></td>
+                            <td data-label="CPD Hours"><strong>{{ $course->cpd_hours }}</strong> hrs</td>
+                            <td data-label="Difficulty">
                                 <span class="hims-badge {{ $course->difficulty_level === 'advanced' ? 'red' : ($course->difficulty_level === 'beginner' ? 'green' : 'yellow') }}">
                                     {{ ucfirst($course->difficulty_level) }}
                                 </span>
                             </td>
-                            <td>{{ $course->enrollments_count ?? 0 }}</td>
+                            <td data-label="Enrolled">{{ $course->enrollments_count ?? 0 }}</td>
                             @can('manage-learning')
-                            <td class="text-end">
+                            <td data-label="Actions" class="text-end">
                                 {{-- One shared form, re-pointed from these data-* values. --}}
                                 <button type="button" class="btn-hims btn-hims-ghost btn-sm"
                                         data-modal-open="courseEditModal"
@@ -190,12 +190,12 @@
             <tbody>
                 @forelse($cpd_records ?? [] as $cpd)
                 <tr>
-                    <td><strong>{{ $cpd->employee_name ?? '—' }}</strong></td>
-                    <td>{{ $cpd->activity_name }}</td>
-                    <td><span class="hims-badge {{ $cpd->source_type === 'course' ? 'blue' : 'gray' }}">{{ ucfirst($cpd->source_type) }}</span></td>
-                    <td><strong>{{ $cpd->cpd_hours }}</strong> hrs</td>
-                    <td>{{ \Carbon\Carbon::parse($cpd->date_earned)->format('M d, Y') }}</td>
-                    <td>
+                    <td data-label="Employee"><strong>{{ $cpd->employee_name ?? '—' }}</strong></td>
+                    <td data-label="Activity">{{ $cpd->activity_name }}</td>
+                    <td data-label="Source"><span class="hims-badge {{ $cpd->source_type === 'course' ? 'blue' : 'gray' }}">{{ ucfirst($cpd->source_type) }}</span></td>
+                    <td data-label="Hours"><strong>{{ $cpd->cpd_hours }}</strong> hrs</td>
+                    <td data-label="Date">{{ \Carbon\Carbon::parse($cpd->date_earned)->format('M d, Y') }}</td>
+                    <td data-label="Verified">
                         <span class="hims-badge {{ $cpd->verified ? 'green' : 'yellow' }}">
                             {{ $cpd->verified ? '✓ Verified' : 'Pending' }}
                         </span>

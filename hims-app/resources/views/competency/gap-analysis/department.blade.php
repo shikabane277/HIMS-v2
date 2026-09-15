@@ -73,10 +73,10 @@
                 <tbody>
                     @foreach($ai['recommended_actions'] as $action)
                     <tr>
-                        <td><strong>{{ $action['action'] ?? '—' }}</strong></td>
-                        <td style="font-size:12px;color:#6b7280">{{ $action['rationale'] ?? '—' }}</td>
-                        <td style="font-size:12px">{{ $action['timeframe'] ?? '—' }}</td>
-                        <td style="font-size:12px">{{ $action['owner'] ?? '—' }}</td>
+                        <td data-label="Action"><strong>{{ $action['action'] ?? '—' }}</strong></td>
+                        <td data-label="Rationale" style="font-size:12px;color:#6b7280">{{ $action['rationale'] ?? '—' }}</td>
+                        <td data-label="Timeframe" style="font-size:12px">{{ $action['timeframe'] ?? '—' }}</td>
+                        <td data-label="Owner" style="font-size:12px">{{ $action['owner'] ?? '—' }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -98,15 +98,15 @@
                     <tbody>
                         @forelse($analysis['weakest'] as $row)
                         <tr>
-                            <td>
+                            <td data-label="Competency">
                                 <strong>{{ $row->competency_name }}</strong>
                                 @if($row->is_mandatory)<span class="hims-badge red" style="margin-left:6px">Mandatory</span>@endif
                             </td>
-                            <td>{{ $row->required_proficiency }}/5</td>
-                            <td>{{ number_format((float) $row->avg_proficiency, 2) }}</td>
-                            <td><span class="gap-chip negative">{{ number_format((float) $row->avg_gap, 2) }}</span></td>
-                            <td>{{ $row->employees_below }}</td>
-                            <td>{{ $row->assessed_employees }}</td>
+                            <td data-label="Required">{{ $row->required_proficiency }}/5</td>
+                            <td data-label="Avg">{{ number_format((float) $row->avg_proficiency, 2) }}</td>
+                            <td data-label="Avg Gap"><span class="gap-chip negative">{{ number_format((float) $row->avg_gap, 2) }}</span></td>
+                            <td data-label="Below">{{ $row->employees_below }}</td>
+                            <td data-label="Assessed">{{ $row->assessed_employees }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="6" class="text-center" style="color:#9ca3af;padding:32px">

@@ -31,6 +31,9 @@ class GeminiProvider extends AbstractAiProvider
 
         $contents = $this->buildContents($prompt, $history, $scope);
 
+        /** @var array<string, string> $rejected model name => the host's reason */
+        $rejected = [];
+
         foreach ($this->models() as $model) {
             try {
                 $endpoint = "{$base}/models/{$model}:generateContent";
@@ -49,7 +52,13 @@ class GeminiProvider extends AbstractAiProvider
                 }
 
                 if ($response->status() === 404) {
-                    continue; // model unavailable for this key — try the next
+                    // Model unavailable for this key — try the next, but keep the
+                    // reason: it is the only thing that makes the final message
+                    // actionable. See AbstractAiProvider::noUsableModel().
+                    $rejected[$model] = trim((string) ($response->json('error.message') ?: 'not found for this key'));
+                    Log::warning('Gemini rejected model', ['model' => $model]);
+
+                    continue;
                 }
 
                 $msg = $response->json('error.message') ?? $response->body();
@@ -63,7 +72,12 @@ class GeminiProvider extends AbstractAiProvider
             }
         }
 
-        return '⚠️ Unable to reach Gemini with the configured models. Check GEMINI_MODEL / GEMINI_API_KEY in .env.';
+        return $this->noUsableModel($rejected);
+    }
+
+    protected function modelEnvKeys(): string
+    {
+        return 'GEMINI_MODEL';
     }
 
     /**

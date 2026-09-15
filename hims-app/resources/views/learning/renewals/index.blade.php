@@ -60,26 +60,26 @@
             <tbody>
                 @forelse($cycles as $cycle)
                 <tr>
-                    <td>
+                    <td data-label="Employee">
                         <div style="font-weight:600">{{ $cycle->first_name }} {{ $cycle->last_name }}</div>
                         <div style="font-size:11px;color:#9ca3af">{{ $cycle->employee_code }}</div>
                     </td>
-                    <td>{{ $cycle->department_name ?? '—' }}</td>
-                    <td>
+                    <td data-label="Department">{{ $cycle->department_name ?? '—' }}</td>
+                    <td data-label="Requirement">
                         <div>{{ $cycle->label }}</div>
                         <div style="font-size:11px;color:#9ca3af">
                             {{ $cycle->subject_key }}
                             @if($cycle->credential_number) · {{ $cycle->credential_number }} @endif
                         </div>
                     </td>
-                    <td style="min-width:150px">
+                    <td data-label="Progress" style="min-width:150px">
                         <div class="d-flex justify-content-between" style="font-size:11.5px;margin-bottom:4px">
                             <span>{{ $cycle->hours_attained }} / {{ rtrim(rtrim(number_format($cycle->hours_required_snapshot, 1), '0'), '.') }} hrs</span>
                             <strong>{{ $cycle->pct_complete }}%</strong>
                         </div>
                         <div class="hims-progress"><div class="hims-progress-bar" style="width:{{ $cycle->pct_complete }}%"></div></div>
                     </td>
-                    <td>
+                    <td data-label="Cycle Ends">
                         {{ \Carbon\Carbon::parse($cycle->cycle_end)->format('M d, Y') }}
                         <div style="font-size:11px;color:#9ca3af">
                             {{ $cycle->days_left >= 0 ? $cycle->days_left.' day(s) left' : abs($cycle->days_left).' day(s) ago' }}
@@ -91,14 +91,14 @@
                         </span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Standing">
                         @if($cycle->risk === 'shortfall')
                             <span class="hims-badge red">Closed short by {{ $cycle->hours_remaining }} hrs</span>
                         @else
                             <span class="hims-badge yellow">{{ $cycle->hours_remaining }} hrs still needed</span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Escalates To">
                         @if($cycle->email)
                             <span style="font-size:12px;color:#6b7280">{{ $cycle->email }}</span>
                         @elseif($cycle->supervisor_id)

@@ -67,12 +67,12 @@
             <tbody>
                 @forelse($roster as $row)
                 <tr>
-                    <td>
+                    <td data-label="Employee">
                         <div style="font-weight:600">{{ $row->first_name }} {{ $row->last_name }}</div>
                         <div style="font-size:11px;color:#9ca3af">{{ $row->employee_code }}</div>
                     </td>
-                    <td>{{ $row->department_name ?? '—' }}</td>
-                    <td>
+                    <td data-label="Department">{{ $row->department_name ?? '—' }}</td>
+                    <td data-label="Status">
                         @if($row->is_complete)
                             <span class="hims-badge green">✓ {{ ucfirst(str_replace('_',' ',$row->status)) }}</span>
                         @elseif($assignment->required_by && now()->toDateString() > $assignment->required_by)
@@ -81,8 +81,8 @@
                             <span class="hims-badge yellow">{{ ucfirst(str_replace('_',' ',$row->status)) }}</span>
                         @endif
                     </td>
-                    <td>{{ $row->completed_at ? \Carbon\Carbon::parse($row->completed_at)->format('M d, Y') : '—' }}</td>
-                    <td>
+                    <td data-label="Completed">{{ $row->completed_at ? \Carbon\Carbon::parse($row->completed_at)->format('M d, Y') : '—' }}</td>
+                    <td data-label="Reachable">
                         @if($row->email)
                             <span style="font-size:12px;color:#6b7280">{{ $row->email }}</span>
                         @else
@@ -93,7 +93,7 @@
                          courses are marked here, sessions are checked in on the
                          attendance sheet. Duplicating check-in would give a
                          session two places to record the same fact. --}}
-                    <td class="text-end" style="white-space:nowrap">
+                    <td data-label="Actions" class="text-end" style="white-space:nowrap">
                         @if($assignment->subject_type === 'session')
                             <a href="{{ route('training.sessions.show', $assignment->subject_id) }}"
                                class="btn-hims btn-hims-ghost btn-sm">Attendance</a>

@@ -47,23 +47,23 @@
                     <tbody>
                         @forelse($sessions ?? [] as $session)
                         <tr>
-                            <td>
+                            <td data-label="Session">
                                 <div style="font-weight:600">{{ $session->title }}</div>
                                 <div style="font-size:11px;color:#9ca3af">{{ $session->session_code ?? '' }} · {{ $session->cpd_hours ?? 0 }} CPD hrs</div>
                             </td>
-                            <td style="font-size:12.5px">
+                            <td data-label="Date & Time" style="font-size:12.5px">
                                 <strong>{{ \Carbon\Carbon::parse($session->session_date)->format('M d, Y') }}</strong><br>
                                 {{ $session->start_time }} – {{ $session->end_time }}
                             </td>
-                            <td>{{ $session->venue_name ?? 'Online' }}</td>
-                            <td>{{ $session->instructor_name ?? '—' }}</td>
-                            <td>
+                            <td data-label="Venue">{{ $session->venue_name ?? 'Online' }}</td>
+                            <td data-label="Instructor">{{ $session->instructor_name ?? '—' }}</td>
+                            <td data-label="Seats">
                                 <div style="font-size:12.5px">{{ $session->registered_count ?? 0 }}/{{ $session->capacity }}</div>
                                 <div class="hims-progress mt-1" style="width:60px">
                                     <div class="hims-progress-bar" style="width:{{ $session->capacity > 0 ? min(100, round(($session->registered_count ?? 0)/$session->capacity*100)) : 0 }}%"></div>
                                 </div>
                             </td>
-                            <td>
+                            <td data-label="Actions">
                                 <a href="{{ route('training.sessions.show', $session->session_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
                                 <form method="POST" action="{{ route('training.register', $session->session_id) }}" style="display:inline">
                                     @csrf
@@ -130,18 +130,18 @@
             <tbody>
                 @forelse($feedback ?? [] as $fb)
                 <tr>
-                    <td>{{ $fb->session_title ?? '—' }}</td>
-                    <td>{{ $fb->employee_name ?? '—' }}</td>
-                    <td>
+                    <td data-label="Session">{{ $fb->session_title ?? '—' }}</td>
+                    <td data-label="Employee">{{ $fb->employee_name ?? '—' }}</td>
+                    <td data-label="Overall">
                         <span class="star-rating">
                             @for($i=1;$i<=5;$i++)
                                 <i class="bi bi-star-fill{{ $i > $fb->overall_rating ? ' empty' : '' }}"></i>
                             @endfor
                         </span>
                     </td>
-                    <td>{{ $fb->content_rating ?? '—' }}/5</td>
-                    <td>{{ $fb->instructor_rating ?? '—' }}/5</td>
-                    <td>
+                    <td data-label="Content">{{ $fb->content_rating ?? '—' }}/5</td>
+                    <td data-label="Instructor">{{ $fb->instructor_rating ?? '—' }}/5</td>
+                    <td data-label="Sentiment">
                         @if($fb->ai_sentiment_label)
                         <span class="hims-badge {{ $fb->ai_sentiment_label === 'positive' ? 'green' : ($fb->ai_sentiment_label === 'negative' ? 'red' : 'yellow') }}">
                             {{ ucfirst($fb->ai_sentiment_label) }}

@@ -66,7 +66,17 @@ document.addEventListener('click', function(e) {
                 `;
 
                 if (before || after) {
-                    html += '<div style="font-size:12px;background:#f8fafc;padding:8px;border-radius:6px;font-family:monospace;max-height:140px;overflow-y:auto">';
+                    // `overflow-wrap:anywhere` is load-bearing, not cosmetic. A
+                    // JSON.stringify dump has no spaces in it, so it is one
+                    // unbreakable token — 714px of it inside a 198px box on a
+                    // 320px phone. And `overflow-y:auto` alone does not leave
+                    // overflow-x at `visible`: CSS computes the other axis to
+                    // `auto` as soon as one axis is not visible, so the box
+                    // silently became the sideways swipe the mobile rules exist
+                    // to remove, hiding the changed values themselves. Wrapping
+                    // it puts them under the max-height's vertical scroll, which
+                    // is the direction a reader can find.
+                    html += '<div style="font-size:12px;background:#f8fafc;padding:8px;border-radius:6px;font-family:monospace;max-height:140px;overflow-y:auto;overflow-wrap:anywhere">';
                     if (after) html += `<div><strong>After:</strong> ${JSON.stringify(after)}</div>`;
                     if (before) html += `<div style="color:#6b7280;margin-top:4px"><strong>Before:</strong> ${JSON.stringify(before)}</div>`;
                     html += '</div>';

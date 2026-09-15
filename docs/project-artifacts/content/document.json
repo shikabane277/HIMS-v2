@@ -1,0 +1,84 @@
+{
+  "title": "Project Documentation Artifacts",
+  "subtitle": "Product Backlog, Sprint Backlog, User Stories, Business Process Architecture, Network Topology, Information Security, Technical Solution Design",
+  "system": "Hospital Information Management System (HIMS)",
+  "module": "Performance & Development Module",
+  "version": "v2.20.2",
+  "date": "2026-08-16",
+  "repository": "antigravity / hims-app",
+  "statusTitle": "Status of this document — AS-BUILT, with a forward backlog",
+  "statusBody": [
+    "Everything marked <strong>Done</strong> in this document was verified against source in <code>hims-app/</code> at v2.20.2. Everything marked <strong>Open</strong> is not implemented and is named as such rather than described as though it exists.",
+    "The three as-built references — <code>HIMS_ARCHITECTURE_AND_SECURITY.md</code>, <code>HIMS_SYSTEM_DOCUMENTATION.md</code> and <code>HIMS_USER_GUIDE.md</code> — describe only what the code does. Where a requested part is already covered there, this document summarises it and points at the owning section instead of restating it. The reference map below says which parts those are."
+  ],
+  "referenceMap": {
+    "intro": "The brief asked for seven parts. Three of them were already documented in the repository, so they are summarised here for self-containment and cross-referenced to the authority. Four were not documented anywhere and are authored here for the first time.",
+    "columns": ["Part", "Treatment", "Authority / where it lives"],
+    "rows": [
+      {
+        "part": "Product Backlog",
+        "treatment": "new",
+        "treatmentLabel": "Authored here (§2)",
+        "where": "Not previously documented. Derived from <code>HIMS_SYSTEM_DOCUMENTATION.md</code> §13 (Implementation Status), the 27 releases in <code>HIMS_PATCH_NOTES.md</code>, and the explicit not-implemented list in <code>CLAUDE.md</code>."
+      },
+      {
+        "part": "Sprint Backlog",
+        "treatment": "new",
+        "treatmentLabel": "Authored here (§3)",
+        "where": "Not previously documented. Sprint history reconstructed from real dated releases in <code>HIMS_PATCH_NOTES.md</code> (2026-07-06 through 2026-08-16); the current sprint is a proposal drawn from the open backlog, not a recorded commitment."
+      },
+      {
+        "part": "User Stories",
+        "treatment": "new",
+        "treatmentLabel": "Authored here (§4)",
+        "where": "Not previously documented. Derived from the role matrix in <code>HIMS_SYSTEM_DOCUMENTATION.md</code> §3.1 and the module behaviour in §4.A–§4.G."
+      },
+      {
+        "part": "Business Process Architecture",
+        "treatment": "part",
+        "treatmentLabel": "Authored here (§5), detail cross-referenced",
+        "where": "Process <em>steps</em> exist (<code>HIMS_SYSTEM_DOCUMENTATION.md</code> §4.A–§4.G and §8 Sample Workflow). The <em>architecture</em> above them — process taxonomy, ownership, swimlanes, cross-process invariants — did not, and is authored here."
+      },
+      {
+        "part": "Network Topology",
+        "treatment": "new",
+        "treatmentLabel": "Authored here (§6)",
+        "where": "Not previously documented. The existing diagram in <code>HIMS_ARCHITECTURE_AND_SECURITY.md</code> §1 is a <em>logical layer</em> diagram, not a network topology. Built here from <code>bootstrap/app.php</code>, <code>config/services.php</code>, <code>routes/console.php</code>, <code>.env</code> and the Railway/Cloudflare facts recorded in §4 of the architecture reference."
+      },
+      {
+        "part": "Information Security",
+        "treatment": "ref",
+        "treatmentLabel": "Summarised here (§7), cross-referenced",
+        "where": "Already documented in depth: <code>HIMS_ARCHITECTURE_AND_SECURITY.md</code> §3 (Security Design), <code>HIMS_SYSTEM_DOCUMENTATION.md</code> §7 (Security &amp; Compliance Architecture), and <code>HIMS_ACCESS_AND_VISIBILITY.md</code>. §7 here is a control matrix and a residual-risk register over those."
+      },
+      {
+        "part": "Technical Solution Design",
+        "treatment": "ref",
+        "treatmentLabel": "Summarised here (§8), cross-referenced",
+        "where": "Already documented: <code>HIMS_ARCHITECTURE_AND_SECURITY.md</code> §1–§2 and §5–§6, <code>HIMS_SYSTEM_DOCUMENTATION.md</code> §1.1, §6 (schema + ERD) and §14 (stack). §8 here adds the decision record and component inventory those lack."
+      }
+    ]
+  },
+  "metrics": {
+    "intro": "Every figure below was counted from the working tree at v2.20.2, not carried over from an earlier document.",
+    "columns": ["Measure", "Value", "Counted from"],
+    "rows": [
+      ["Live database objects", "51 tables + 1 view", "MySQL <code>hims_v2</code>; 31 applied migration rows"],
+      ["Migration files", "31", "<code>database/migrations/</code>"],
+      ["Route registrations", "114", "<code>routes/web.php</code>"],
+      ["Domain controllers", "14 + 1 base", "<code>app/Http/Controllers/</code> (plus 9 Breeze auth controllers in <code>Auth/</code>)"],
+      ["Blade views", "102 total, 48 on the app shell", "<code>resources/views/</code>; <code>layouts/hims.blade.php</code>"],
+      ["Eloquent models", "1 (<code>User</code>)", "Data access is raw Query Builder — 329 <code>DB::table(</code> call sites across 14 files"],
+      ["Authorisation gates", "20", "<code>AppServiceProvider::registerGates()</code>"],
+      ["AI actions in registry", "30", "<code>app/Services/Ai/AiActionRegistry.php</code>"],
+      ["Derived-state helpers", "6", "<code>app/Support/</code> — AuditTrail, CredentialStatus, CycleStatus, KpiWeighting, ReviewFeedback, ReviewStatus"],
+      ["Domain services", "5 + AI subsystem", "<code>app/Services/</code>"],
+      ["Scheduled / console commands", "2", "<code>hims:scan-credential-expiry</code>, <code>hims:mail-test</code>"],
+      ["Stylesheet", "1506 lines, hand-authored", "<code>public/css/hims.css</code>, served outside the Vite build"],
+      ["Test classes", "33", "<code>tests/</code>"],
+      ["Test suite — sqlite", "362 tests, 341 passed, 21 skipped, 1546 assertions", "<code>php artisan test</code> (phpunit.xml pins sqlite <code>:memory:</code>)"],
+      ["Test suite — MySQL", "362 tests, 362 passed, 0 skipped, 1614 assertions", "Scratch database; the 21 skips are MySQL-only read paths"],
+      ["Releases to date", "27", "<code>HIMS_PATCH_NOTES.md</code>, 2026-07-06 → 2026-08-16"]
+    ]
+  }
+}

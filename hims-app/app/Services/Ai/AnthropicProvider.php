@@ -31,6 +31,9 @@ class AnthropicProvider extends AbstractAiProvider
 
         $messages = $this->buildMessages($prompt, $history);
 
+        /** @var array<string, string> $rejected model name => the host's reason */
+        $rejected = [];
+
         foreach ($this->models() as $model) {
             try {
                 $response = Http::timeout($this->timeout())
@@ -51,8 +54,13 @@ class AnthropicProvider extends AbstractAiProvider
                         ?? 'No response generated.';
                 }
 
-                // 404 (unknown model) — try the next configured model.
+                // 404 (unknown model) — try the next configured model, keeping the
+                // reason so the final message can name it. See
+                // AbstractAiProvider::noUsableModel().
                 if ($response->status() === 404) {
+                    $rejected[$model] = trim((string) ($response->json('error.message') ?: 'not found'));
+                    Log::warning('Anthropic rejected model', ['model' => $model]);
+
                     continue;
                 }
 
@@ -67,7 +75,12 @@ class AnthropicProvider extends AbstractAiProvider
             }
         }
 
-        return '⚠️ Unable to reach Anthropic with the configured models. Check ANTHROPIC_MODEL / ANTHROPIC_API_KEY in .env.';
+        return $this->noUsableModel($rejected);
+    }
+
+    protected function modelEnvKeys(): string
+    {
+        return 'ANTHROPIC_MODEL';
     }
 
     /**

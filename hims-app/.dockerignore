@@ -1,0 +1,34 @@
+# Secrets never enter the image — Render injects them as environment variables.
+.env
+.env.*
+!.env.example
+
+# Rebuilt inside the image by their own stages.
+node_modules
+vendor
+public/build
+public/hot
+public/storage
+
+# Runtime state. The Dockerfile recreates these directories empty; copying a
+# developer's cached config or compiled views in would shadow what the
+# entrypoint writes.
+bootstrap/cache/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+storage/pail
+storage/app/public/*
+database/database.sqlite
+
+# Not needed to serve requests. Note that composer install --no-dev already
+# leaves phpunit out of the image, so the tests could not run there anyway.
+tests
+phpunit.xml
+.phpunit.result.cache
+.git
+.github
+.idea
+.vscode
+*.md

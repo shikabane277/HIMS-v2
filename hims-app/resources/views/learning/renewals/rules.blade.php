@@ -41,23 +41,23 @@
             <tbody>
                 @forelse($rules as $rule)
                 <tr>
-                    <td>
+                    <td data-label="Rule">
                         <div style="font-weight:600">{{ $rule->label }}</div>
                         <div style="font-size:11px;color:#9ca3af">{{ $rule->subject_key }}</div>
                     </td>
-                    <td>
+                    <td data-label="Applies To">
                         <span class="hims-badge {{ $rule->subject_type === 'credential' ? 'blue' : 'purple' }}">
                             {{ $rule->subject_type === 'credential' ? 'Credential' : 'CPD category' }}
                         </span>
                     </td>
-                    <td><strong>{{ rtrim(rtrim(number_format($rule->required_hours, 1), '0'), '.') }}</strong> hrs</td>
-                    <td>
+                    <td data-label="Requirement"><strong>{{ rtrim(rtrim(number_format($rule->required_hours, 1), '0'), '.') }}</strong> hrs</td>
+                    <td data-label="Cycle">
                         {{ $rule->cycle_months }} months
                         @if($rule->grace_days)
                         <div style="font-size:11px;color:#9ca3af">+{{ $rule->grace_days }} day grace</div>
                         @endif
                     </td>
-                    <td>{{ $rule->cycles_count }}</td>
+                    <td data-label="Open Cycles">{{ $rule->cycles_count }}</td>
                 </tr>
                 @empty
                 <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:32px">

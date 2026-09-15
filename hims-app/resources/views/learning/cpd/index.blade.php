@@ -71,15 +71,15 @@
                 {{-- Global search deep-links a CPD hit to #cpd-<id>; the anchor
                      has to sit on the record's own row. --}}
                 <tr id="cpd-{{ $cpd->cpd_id }}" style="scroll-margin-top:84px">
-                    <td><strong>{{ $cpd->employee_name ?? '—' }}</strong></td>
-                    <td>{{ $cpd->activity_name }}</td>
-                    <td><span class="hims-badge {{ $cpd->source_type === 'external' ? 'gray' : 'blue' }}">{{ ucfirst(str_replace('_',' ',$cpd->source_type)) }}</span></td>
-                    <td><strong>{{ $cpd->cpd_hours }}</strong> hrs</td>
-                    <td style="font-size:12.5px;color:#6b7280">{{ \Carbon\Carbon::parse($cpd->date_earned)->format('M d, Y') }}</td>
-                    <td style="font-size:12.5px">{{ trim($cpd->verified_by_name ?? '') ?: '—' }}</td>
-                    <td><span class="hims-badge {{ $cpd->verified ? 'green' : 'yellow' }}">{{ $cpd->verified ? '✓ Verified' : 'Pending' }}</span></td>
+                    <td data-label="Employee"><strong>{{ $cpd->employee_name ?? '—' }}</strong></td>
+                    <td data-label="Activity">{{ $cpd->activity_name }}</td>
+                    <td data-label="Source"><span class="hims-badge {{ $cpd->source_type === 'external' ? 'gray' : 'blue' }}">{{ ucfirst(str_replace('_',' ',$cpd->source_type)) }}</span></td>
+                    <td data-label="Hours"><strong>{{ $cpd->cpd_hours }}</strong> hrs</td>
+                    <td data-label="Date" style="font-size:12.5px;color:#6b7280">{{ \Carbon\Carbon::parse($cpd->date_earned)->format('M d, Y') }}</td>
+                    <td data-label="Verified By" style="font-size:12.5px">{{ trim($cpd->verified_by_name ?? '') ?: '—' }}</td>
+                    <td data-label="Status"><span class="hims-badge {{ $cpd->verified ? 'green' : 'yellow' }}">{{ $cpd->verified ? '✓ Verified' : 'Pending' }}</span></td>
                     @if($canVerify)
-                    <td>
+                    <td data-label="Actions">
                         @unless($cpd->verified)
                             <form method="POST" action="{{ route('learning.cpd.verify', $cpd->cpd_id) }}" style="margin:0">
                                 @csrf

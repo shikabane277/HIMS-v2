@@ -105,6 +105,10 @@ final class AiActionExecutor
             [
                 'action_key' => $plan['action'],
                 'prompt' => $plan['prompt'] ?? null,
+                // Present only when AiTypoCorrector read the message differently
+                // from the way it was typed, so the audit shows both the person's
+                // words and the reading the write was actually made from.
+                'prompt_corrected' => $plan['prompt_corrected'] ?? null,
                 'session_id' => $plan['session_id'] ?? null,
                 'provider' => config('services.ai.provider'),
             ],

@@ -51,15 +51,15 @@
                     <tbody>
                         @forelse($gap_matrix ?? [] as $row)
                         <tr>
-                            <td><strong>{{ $row->competency_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $row->competency_code }}</div></td>
-                            <td><span style="font-weight:600">{{ $row->required_proficiency }}/5</span></td>
-                            <td><span style="font-weight:600">{{ number_format($row->avg_score ?? 0,1) }}/5</span></td>
-                            <td>
+                            <td data-label="Competency"><strong>{{ $row->competency_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $row->competency_code }}</div></td>
+                            <td data-label="Required"><span style="font-weight:600">{{ $row->required_proficiency }}/5</span></td>
+                            <td data-label="Avg Score"><span style="font-weight:600">{{ number_format($row->avg_score ?? 0,1) }}/5</span></td>
+                            <td data-label="Gap">
                                 <span class="gap-chip {{ ($row->gap ?? 0) >= 0 ? 'positive' : 'negative' }}">
                                     {{ ($row->gap ?? 0) >= 0 ? '+' : '' }}{{ $row->gap ?? 0 }}
                                 </span>
                             </td>
-                            <td>
+                            <td data-label="Status">
                                 <span class="hims-badge {{ ($row->gap ?? 0) >= 0 ? 'green' : (($row->gap ?? 0) >= -1 ? 'yellow' : 'red') }}">
                                     {{ ($row->gap ?? 0) >= 0 ? 'Met' : (($row->gap ?? 0) >= -1 ? 'Minor Gap' : 'Critical Gap') }}
                                 </span>
@@ -117,11 +117,11 @@
             <tbody>
                 @forelse($domains ?? [] as $domain)
                 <tr>
-                    <td><strong>{{ $domain->domain_name }}</strong></td>
-                    <td>{{ $domain->categories_count ?? 0 }}</td>
-                    <td>{{ $domain->competencies_count ?? 0 }}</td>
-                    <td><span class="hims-badge blue">{{ $domain->jci_codes ?? 'SQE' }}</span></td>
-                    <td><a href="{{ route('competency.domains.show', $domain->domain_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a></td>
+                    <td data-label="Domain"><strong>{{ $domain->domain_name }}</strong></td>
+                    <td data-label="Categories">{{ $domain->categories_count ?? 0 }}</td>
+                    <td data-label="Competencies">{{ $domain->competencies_count ?? 0 }}</td>
+                    <td data-label="JCI Reference"><span class="hims-badge blue">{{ $domain->jci_codes ?? 'SQE' }}</span></td>
+                    <td data-label="Actions"><a href="{{ route('competency.domains.show', $domain->domain_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a></td>
                 </tr>
                 @empty
                 <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:32px">No domains configured yet.</td></tr>

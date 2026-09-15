@@ -11,6 +11,436 @@ Entries marked 📋 are specified but not implemented.
 
 ---
 
+## v2.22.1 - 2026-08-17
+
+The AI assistant went dark on every question at once, and the reply it gave named the one thing that was working.
+Reported verbatim as *"Unable to reach Groq with the configured models. Check the model/API key in .env."* — which
+is HIMS's own sentence, not the provider's. Groq had retired `llama-3.3-70b-versatile`; the key was fine. So this
+release is two fixes that happen to share a cause: the configuration that broke, and the message that failed to
+say so. No migration, no route change, no schema change.
+
+### Fixed
+
+*   **The `compatible` provider slot had no fallback chain, so one retired model was a total outage.**
+    `config/services.php` defined `fallback_models` for `gemini` and `anthropic` only. The `compatible` slot — the
+    one `AI_PROVIDER=compatible` actually selects, serving Groq here — had no such key, so `models()` returned a
+    single candidate. When Groq answered `404 model_not_found` the driver behaved exactly as designed (a model
+    error advances to the next candidate) and then ran out of candidates on the first one. The slot now reads
+    **`AI_COMPATIBLE_FALLBACK_MODELS`**, a comma-separated list parsed into a clean array — stray spaces trimmed,
+    blanks and trailing commas dropped, so a hand-edited `.env` line cannot turn into `['']` and spend a request
+    on the empty string.
+
+    **The chain is env-driven rather than a literal, unlike the other two slots, and that asymmetry is
+    deliberate.** `gemini` and `anthropic` name a vendor, so their model names can be written in code. `compatible`
+    names a *protocol* — the same slot serves Groq, DeepSeek, xAI, Mistral, Together, OpenRouter and a local
+    Ollama — and a hardcoded list of Groq model names is nonsense pointed at any of the others. `openai` still has
+    no chain, which is recorded rather than fixed: it is the one slot whose vendor does not retire models out from
+    under a running deployment on this timescale.
+
+*   **The diagnosis was proven against the live host rather than inferred.** `GET /openai/v1/models` returned
+    **200** with thirteen models and no `llama-3.3-70b-versatile` in them; `POST /chat/completions` returned
+    **404** with `code: model_not_found`. Both facts were needed: the 200 is what rules the API key out, and
+    without it "check the model/API key" is a coin toss.
+
+*   **A refused model is now named, quoted, and separated from the key.**
+    `AbstractAiProvider::noUsableModel()` replaces the generic sentence in all three drivers. Each driver already
+    knew why it was skipping a model and threw the reason away inside the loop; each now collects
+    `model => reason` on its way past, so the reply lists **every** model that was refused with **the host's own
+    wording** for each, and states plainly that the API key works. That last clause is not politeness, it is an
+    inference the reader cannot make and the code can: *a refusal proves the key authenticated*, because the host
+    had to accept the request to discover the model was wrong. The old message sent whoever read it to go and test
+    the working half of the configuration.
+
+    An empty model list is reported as a different fault — *"No model is configured … so no request was sent"* —
+    because "we tried and were refused" and "we never asked" send an administrator to different places. Which
+    `.env` keys to edit comes from `modelEnvKeys()`, overridden per driver, and **passed in from `AiManager` for
+    the OpenAI driver** because that one class serves two config slots and only `AiManager` knows which one it is
+    building. Guessing from the label would misfire the moment somebody sets `AI_COMPATIBLE_LABEL=OpenAI`.
+
+*   **`.env.example` shipped the same dead model as its documented example, so a fresh checkout was born broken.**
+    It now names `openai/gpt-oss-120b` with a fallback line beside it, and says in three lines why the fallback
+    exists: hosts retire models on a rolling basis, a chain makes that cost a redirect instead of an outage, and a
+    model name should be checked against the host's own `GET /models` before being trusted.
+
+*   **The assistant's replies were printing raw markdown as literal characters.** Not a new bug, but the model
+    swap made it constant: llama-3.3 rarely volunteered markdown, and `openai/gpt-oss-*` uses it by default, so
+    answers arrived full of visible `**asterisks**` and backticks. The AI rail renders a reply with
+    `div.textContent = text` (`layouts/hims.blade.php:855`), which is **correct and was not changed** — model
+    output is untrusted, and `innerHTML` there would be an injection surface reached by anything the model can be
+    persuaded to repeat. The fix is therefore in the system prompt, which now tells the model its reply is shown
+    as literal text and asks for plain prose with `- ` lines where a list genuinely helps. `.ai-msg` carries
+    `white-space: pre-wrap`, so those newlines survive and a list still reads as one. JSON callers are unaffected
+    either way — `decodeJson()` strips code fences whether or not they arrive.
+
+### Changed
+
+*   **`AI_COMPATIBLE_MODEL=openai/gpt-oss-120b`, with `openai/gpt-oss-20b` behind it.** Chosen by measurement
+    against the live host, not by reputation. Both return a clean `content` string in about a second (1051ms and
+    1111ms), and the 120b keeps its reasoning in a separate response key where the rail never sees it.
+
+    Three of Groq's other current models were **excluded on inspection**, and the reasons are worth keeping
+    because they are the criteria for the next replacement. `qwen/qwen3.6-27b` writes its raw `<think>` monologue
+    into `content` and hit `finish_reason: length` having spent the entire 1024-token budget on it — in a
+    `textContent` panel that renders as visible garbage rather than as hidden scaffolding. The `groq/compound`
+    models perform their own web search, which would send a prompt that can legitimately carry employee names and
+    written review comments to a search backend outside the hospital's control — `system_settings` exists to
+    govern exactly that egress, and a model that widens it behind the setting's back defeats it. The rest of the
+    catalogue is speech, guard or wrong-language.
+
+### Added
+
+*   **`Unit\OpenAiProviderFailureTest`** — 26 cases, 54 assertions, every one on `Http::fake()`; nothing in it
+    reaches a provider. It pins the incident from both ends: that a retired model is named with the host's own
+    reason, that the reply says the key works and no longer says *"Check the model/API key"*, that **every**
+    refused model is listed rather than only the last, that an empty model list reports "no request was sent" and
+    then proves it with `Http::assertNothingSent()`, and that a retired primary with a live fallback behind it
+    costs exactly one extra request (`assertSentCount(2)`) rather than an outage.
+
+    It also fences the parts that must *not* generalise. A `401` is reported as an API error and **stops** the
+    walk after one request, because re-sending the same auth rejection under a different model name learns
+    nothing. A missing key never reaches the network at all. Each slot names only the env keys it actually reads,
+    asserted through `AiManager` rather than by constructing the driver directly, since the plumbing being tested
+    is `AiManager`'s. A data provider covers the fallback-string parsing (empty, single, two, spaced, trailing
+    comma, only commas, slashes preserved), another runs all three drivers past the same refusal to assert that
+    none of them blames the key, and a third asserts every failure path returns a `⚠️` string rather than
+    throwing — the contract `CompetencyGapAnalysisService::parseAiJson()`, `AbstractAiProvider::decodeJson()` and
+    `sanitiseHistory()` all read.
+
+### Verification
+
+*   `vendor/bin/pint --test` — passed, project-wide.
+*   **1080 tests, 1059 passed, 21 skipped, 2935 assertions** on the default sqlite connection (20.4s), up from
+    1054/1033/21/2881. The **skip count did not move**: all 26 new cases are `Http::fake` and touch no database,
+    so they are portable by construction.
+*   **1080 tests, 1080 passed, 0 skipped, 3003 assertions** against a MySQL scratch database (36.1s), created and
+    then dropped. `hims_v2` was never touched. The gap between the runs is still 68 assertions — the same
+    MySQL-only read paths, no more and no fewer.
+*   **End-to-end through the contract, not just the unit tests.** `app(AiProvider::class)->ask(...)` was driven
+    with a real scope fragment and then again with a replayed history containing a synthetic `⚠️` turn that
+    `sanitiseHistory()` is supposed to drop. Both returned real, HIMS-grounded answers in plain prose.
+
+### Docs
+
+*   `HIMS_ARCHITECTURE_AND_SECURITY.md` §5's **Model config** row is rewritten for the mixed design, and gains two
+    rows: **Exhausted-chain message** (what `noUsableModel()` reports, the two corrections it makes, the separate
+    empty-chain case, and the test that pins it) and **Reply formatting** (the no-markdown clause recorded as what
+    it is — a coupling to `div.textContent`, so anyone who changes the renderer knows the prompt is downstream
+    of it).
+*   `HIMS_SYSTEM_DOCUMENTATION.md` §5's **Model fallback** row said the chains "are **not**" env-configurable and
+    that `compatible` had none — true when written, false now; rewritten, along with the §13 status row and the
+    suite figures.
+*   `.claude/rules/services.md` carried the same claim and is corrected with it, plus two new subsections: *a
+    refused model must name itself, and must not implicate the key*, and *the system prompt bans markdown because
+    the rail cannot render it*.
+*   `.claude/rules/testing.md` re-measured, and its contract-test table gains an eighth row for the `⚠️`
+    never-throws assertion.
+*   `HIMS_USER_GUIDE.md` §12 and its FAQ now say what a `⚠️` reply means in the terms a nurse needs: it is a
+    system fault rather than a mistake they made, retyping will not help, the line names what needs changing so
+    it should be sent on to an administrator whole, and the rest of HIMS keeps working while the assistant
+    does not.
+
+---
+
+## v2.22.0 - 2026-08-17
+
+The assistant now reads a mistyped instruction, and tells the person how it read it. Reported as *"make it able to
+detect typo mistakes and would suggest what the messager actually mean"*, and the reason that is a release rather
+than a tweak is that **every gate in front of the model is a literal string test**: `ACTION_VERBS` is a word list,
+`AiAccessPolicy::TOPICS` is a pattern list, `AiEntityResolver` is a substring `LIKE`. One wrong letter made a
+message invisible to all three at once, and the failure was silent in the worst available way — *"crate a 2027
+cycle"* came back with a helpful paragraph about how one creates review cycles, so the asker had every reason to
+believe the cycle existed. No migration, no route change, no schema change, and **no extra AI call**: the whole
+pass is local string work. Two new classes, three new test files, and about 250 lines across three existing AI
+files.
+
+### Added
+
+*   **`App\Support\FuzzyMatch`** — the edit-distance primitive both new behaviours rest on, in the same shape as
+    the other `App\Support` helpers (`final class`, static, no DB, no Carbon). It is **Optimal String Alignment
+    rather than PHP's `levenshtein()`** for two measured reasons: `levenshtein()` prices a transposition at 2
+    edits, which puts the single commonest keyboard slip (`confrim` → `confirm`) exactly as far away as an
+    unrelated word, and it counts **bytes**, which reads the `ñ` in *Peña* as two edits from anything and so puts
+    every accented surname in this hospital out of reach of a suggestion. The DP therefore walks
+    `mb_str_split()`. The allowance scales with the term's length (`ceiling()`: ≤3 → 0, ≤6 → 1, ≤10 → 2, else 3)
+    — a three-character word gets **none at all**, because nearly every single edit of one lands on another real
+    word.
+
+    **Ambiguity is the caller's decision, which is why there are two entry points rather than a flag.**
+    `closest()` / `closestOf()` return **null** when two different candidates tie, and everything that resolves a
+    record uses those: guessing between two people is the mistake the rule exists to prevent. `preferred()`
+    settles a tie by candidate order, and only `AiTypoCorrector` may use it, because a guess that merely reshapes
+    text is shown back to the person and costs nothing when it is wrong. A tie is first thinned by the opening
+    letter — a typist keeps the first character far more often than not — but that preference yields when no
+    candidate shares the initial, since thinning to nothing would turn a perfectly good single match into a miss.
+    `closestOf()` maps aliases to labels, so a person reachable by full name, surname and employee code is one
+    candidate rather than three tying ones.
+
+*   **`App\Services\Ai\AiTypoCorrector`** — the reading of a chat message. `correct()` returns
+    `{text, changes}` and `note()` renders the changes as the sentence the user sees. A token is a candidate for
+    re-reading only if it is **≥5 characters**, unknown to the domain vocabulary (**386 entries**, grouped as
+    verbs, then records, then fields, which is also the tie-break order), absent from the **182-entry**
+    `NEVER_CORRECT` stop-list, outside any quoted span, not an identifier (anything carrying `@`, a digit or an
+    underscore — codes, emails, dates, column names), and not capitalised mid-sentence. That last rule is what
+    keeps surnames out of reach: *Reyes* is never read as *review*, and *Cruze* is never read as *course*. A
+    capital that opens a sentence is still corrected, because there the capital is grammar rather than a name.
+
+    Two limits are deliberately tighter than the primitive's defaults. The per-token allowance is **1 edit under
+    8 characters and 2 at 8 or more**, not the length-scaled ceiling, because this rewrites text rather than
+    offering a suggestion. And at most **`MAX_CORRECTIONS = 3`** words are re-read per message: a message needing
+    a fourth was misunderstood, not mistyped, and silently rebuilding half a sentence is not a correction.
+    Case is restored from the original token, so `CRATE` → `CREATE` and `Crate` → `Create`.
+
+*   **A `— did you mean "…"?` suffix on every zero-match answer from `AiEntityResolver`** (employees, login
+    accounts, and all thirteen `LOOKUPS` types). *"no employee matching "Delacruze" that you have access to"* was
+    the whole of the old answer, and a reader has no way to tell a typo from a permissions boundary from a person
+    who does not exist. **Suggesting is not resolving**, and two properties hold that line: the fuzzy pass runs
+    *only* after the real query has already returned nothing, so it cannot widen a successful match or change
+    which row resolves — the action still stops — and its candidate pool is **the already-scoped pool**, capped at
+    `SUGGEST_POOL = 500`. A suggestion can therefore never name a record the caller could not have reached by
+    spelling it correctly, which would leak a record's existence through a misspelling. A value that is already a
+    UUID gets no suggestion, and the strict tie rule applies, so an ambiguous near-miss produces nothing rather
+    than half an answer. The suggestion path assembles names in PHP instead of `CONCAT`, unlike the lookup above
+    it, so it is reachable from the sqlite suite.
+
+*   **A cancelled destructive action says when it looks like a mistyped confirmation.** *"Cancelled — nothing was
+    changed. If you meant “confirm”, send the instruction again — a misspelt confirmation is always read as no."*
+    The cancel itself stands: this reports the near-miss instead of acting on it, which is the entire point, since
+    the confirmation step is the one place where reading a typo generously would be the dangerous choice. It costs
+    nothing and saves the person wondering why the delete they thought they had approved never happened.
+
+*   **`audit_trails.metadata.prompt_corrected`** on AI-executed writes, **present only when the reading differed
+    from the words typed**. `metadata.prompt` remains what the person wrote. An auditor can see that *"delet the
+    uesr bob"* was carried out as a delete of the user bob — and a row without the key is proof that nothing was
+    re-read, which is why the field is absent rather than a copy of `prompt`.
+
+*   **Three test files — 50 methods expanding to 686 cases, 1,320 assertions**, all of which stay on the portable
+    sqlite suite. `Unit\FuzzyMatchTest` (19 methods → 28 cases) pins the transposition price against
+    `levenshtein()` directly, mb-safety on *Peña*, the length-scaled ceiling and the strict-versus-preferred tie
+    rules — both behaviours come out of one private ranking function, so they can drift apart.
+    `Unit\AiTypoCorrectorTest` (19 → **646**) is a corpus: ~450 common English words, ~60 lowercase Filipino
+    surnames and given names, 26 correctly-spelt HIMS messages and the confirmation keywords, **each of which must
+    survive untouched**, plus 20 misspelt instructions that must be repaired. A missed typo leaves today's
+    behaviour intact; a wrongly "corrected" word changes what the assistant was asked to do, and the worst case is
+    a person's name in a message that ends in a delete — so the test that matters most is the one asserting
+    nothing happened. It also carries a reflection contract asserting every verb in `AiController::ACTION_VERBS`
+    is in the vocabulary (with a ≥40 floor, so a regex that quietly stopped matching cannot pass as a clean scan),
+    and one asserting the vocabulary and the stop-list do not overlap. `Feature\AiTypoRecoveryTest` (12) drives
+    `/ai/query` end to end for each of the three splits below.
+
+### Changed
+
+*   **`AiController::query()` computes the reading once, and which of the two texts each consumer sees is a
+    deliberate split.** **Corrected text:** the verb pre-filter, the planner, and a second pass of
+    `deniedTopic()`. **Raw text:** `ask()`, the stored transcript, `deriveTitle()`, the `audit_trails` metadata,
+    and the destructive confirmation keyword. The provider gets the words as typed because a model reads around a
+    typo natively, and the transcript keeps them because the record has to hold the person's own words —
+    what the assistant read them as is stated in the reply beside them instead.
+
+*   **The reading is stated back only when it changed the outcome** — an action that ran, or a refusal the raw
+    spelling would have missed. *"Read “Crate” as “Create”."* opens the reply. A conversational question is
+    answered from the raw text and gets no note, because a note describing a correction the answer never used
+    would be a claim about work that did not happen.
+
+### Security
+
+*   **A misspelling could walk a restricted topic past `AiAccessPolicy`, and now cannot.** `TOPICS` is a list of
+    mostly multi-word phrases, which a single wrong letter defeats outright: spelt correctly, *"tell me about the
+    succession plan"* was refused for a staff account; spelt *"succesion"*, it was answered. The gate now runs on
+    the raw message first, exactly as before, and **again on the corrected reading when the two differ**. The
+    re-check can only ever turn a null into a refusal, never the reverse, so correcting spelling can close a topic
+    a misspelling had propped open but can never open one — the direction is the whole safety argument, and both
+    halves of it are tested.
+
+*   **The confirmation keyword for a destructive action is matched against the raw message and is never
+    fuzzy-matched.** `confrim` cancels. The only safe reading of an unclear answer at that step is *no*, and the
+    pending offer is spent either way, so a later stray "confirm" cannot fire it.
+
+### Verification
+
+*   `vendor/bin/pint --test` — passed, project-wide.
+*   **1054 tests, 1033 passed, 21 skipped, 2881 assertions** on the default sqlite connection (18.5s), up from
+    368/347/21/1561. The **skip count did not move**: every one of the 686 new cases is portable, which is the
+    intended outcome — employee resolution needs `CONCAT` and is deliberately not exercised, and the "did you
+    mean" feature test rides `performance.cycle.update`, whose name lookup is a plain `LIKE`.
+*   **1054 tests, 1054 passed, 0 skipped, 2949 assertions** against a MySQL scratch database (34s), created and
+    then dropped. `hims_v2` was never touched.
+*   **The corpus earned its keep before it was committed.** Sweeping it found the corrector reading *manage* as
+    *manager*, *ending* as *pending* and *deletion* as *deleting* — six vocabulary entries and four stop-list
+    entries exist for no other reason. Widening either list safely means widening the corpus first, which is why
+    the sweep is now a permanent test rather than the throwaway script it started as.
+
+### Docs
+
+*   `HIMS_ARCHITECTURE_AND_SECURITY.md` §5's pipeline diagram carries `AiTypoCorrector`, with a note on the one
+    arrow it is *not* on — `ask()` receives the raw message. A new **Spelling tolerance** row documents the
+    corrected/raw split and the three properties that make it safe; the `AiEntityResolver` row now covers the
+    suggestion suffix and its scoped pool; `AiTypoCorrector` and `App\Support\FuzzyMatch` have rows of their own.
+    §3.2.1 records that the hard topic block is now tested twice, and why the second pass cannot open a topic.
+*   `HIMS_SYSTEM_DOCUMENTATION.md` §5.1's eight-step pipeline, its audit paragraph (`prompt_corrected`) and its
+    test-coverage figures are updated, and **Spelling tolerance** joins the live-AI-features list.
+*   `.claude/rules/services.md` gains `AiTypoCorrector` and `FuzzyMatch`; `.claude/rules/testing.md` gains the two
+    new contract assertions and re-measured suite figures.
+*   `HIMS_USER_GUIDE.md` §12 documents all three user-visible behaviours in the terms a reader needs: typing
+    mistakes are read through and the reading is stated back, names are offered as a question rather than guessed
+    at, and **a mistyped confirmation always cancels**. That last one matters most on this page — the section
+    already said "anything else cancels it", and *"confrim"* is exactly the "anything else" a person would not
+    expect to have written. Two new FAQ entries carry the same points.
+
+---
+
+## v2.21.0 - 2026-08-17
+
+A phone release. It was reported as "some columns are not showing on the screen and I have to swipe left or
+right to view others" against the AI Gap Analysis table at 372px, and that one table turned out to be the
+loudest instance of a rule the stylesheet had never actually held: **below 768px every value on a page must be
+reachable by scrolling down, and nothing may ask for a sideways swipe.** Seven separate things were breaking it.
+No migration, no route change, no query change — 37 Blade views, one stylesheet and one new contract test.
+
+### Fixed
+
+*   **Every `.hims-table` restacks into labelled record cards below 768px, instead of scrolling sideways inside
+    its card.** `thead` is hidden, `table`/`tbody`/`tr`/`td` become blocks, each `tr` is a bordered card and each
+    `td` is a two-column grid printing its own heading from `content: attr(data-label)`. That last part is the
+    contract: a cell can only survive being lifted out of its column if it carries its column's name, so **322
+    `data-label` attributes** were added across 37 views, and a `colspan` cell deliberately carries none — an
+    empty-state sentence spanning the table belongs to no column, so it stays one block with nothing in front
+    of it.
+
+    What was removed matters as much as what was added. `.hims-table { min-width: 520px }` guaranteed *every*
+    table in the app was wider than the phone reading it, and the `overflow-x: auto` on `.hims-card .card-body`
+    beside it turned that guarantee into a scrollbar. Both are gone. A horizontally scrolled region gives the
+    reader no signal that anything exists to its right, which is what made this a legibility defect rather than
+    an inconvenience: the gap analysis table clipped after its third column looked exactly like a table that
+    has three columns, and **Below Requirement** and **Suggested Response** — the two that decide whether a row
+    needs acting on — were the ones that disappeared. Verified against the reported page: all seven columns now
+    render as labelled rows.
+
+    The alignment utilities are overridden at this width rather than honoured (`.text-center` / `.text-end` /
+    `.text-start` on a non-`colspan` `td` is forced back to left), because a stacked card has one value column.
+    Keep writing the `th`/`td` pairs anyway — they govern the desktop grid and `Unit\TableAlignmentContractTest`
+    still checks them.
+
+*   **Rows of buttons wrap, including the nested ones — which is where the first attempt stopped and shipped
+    `/learning` with its primary action off the side of the screen.** Wrapping the outer
+    `.d-flex.justify-content-between` moves a header's action group onto its own line and then leaves it there
+    unwrapped at natural width: measured, three buttons occupying **481px inside a 357px viewport**, putting
+    **New Course** past the right edge with a scrollbar as the only way to reach it. So the gap utilities wrap
+    too (`.d-flex.gap-1` … `.gap-4`), and `.hims-card .card-header` is named separately because it gets its
+    `space-between` from its own rule in the CARDS section where the utility pair cannot reach it. Four pages
+    were over: `/learning` by 136px, `/succession` by 44px, `/learning/required` by 14px, and
+    `/learning/accounts`, which was the worst of them — it clipped its **Proxy-tracked** filter with no scroll
+    offered at all, so the control was simply unreachable. Plain `.d-flex` is deliberately left alone, which is
+    why the fix is written against the gap classes: avatar-plus-name and icon-plus-label pairs carry no gap
+    class and stay on one line. Wrapping is a no-op on a row that already fits.
+
+*   **The topbar gives the page title a row of its own.** The bar's fixed furniture — menu toggle, four 38px
+    icon buttons, their gaps, the bar's padding — claims 260px, so at 360px the title was offered 85px for text
+    measuring 250 and held `.topbar-left` open at the width of its longest word, pushing the icon buttons off
+    the screen. Letting it shrink (`min-width: 0`) and clamping it fixed the *horizontal* overflow and created a
+    vertical one: measured afterwards, "AI-Assisted Competency Gap Analysis" needed three lines at 372px and six
+    at 320px against a two-line clamp, and the 64px bar had 14px of slack against the 18px a third line costs.
+    Every title longer than about 22 characters was cut at 320px, which is most of the module names.
+
+    So `display: contents` on `.topbar-left` drops that element's own box and promotes the toggle and the title
+    block to children of the bar: the toggle stays up beside the icon buttons (`order: 1` / `order: 2` plus
+    `margin-left: auto`) while the title takes a full row below them (`order: 3`, `flex: 1 1 100%`). No markup
+    changed, and the shell's JS reaches `#menu-toggle` by id, so nothing there cares which parent it has. Across
+    the full bar width every title in the app measures one line from 320px up, so the bar grows to **84px**
+    rather than by a whole second row, and the two-line clamp survives only as the backstop for a 280px screen.
+    `--hims-topbar-h` is *overridden* rather than a literal `height` being set, because `.hims-main`'s
+    `margin-top` and `min-height`, the AI rail and its backdrop, the rail header and the pinned dropdowns all
+    measure off that one variable — a literal height would leave five rules clearing a bar that is no longer
+    64px. The 38px tap targets were **not** shrunk to pay for the extra 20px: they are already under the 44px
+    guidance and a hospital phone is used one-handed in a hurry.
+
+*   **The Help/FAQ menu no longer renders half off the left edge of the screen.** The mobile pinning was written
+    per panel — `.notif-dropdown` and `.search-dropdown` were listed and `#help-dropdown` carries neither class
+    — so one of the three was still hung off `right: 0` of a button only ~110px from the right edge, starting at
+    a negative x. The half that lands off screen is the half holding the *start* of every line, so the panel
+    read as gibberish rather than as something cut off. It is now one rule against `.topbar-dropdown`, the
+    shared base class, and a new panel earns the fix by carrying that class and nothing else. The caret is
+    suppressed at this width, since a pinned panel is no longer beside its trigger.
+
+*   **The `.hims-tabs` strip wraps to a second row below 768px.** It scrolls horizontally on purpose on the
+    desktop — a wrapped second row of tabs reads as a second navigation bar — but that trade only holds where
+    the overflow is a tab or two. Learning has eight, so on a phone the majority of the module was behind a
+    horizontal gesture with no affordance.
+
+*   **The AI rail is measured in `%`, not `vw`.** `width: 100vw` and `max-width: 100vw` are 15px too wide the
+    moment a classic scrollbar is present, so the panel that is supposed to fill the screen was itself a source
+    of horizontal scroll.
+
+*   **A long single word no longer widens the page.** `.hims-kv td` and `.hims-badge` now wrap with
+    `overflow-wrap: anywhere` — an employee's email address was being clipped mid-domain by
+    `.hims-card { overflow: hidden }` at every width where the card is narrower than the string. `anywhere`
+    rather than `break-word` deliberately: only `anywhere` also reduces the element's min-content contribution,
+    which is the half that lets the table itself stop being too wide.
+
+*   **Card gutters and filter-control widths are normalised on phones, over their inline declarations.** 61 card
+    bodies carry `style="padding:0"` so a table can run full-bleed to the card edge — right for a grid, wrong
+    for a stack of record cards that need a gutter to read as separate objects — and the filter controls declare
+    desktop pixel widths inline (220px on the employee search, 190px on the competency matrix select). Nothing
+    but `!important` beats an inline declaration, which is why those two rules carry it and must keep it.
+
+### Added
+
+*   **`Unit\ResponsiveTableContractTest`** (6 tests) — pins the half of the stacking contract that lives in the
+    markup: every `td` belonging to a column carries `data-label`, every `colspan` cell carries none, and the
+    stacking rules themselves stay in `hims.css`. Omit the attribute and the cell renders as a bare value under
+    no heading **on phones only** — the one width nobody checks after editing a table, and the one no other test
+    looks at. Where a column's `th` is deliberately blank (the trailing action columns) the label still names
+    the column, so `data-label="Actions"` is correct there rather than a mismatch to fix.
+
+### Verification
+
+Measured in headed Chrome against the running app on MySQL, not asserted from the source:
+
+*   **53 pages × 2 widths (320px and 372px) = 106 loads, 0 problems.** Nothing extends past the viewport, no
+    element is a horizontal scroller, and the document width never exceeds the layout width. Overflow is
+    measured against `documentElement.clientWidth`, not `window.innerWidth` — those differ by the 15px
+    scrollbar (372 vs 357), and comparing against the wrong one reports every page as clean.
+*   **16 page titles × 11 widths (280px → 1100px), 0 truncation.** The bar measures 84px on phones and the
+    documented 64px on the desktop, with `.hims-main`'s offset matching it at both.
+*   **The sweep was then repeated as all four non-admin accounts**, because a contract test reads Blade source
+    and cannot know which `@can` branch a given role is actually served. 136 pages returned 200 across HR
+    manager, supervisor and two staff logins — 2,542 column cells, every one labelled, 0 defects, 0 non-200s —
+    with 4, 16, 34 and 34 legitimate 403s accounting for the rest. A supervisor was then measured in the browser
+    at 372px across the 14 table-bearing pages that role may reach (368 column cells): `spill: 0` on every one,
+    no scrollers, `thead` hidden, rows blocks, bar 84px, no title truncated. **Role changes which rows and
+    columns render; it does not change whether they fit.**
+*   Interactive states: off-canvas sidebar open, all three topbar panels pinned inside the viewport, four modals
+    confirmed as direct children of `<body>`, and every roster table rendered *inside* a modal stacking
+    correctly at both widths.
+*   `body.ai-rail-docked .hims-card .card-body { overflow-x: auto }` sits outside any media query and was the
+    obvious suspect for a surviving scroller. It cannot fire on a phone: the rail overlays rather than docks
+    below 1099px, so `docked` measures false at 372px. Left in place rather than removed on suspicion.
+*   **Five parameterised GET routes had no rows to render, so rows were made for them.** `succession/positions/{id}`,
+    `succession/candidates/{id}`, `succession/candidates/{id}/edit`, `training/sessions/{id}` and
+    `ai/sessions/{session}/messages` are unreachable against the development database — `critical_positions`,
+    `succession_candidates`, `training_sessions` and `ai_chat_sessions` are all empty there. Rather than let the
+    contract test's Blade-source assertion stand in for a browser, a scratch database was seeded with one
+    critical position, three candidates across all three readiness bands, two sessions, a four-row roster and a
+    chat session, then served on a second port through an exported `DB_DATABASE` so `hims_v2` and the running
+    dev server were untouched. All five load clean at 320px and 372px: `spill: 0`, no scrollers, `unlabelled: 0`,
+    `thead` hidden and rows blocks. `ai/sessions/{session}/messages` turns out to return `application/json`, so
+    it has no responsive surface at all. The seeding also gave `succession/index` and `training/index` their
+    first non-empty render in a browser — 22 and 18 column cells, every one labelled — since both had only ever
+    been seen in their empty state.
+
+### Docs
+
+*   `HIMS_ARCHITECTURE_AND_SECURITY.md` §1 and the Frontend row, and `HIMS_SYSTEM_DOCUMENTATION.md`'s Styling
+    row and mobile status line, now describe the wrapped action rows and the title's own bar row alongside the
+    table restacking. `hims.css` is **1808 lines** (was 1670) with **12** media queries (was 11).
+*   The test-suite figures in `HIMS_SYSTEM_DOCUMENTATION.md` were three releases stale and are re-measured:
+    **368 tests, 347 passed, 21 skipped, 1561 assertions** on sqlite; **368 passed, 0 skipped, 1629
+    assertions** against a MySQL scratch database.
+*   `.claude/rules/blade-ui.md` carries the two new mobile rules, replacing its account of the first topbar
+    attempt — measurement disproved it, and a rule file describing a superseded fix is worse than one saying
+    nothing.
+
+---
+
 ## v2.20.2 - 2026-08-16
 
 The four defects v2.20.1 found and reported instead of guessing at. Three were unambiguous once looked at; the

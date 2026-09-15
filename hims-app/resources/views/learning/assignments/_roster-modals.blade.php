@@ -32,9 +32,9 @@
                     <tbody>
                     @forelse($assignment->visible_roster as $row)
                         <tr data-roster-state="{{ $row->is_complete ? 'complete' : 'outstanding' }}">
-                            <td><strong>{{ $row->first_name }} {{ $row->last_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $row->employee_code }}</div></td>
-                            <td>{{ $row->department_name ?? '—' }}</td>
-                            <td>
+                            <td data-label="Employee"><strong>{{ $row->first_name }} {{ $row->last_name }}</strong><div style="font-size:11px;color:#9ca3af">{{ $row->employee_code }}</div></td>
+                            <td data-label="Department">{{ $row->department_name ?? '—' }}</td>
+                            <td data-label="Status">
                                 @if($row->is_complete)
                                     <span class="hims-badge green">Complete</span>
                                 @elseif($assignment->required_by && now()->toDateString() > $assignment->required_by)
@@ -43,8 +43,8 @@
                                     <span class="hims-badge yellow">Outstanding</span>
                                 @endif
                             </td>
-                            <td>{{ $row->email ?: 'No email on file' }}</td>
-                            <td class="text-end" style="white-space:nowrap">
+                            <td data-label="Contact">{{ $row->email ?: 'No email on file' }}</td>
+                            <td data-label="Action" class="text-end" style="white-space:nowrap">
                                 @if($assignment->subject_type === 'session')
                                     <a href="{{ route('training.sessions.show', $assignment->subject_id) }}" class="btn-hims btn-hims-ghost btn-sm">Attendance</a>
                                 @elseif(! $row->is_complete)

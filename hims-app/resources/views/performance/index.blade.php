@@ -50,18 +50,18 @@
             <tbody>
                 @forelse($cycles ?? [] as $cycle)
                 <tr>
-                    <td><strong>{{ $cycle->cycle_name }}</strong></td>
-                    <td><span class="hims-badge blue">{{ ucfirst(str_replace('_',' ',$cycle->cycle_type)) }}</span></td>
-                    <td style="font-size:12px;color:#6b7280">{{ \Carbon\Carbon::parse($cycle->start_date)->format('M d, Y') }} – {{ \Carbon\Carbon::parse($cycle->end_date)->format('M d, Y') }}</td>
-                    <td>
+                    <td data-label="Cycle Name"><strong>{{ $cycle->cycle_name }}</strong></td>
+                    <td data-label="Type"><span class="hims-badge blue">{{ ucfirst(str_replace('_',' ',$cycle->cycle_type)) }}</span></td>
+                    <td data-label="Period" style="font-size:12px;color:#6b7280">{{ \Carbon\Carbon::parse($cycle->start_date)->format('M d, Y') }} – {{ \Carbon\Carbon::parse($cycle->end_date)->format('M d, Y') }}</td>
+                    <td data-label="Status">
                         @php($cycleStatus = $cycle->effective_status ?? \App\Support\CycleStatus::of($cycle->status, $cycle->end_date))
                         <span class="hims-badge {{ \App\Support\CycleStatus::badgeClass($cycleStatus) }}">
                             <span class="status-dot {{ \App\Support\CycleStatus::isLive($cycleStatus) ? 'active' : 'inactive' }}"></span>
                             {{ \App\Support\CycleStatus::label($cycleStatus) }}
                         </span>
                     </td>
-                    <td>{{ $cycle->reviews_count ?? 0 }} reviews</td>
-                    <td>
+                    <td data-label="Reviews">{{ $cycle->reviews_count ?? 0 }} reviews</td>
+                    <td data-label="Actions">
                         <a href="{{ route('performance.cycles.show', $cycle->cycle_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
                         @can('manage-review-cycles')
                         <button type="button" class="btn-hims btn-hims-outline btn-sm"
@@ -99,7 +99,7 @@
             <tbody>
                 @forelse($reviews ?? [] as $review)
                 <tr>
-                    <td>
+                    <td data-label="Employee">
                         <div style="display:flex;align-items:center;gap:9px">
                             <div style="width:32px;height:32px;background:var(--hims-primary-xlight);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--hims-primary-dark)">
                                 {{ strtoupper(substr($review->employee_first ?? 'U', 0, 1)) }}
@@ -111,9 +111,9 @@
                             </div>
                         </div>
                     </td>
-                    <td style="font-size:13px">{{ $review->cycle_name ?? '—' }}</td>
-                    <td><span class="hims-badge gray">{{ ucfirst($review->review_type ?? 'standard') }}</span></td>
-                    <td>
+                    <td data-label="Cycle" style="font-size:13px">{{ $review->cycle_name ?? '—' }}</td>
+                    <td data-label="Type"><span class="hims-badge gray">{{ ucfirst($review->review_type ?? 'standard') }}</span></td>
+                    <td data-label="Status">
                         <span class="hims-badge {{ ReviewStatus::badgeClass($review->effective_status) }}">{{ ReviewStatus::label($review->effective_status) }}</span>
                         @if($review->is_exception_review)
                         <span class="hims-badge yellow" style="margin-left:4px" title="{{ $review->exception_reason }}">
@@ -121,7 +121,7 @@
                         </span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Score">
                         @if($review->overall_score)
                             <span style="font-weight:700;color:{{ $review->overall_score >= 4 ? 'var(--hims-primary)' : ($review->overall_score < 2.5 ? 'var(--hims-danger)' : '#d97706') }}">
                                 {{ number_format($review->overall_score,2) }}/5.00
@@ -130,7 +130,7 @@
                             <span style="color:#9ca3af">—</span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Actions">
                         <a href="{{ route('performance.show', $review->review_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
                         @if($review->can_score)
                         <a href="{{ route('performance.reviews.score', $review->review_id) }}" class="btn-hims btn-hims-outline btn-sm">Score</a>

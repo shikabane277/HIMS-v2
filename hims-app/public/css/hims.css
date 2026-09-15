@@ -598,6 +598,24 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
 .hims-table tr:hover td { background: var(--hims-primary-pale); }
 .hims-table tr:last-child td { border-bottom: none; }
 
+/* A key/value table, not a grid of records: two columns, no `thead`, one row per
+   field. `employees/show`, `performance/show`, `training/sessions/show` and
+   `training/venues/index` each build a profile card out of one. They are
+   deliberately *not* `.hims-table` — they have no header row to drop and no
+   columns to stack, so none of the responsive rules at the end of this file
+   apply to them, including the `overflow-wrap: anywhere` that keeps an address
+   inside a cell.
+
+   Which is what this rule is for. A `td` will not shrink below the min-content
+   width of its contents, and an email has no space to break at: on
+   `employees/show` a 55-character address demanded 367px inside a card body
+   279px wide, and `.hims-card { overflow: hidden }` clipped the rest — so the
+   address a phone user wanted to copy ended mid-domain, at every width where the
+   card is narrower than the string. `anywhere` rather than `break-word` because
+   only `anywhere` also reduces the min-content contribution, which is the half
+   that lets the table itself stop being too wide. */
+.hims-kv td { overflow-wrap: anywhere; }
+
 /* ═══════════════ BADGES / PILLS ═══════════════ */
 .hims-badge {
     display: inline-flex; align-items: center; gap: 4px;
@@ -990,7 +1008,12 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     right: 0;
     bottom: 0;
     width: var(--hims-ai-w);
-    max-width: 100vw;
+    /* 100% of the initial containing block, not 100vw: `vw` includes the width
+       of a classic scrollbar, so on a narrow desktop window the rail became
+       wider than the space it could be seen in and its left edge — where every
+       line of the conversation starts — sat off screen. Fixed positioning means
+       it can never add a scrollbar of its own, so the overflow was silent. */
+    max-width: 100%;
     background: var(--hims-white);
     border-left: 1px solid var(--hims-border);
     display: flex;
@@ -1251,7 +1274,9 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     #ai-rail-resizer { display: none; }
 }
 @media (max-width: 480px) {
-    #ai-rail { width: 100vw; }
+    /* Full width, but measured the same way as the max-width above — 100vw is
+       15px too wide the moment a classic scrollbar is present. */
+    #ai-rail { width: 100%; }
 }
 
 /* Docking the rail narrows the main column enough that a wide table would be
@@ -1259,13 +1284,36 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
    for as long as the rail is taking up space. */
 body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
 
-/* ═══════════════ MOBILE RESPONSIVE ═══════════════ */
+/* ═══════════════════════════════════════════════
+   MOBILE RESPONSIVE
+
+   One rule governs this section: below 768px every value on a page must be
+   reachable by scrolling *down*. Nothing may ask for a sideways swipe.
+
+   That is a legibility rule, not a taste one. A horizontally scrolled region
+   gives the reader no signal that anything exists to its right — the gap
+   analysis table clipped after its third column looks exactly like a table
+   that has three columns, and the two that decide whether a row needs acting
+   on (Below Requirement, Suggested Response) are the ones that disappear. The
+   rules that used to live here made that the default rather than the accident:
+   `.hims-table { min-width: 520px }` guaranteed every table in the app was
+   wider than the phone reading it, and the `overflow-x: auto` beside it turned
+   the guarantee into a scrollbar.
+
+   So below 768px a table stops being a grid and becomes a list of records. The
+   header row is dropped and each cell prints its own label from `data-label`,
+   which is the only reason a cell can survive being lifted out of its column.
+   `Unit\ResponsiveTableContractTest` pins that: a `td` with no `data-label`
+   renders as a bare value under no heading, on phones only — which is exactly
+   where nobody is looking when they change a table.
+═══════════════════════════════════════════════ */
 @media (max-width: 1024px) {
     .hims-main { padding: 20px; }
     .hims-topbar { padding: 0 20px; }
 }
 
 @media (max-width: 768px) {
+    /* ── Shell ── */
     .hims-sidebar {
         transform: translateX(-100%);
         box-shadow: none;
@@ -1277,29 +1325,257 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
     }
     .hims-sidebar-backdrop.open { display: block; }
     .hims-menu-toggle { display: flex; }
-    .hims-topbar  { left: 0; padding: 0 16px; }
     .hims-main    { margin-left: 0; padding: 16px; }
     .topbar-left .page-breadcrumb { display: none; }
-    .topbar-left .page-title { font-size: 16px; }
-    .topbar-right { gap: 8px; }
-    .notif-dropdown { position: fixed; top: var(--hims-topbar-h); right: 8px; width: calc(100vw - 16px); }
-    .search-dropdown { position: fixed; top: var(--hims-topbar-h); right: 8px; width: calc(100vw - 16px); }
+
+    /* The bar carries a menu toggle, four 38px icon buttons and the page title,
+       and below 768px they do not fit on one line: the toggle, the buttons,
+       their gaps and the bar's own padding claim a fixed 260px, so on a 360px
+       screen the title is offered 85px for text measuring 250.
+
+       Letting the title shrink into that (`min-width: 0`) and clamping it at two
+       lines is what stopped it pushing the icon buttons off the side of the
+       screen — a flex item will not shrink below its own min-content width until
+       told it may, so the title block used to hold `.topbar-left` open at the
+       width of its longest word. But a clamp only converts a horizontal overflow
+       into a vertical one. Measured after that change, "AI-Assisted Competency
+       Gap Analysis" still needed three lines at 372px and six at 320px against a
+       two-line clamp, so the title was cut mid-phrase on both common phone
+       widths — and the bar had 14px of slack left inside its 64px, which is not
+       the 18px a third line costs. Every title longer than about 22 characters
+       was affected at 320px, which is most of the module names.
+
+       So the title gets a row to itself. `display: contents` on `.topbar-left`
+       drops that element's box and promotes the toggle and the title block to
+       children of the bar, which is what lets the toggle stay up beside the icon
+       buttons while the title wraps below them — no markup change, and the
+       shell's JS reaches `#menu-toggle` by id, so nothing there cares which
+       parent it has. Across the full bar width every title in the app measures
+       one line from 320px up, so the bar grows by 20px rather than by a whole
+       second row, and the two-line clamp stays as the backstop for a 280px
+       screen where one row is still not enough.
+
+       `--hims-topbar-h` is overridden rather than `height` being set directly:
+       `.hims-main` clears the bar with a matching `margin-top` and subtracts it
+       again from `min-height`, the AI rail and its backdrop take their `top` from
+       it, the rail header matches its height, and the pinned dropdowns below hang
+       off it. One value keeps six rules that must agree in step; a literal height
+       here would leave the other five measuring a 64px bar.
+
+       Tap targets are deliberately not shrunk to pay for any of this: 38px is
+       already under the 44px guidance and a hospital phone is used one-handed in
+       a hurry. */
+    :root { --hims-topbar-h: 84px; }
+    .hims-topbar {
+        left: 0;
+        flex-wrap: wrap;
+        align-content: center;
+        row-gap: 2px;
+        padding: 6px 12px;
+    }
+    .topbar-left { display: contents; }
+    .hims-menu-toggle { order: 1; flex-shrink: 0; }
+    .topbar-right { order: 2; margin-left: auto; gap: 6px; flex-shrink: 0; }
+    .topbar-left > div { order: 3; flex: 1 1 100%; min-width: 0; }
+    .topbar-left .page-title {
+        font-size: 14.5px;
+        line-height: 1.25;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow: hidden;
+        overflow-wrap: break-word;
+    }
+
+    /* ── Topbar dropdowns ──
+       Pinned to the viewport instead of to their trigger. A 320px panel hung
+       off `right: 0` of a button that is itself only ~110px from the right edge
+       starts at a negative x on a phone, and the half that lands off screen is
+       the half holding the *start* of every line of text — so the panel reads
+       as gibberish rather than as something cut off.
+
+       Written against `.topbar-dropdown` rather than against the panels one at
+       a time, because doing it one at a time is what broke it: `.notif-dropdown`
+       and `.search-dropdown` were listed here and `#help-dropdown` carries
+       neither class, which left the help menu as the one panel still clipped. */
+    .topbar-dropdown {
+        position: fixed;
+        top: var(--hims-topbar-h);
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-width: none;
+    }
+    /* The caret would now point at a trigger the panel is no longer beside. */
+    .topbar-dropdown::before { display: none; }
+
+    /* ── Cards and stats ── */
     .stat-card { padding: 16px 18px; }
     .stat-card .stat-value { font-size: 24px; }
     .stat-card .stat-label { font-size: 12px; }
-    .hims-table { font-size: 12px; }
-    .hims-table th, .hims-table td { padding: 8px 10px; }
-    .hims-card .card-body { overflow-x: auto; }
-    .hims-table { min-width: 520px; }
+
+    /* 61 card bodies carry an inline `style="padding:0"` so a table can run
+       full-bleed to the card's edges. That is right for a grid and wrong for a
+       stack of record cards, which need a gutter to read as separate objects —
+       and an inline declaration can only be beaten by `!important`. Normalising
+       every card body to one mobile gutter is the point, not a side effect — it
+       also flattens the 32-60px an empty-state body or two declares inline,
+       which on a phone is air the sentence does not need. */
+    .hims-card .card-body { padding: 14px !important; }
+
+    /* A card header has to be wrapped by name. It is already a flex row with
+       `justify-content: space-between`, but it gets that from its own rule in the
+       CARDS section and *not* from the `.d-flex.justify-content-between` utility
+       pair below, so that rule cannot reach it — and four headers put a filter
+       `<select>` carrying an inline pixel width beside their title (performance,
+       training and competency index, plus succession index). Unwrapped at 360px
+       the title is squeezed to two lines and the 190px select down to 140, and
+       the row still fits, so nothing overflows to give it away. `employees/index`
+       carries `flex-wrap:wrap` inline, which is the other half of why this looked
+       like it was already handled. */
+    .hims-card .card-header { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
+
+    /* A page header row with a title on the left and an action on the right has
+       no room for both. Only the `justify-content-between` rows are wrapped;
+       leaving bare `.d-flex` alone keeps avatar-plus-name and icon-plus-label
+       pairs on one line where they belong. */
+    .d-flex.justify-content-between { flex-wrap: wrap; }
+    .hims-table td .d-flex { flex-wrap: wrap; }
+
+    /* Wrapping the header row is only half the job, and stopping there is what
+       shipped `/learning` with its primary action off the side of the screen.
+       The actions in such a header are a *nested* `.d-flex.gap-2`, so the rule
+       above moves that group onto its own line and then leaves it unwrapped at
+       its natural width: three buttons measured 481px inside a 357px viewport,
+       putting "New Course" past the right edge with a scrollbar as the only way
+       to reach it — and `/learning/accounts` fared worse, clipping its
+       "Proxy-tracked" filter with no scroll offered at all. So the gap-carrying
+       rows wrap too. Naming the gap utilities is what keeps this off
+       avatar-plus-name pairs, which carry no gap class and stay on one line.
+       Wrapping never moves a group that already fits, so this changes nothing
+       but the rows that overflow. */
+    .d-flex.gap-1, .d-flex.gap-2,
+    .d-flex.gap-3, .d-flex.gap-4 { flex-wrap: wrap; }
+
+    /* Filter controls carry inline pixel widths sized for a desktop filter row
+       (220px on the employee search, 190px on the competency matrix select).
+       Two of those side by side are wider than a phone, so the row overflowed
+       the card. Again inline, so again `!important`. */
+    .hims-input, .hims-select { width: 100% !important; max-width: 100% !important; }
+
+    /* Tabs wrap to a second row instead of scrolling below this width, but the
+       declarations that do it are not here — they are at the foot of the TABS
+       section, 250 lines down. `.hims-tabs` and `.hims-tab` are defined *after*
+       this block at the same specificity (0,1,0), and a media query adds none of
+       its own, so the tie is settled by source order and the base rule wins.
+       Written here, three of the five declarations were dead on arrival: only
+       `flex-wrap` survived, and only because the base rule happens not to
+       declare it. Anything else this section wants from a component defined
+       below it has the same problem. */
+
+    /* ── Badges ──
+       A badge is usually a status word, and `white-space: nowrap` is right for
+       those: "Expiring Soon" reads badly broken in two. But some badges hold a
+       *name* — `employees/index` and `employees/show` both put the department in
+       one — and a stacked cell gives its value a 130px track at 320px wide. The
+       badge is the grid item, so it is stretched to that track and its text has
+       nowhere to go, and `.hims-table tr` below clips instead of scrolling: at
+       320px "Quality & Patient Safety" and "Information Technology" — two of the
+       seven seeded departments, not edge cases — lost their last word with no
+       scrollbar to reveal it. The `overflow-wrap: anywhere` on the cell could not
+       help, because a break is only taken where wrapping is allowed at all.
+
+       Relaxing it here costs nothing: `normal` permits a wrap, it does not force
+       one, so every badge that already fits on one line still does. A two-line
+       pill is legible; half a department name is not. */
+    .hims-badge { white-space: normal; overflow-wrap: anywhere; }
+
+    /* ── Tables become records ──
+       Every part of the table is re-flowed to a block, the header row is
+       dropped, and each cell prints its own `data-label`. */
+    .hims-table,
+    .hims-table tbody,
+    .hims-table tr,
+    .hims-table td { display: block; width: auto; }
+
+    /* Hidden rather than removed from the markup: the desktop rule set still
+       needs it, and it is still what describes the table to a screen reader at
+       every width above this one. */
+    .hims-table thead { display: none; }
+
+    .hims-table tr {
+        border: 1px solid var(--hims-border);
+        border-radius: var(--hims-radius-sm);
+        background: var(--hims-white);
+        margin-bottom: 10px;
+        overflow: hidden;
+    }
+    .hims-table tr:last-child { margin-bottom: 0; }
+
+    .hims-table td {
+        display: grid;
+        /* Label column sized off the longest realistic header, not a straight
+           percentage, so the values line up down the card without a two-word
+           heading forcing the value onto its own line. */
+        grid-template-columns: minmax(84px, 34%) minmax(0, 1fr);
+        gap: 4px 12px;
+        align-items: baseline;
+        padding: 8px 12px;
+        border: 0;
+        font-size: 13px;
+        /* Emails, credential numbers and licence codes have no space to break
+           at, and one of them is all it takes to push the card past the
+           viewport — which is the defect this whole section exists to remove. */
+        overflow-wrap: anywhere;
+    }
+    .hims-table td + td { border-top: 1px solid var(--hims-primary-pale); }
+
+    /* One `td` in the app carries an inline `max-width` sized for a desktop
+       column — `competency/gap-analysis/employee`'s Notes cell, at 260px. Left
+       standing it holds that cell 29px narrower than the ones above and below it
+       in the same card, and because the label track is a percentage of the *cell*
+       rather than of the card the label column shrinks with it: one row starts
+       its value 10px left of its neighbours, which is the misalignment the
+       `minmax()` above exists to prevent. Inline, so `!important`. */
+    .hims-table td { max-width: none !important; }
+
+    .hims-table td::before {
+        content: attr(data-label);
+        font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: .05em;
+        color: var(--hims-primary-dark);
+    }
+
+    /* Tint the whole record on hover, not the one cell under the pointer: in a
+       stacked card the row is the object, and a single tinted cell reads as a
+       rendering fault. */
+    .hims-table tr:hover td { background: transparent; }
+    .hims-table tr:hover { background: var(--hims-primary-pale); }
+
+    /* A stacked card has exactly one value column, so a column-alignment class
+       has nothing left to align against — and `.text-center` on a value now
+       sitting beside its label reads as a mistake. More specific than the
+       utilities in the Text section, which are `!important`. `colspan` cells
+       are exempt: they belong to no column, so their own centring still means
+       what it says. */
+    .hims-table td.text-center:not([colspan]),
+    .hims-table td.text-end:not([colspan]),
+    .hims-table td.text-start:not([colspan]) { text-align: left !important; }
+
+    /* An empty-state row spans the table, so it stays one block with no label
+       in front of its sentence. */
+    .hims-table td[colspan] { display: block; }
+    .hims-table td[colspan]::before { content: none; }
 }
 
 @media (max-width: 480px) {
     .hims-main { padding: 12px; }
     .stat-card { padding: 18px 18px; }
     .stat-card .stat-value { font-size: 26px; }
-    .hims-card .card-header { padding: 14px 16px; }
-    .hims-card .card-body { padding: 16px; }
-    .hims-table th, .hims-table td { padding: 10px 12px; }
+    /* The label column gives way first — at 360px a fixed 84px minimum leaves
+       too little for the value beside it. */
+    .hims-table td { grid-template-columns: minmax(72px, 38%) minmax(0, 1fr); padding: 7px 10px; }
 }
 
 /* ═══════════════ ANIMATIONS ═══════════════ */
@@ -1493,6 +1769,32 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
     background: var(--hims-white);
 }
 .hims-tab i { font-size: 14px; }
+
+/* Below 768px the strip wraps to a second row instead of scrolling. The trade
+   described above only holds while the overflow is a tab or two: Learning has
+   eight, so on a phone a horizontal scroll hides most of a module behind a
+   gesture with nothing on screen to suggest it, and a second row of tabs is the
+   lesser evil.
+
+   This has to live *here*, after the base rules, rather than in the MOBILE
+   RESPONSIVE section with the rest of the phone layout. Both selectors are a
+   single class, a media query contributes no specificity of its own, and these
+   base rules sit 250 lines *below* that section — so an override written up
+   there loses the tie on source order and never applies. It was written up
+   there, and `overflow`, `gap` and `margin-bottom` all silently lost. */
+@media (max-width: 768px) {
+    .hims-tabs {
+        flex-wrap: wrap;
+        /* `overflow-x: auto` has nothing left to scroll once the strip wraps,
+           and the `overflow-y: hidden` beside it clips the 1px the tabs hang
+           below the strip on purpose. */
+        overflow: visible;
+        gap: 2px 4px;
+    }
+    /* The -1px that lets an active tab paint over the strip's border also pulls
+       the row below it up by 1px once there is a row below it. */
+    .hims-tab { margin-bottom: 0; }
+}
 
 @media (max-width: 576px) {
     /* Icons alone would be a guessing game, so the label stays and the padding

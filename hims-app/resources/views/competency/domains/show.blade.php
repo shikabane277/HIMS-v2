@@ -71,19 +71,19 @@
                 {{-- Global search deep-links a competency hit to #competency-<id>;
                      the anchor has to sit on the competency's own row. --}}
                 <tr id="competency-{{ $competency->competency_id }}" style="scroll-margin-top:84px">
-                    <td>
+                    <td data-label="Competency">
                         <strong>{{ $competency->competency_name }}</strong>
                         @if($competency->description)
                         <div style="font-size:11.5px;color:#6b7280;margin-top:3px;max-width:520px">{{ $competency->description }}</div>
                         @endif
                     </td>
-                    <td style="font-family:monospace;font-size:12px">{{ $competency->competency_code ?? '—' }}</td>
-                    <td>
+                    <td data-label="Code" style="font-family:monospace;font-size:12px">{{ $competency->competency_code ?? '—' }}</td>
+                    <td data-label="Required Level">
                         <span class="hims-badge {{ $competency->required_proficiency >= 4 ? 'red' : ($competency->required_proficiency === 3 ? 'yellow' : 'green') }}">
                             Level {{ $competency->required_proficiency }}/5
                         </span>
                     </td>
-                    <td>
+                    <td data-label="Scope">
                         @if($competency->is_mandatory)
                             <span class="hims-badge red">Mandatory</span>
                         @else

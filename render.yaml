@@ -1,0 +1,128 @@
+# Render Blueprint for HIMS v2.
+#
+# Blueprints live at the repository root; the Laravel app is one directory down,
+# which is what every rootDir below says.
+#
+# ── The database is not in here, and that is not an omission ────────────────
+# Render's managed database is PostgreSQL. HIMS cannot run on it without a
+# rewrite: migration 2026_01_01_000030 installs two MySQL triggers via
+# DB::unprepared, two more create the v_recognition_leaderboard view, and the
+# controllers embed CONCAT(), DATE_FORMAT(), FIELD() ordering and whereMonth().
+# So MySQL 8 has to come from somewhere else, and its user needs TRIGGER and
+# CREATE VIEW — which rules out hosts that forbid triggers, PlanetScale among
+# them. Point the DB_* variables at whatever you choose.
+
+envVarGroups:
+  - name: hims-shared
+    envVars:
+      - key: APP_NAME
+        value: HIMS
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      # Asia/Manila is an authorization setting here, not a display one:
+      # CredentialStatus, CycleStatus and ReviewStatus all ask "has this date
+      # passed?" against it. Under the stock UTC default a cycle that ended
+      # yesterday stayed scoreable until 8am Philippine time.
+      - key: APP_TIMEZONE
+        value: Asia/Manila
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: warning
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_PORT
+        value: "3306"
+      # All three are the database, so the migrations must have run before any
+      # of them work — the start-up script runs them on every boot.
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: SESSION_LIFETIME
+        value: "120"
+      - key: BCRYPT_ROUNDS
+        value: "12"
+
+      # sync: false means "ask me in the dashboard and never store it here".
+      # Everything secret, plus the four values that differ per environment.
+      - key: APP_KEY          # php artisan key:generate --show, locally
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+
+      # Password-reset and credential-expiry mail. MAIL_MAILER=log delivers
+      # nothing, so leaving it unset means no user can recover an account.
+      - key: MAIL_MAILER
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false
+
+      # AI assistant. Omit AI_COMPATIBLE_API_KEY and the assistant returns its
+      # ⚠️ string on every question — every other module keeps working.
+      - key: AI_PROVIDER
+        value: compatible
+      - key: AI_COMPATIBLE_LABEL
+        value: Groq
+      - key: AI_COMPATIBLE_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: AI_COMPATIBLE_MODEL
+        value: openai/gpt-oss-120b
+      - key: AI_COMPATIBLE_FALLBACK_MODELS
+        value: openai/gpt-oss-20b
+      - key: AI_COMPATIBLE_API_KEY
+        sync: false
+
+services:
+  - type: web
+    name: hims
+    runtime: docker
+    plan: starter
+    region: singapore
+    rootDir: hims-app
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # bootstrap/app.php already registers health: '/up', so this needs no route.
+    healthCheckPath: /up
+    envVars:
+      - fromGroup: hims-shared
+      # Must match the service's own public URL or every password-reset link in
+      # the outgoing mail points at localhost.
+      - key: APP_URL
+        sync: false
+
+  # The scheduler has exactly one job — routes/console.php runs
+  # hims:scan-credential-expiry daily at config('hims.credential_scan_time',
+  # '06:30'). Invoking that command directly beats a container running
+  # `schedule:run` every minute for one daily task.
+  #
+  # Render cron is UTC: 22:30 UTC is 06:30 the next day in Manila.
+  - type: cron
+    name: hims-credential-scan
+    runtime: docker
+    plan: starter
+    region: singapore
+    rootDir: hims-app
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "30 22 * * *"
+    # Replaces the image's CMD, so the start-up script does not run here — no
+    # migrations, no nginx, just the command. Laravel reads configuration
+    # straight from the environment when no config cache is present.
+    dockerCommand: php artisan hims:scan-credential-expiry
+    envVars:
+      - fromGroup: hims-shared

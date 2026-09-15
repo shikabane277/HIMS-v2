@@ -50,15 +50,15 @@
             <tbody>
                 @forelse($department['weakest'] as $row)
                 <tr>
-                    <td>
+                    <td data-label="Competency">
                         <strong>{{ $row->competency_name }}</strong>
                         @if($row->is_mandatory)<span class="hims-badge red" style="margin-left:6px">Mandatory</span>@endif
                     </td>
-                    <td>{{ $row->required_proficiency }}/5</td>
-                    <td>{{ number_format((float) $row->avg_proficiency, 2) }}</td>
-                    <td><span class="gap-chip negative">{{ number_format((float) $row->avg_gap, 2) }}</span></td>
-                    <td>{{ $row->employees_below }} of {{ $row->assessed_employees }}</td>
-                    <td style="font-size:12px;color:#6b7280">
+                    <td data-label="Required">{{ $row->required_proficiency }}/5</td>
+                    <td data-label="Avg Proficiency">{{ number_format((float) $row->avg_proficiency, 2) }}</td>
+                    <td data-label="Avg Gap"><span class="gap-chip negative">{{ number_format((float) $row->avg_gap, 2) }}</span></td>
+                    <td data-label="Below Requirement">{{ $row->employees_below }} of {{ $row->assessed_employees }}</td>
+                    <td data-label="Suggested Response" style="font-size:12px;color:#6b7280">
                         {{ abs((float) $row->avg_gap) >= 2 ? 'Instructor-led workshop with supervised practice' : 'Refresher module plus reassessment' }}
                     </td>
                 </tr>
@@ -84,10 +84,10 @@
             <tbody>
                 @forelse($employees as $employee)
                 <tr>
-                    <td><strong>{{ $employee->first_name }} {{ $employee->last_name }}</strong></td>
-                    <td>{{ $employee->position_title ?? '—' }}</td>
-                    <td>{{ $employee->department_name }}</td>
-                    <td class="text-end">
+                    <td data-label="Employee"><strong>{{ $employee->first_name }} {{ $employee->last_name }}</strong></td>
+                    <td data-label="Position">{{ $employee->position_title ?? '—' }}</td>
+                    <td data-label="Department">{{ $employee->department_name }}</td>
+                    <td data-label="Analysis" class="text-end">
                         <a href="{{ route('competency.gap.employee', $employee->employee_id) }}" class="btn-hims btn-hims-primary btn-sm">
                             <i class="bi bi-robot"></i> Analyse
                         </a>

@@ -31,9 +31,9 @@
                     $maskedNum = $rawNum ? ('••••-••••-' . (strlen($rawNum) > 4 ? substr($rawNum, -4) : '1234')) : '—';
                 @endphp
                 <tr id="credential-{{ $cred->credential_id }}" style="scroll-margin-top:84px">
-                    <td><strong>{{ $cred->employee_name ?? '—' }}</strong></td>
-                    <td>{{ $cred->credential_type }}</td>
-                    <td style="font-family:monospace;font-size:12.5px">
+                    <td data-label="Employee"><strong>{{ $cred->employee_name ?? '—' }}</strong></td>
+                    <td data-label="Type">{{ $cred->credential_type }}</td>
+                    <td data-label="Number" style="font-family:monospace;font-size:12.5px">
                         @if($rawNum)
                         <span id="cred-num-{{ $cred->credential_id }}">{{ $maskedNum }}</span>
                         <button type="button" class="btn-hims btn-hims-ghost btn-sm" style="padding:1px 5px;font-size:11px" onclick="let d = document.getElementById('cred-num-{{ $cred->credential_id }}'); d.innerText = d.innerText === '{{ $maskedNum }}' ? '{{ $rawNum }}' : '{{ $maskedNum }}';">Show</button>
@@ -41,14 +41,14 @@
                         —
                         @endif
                     </td>
-                    <td style="font-size:12.5px">{{ $cred->issuing_body ?? '—' }}</td>
-                    <td style="{{ $expired ? 'color:var(--hims-danger);font-weight:700' : ($expiring ? 'color:#d97706;font-weight:600' : '') }};font-size:12.5px">
+                    <td data-label="Issued By" style="font-size:12.5px">{{ $cred->issuing_body ?? '—' }}</td>
+                    <td data-label="Expiry" style="{{ $expired ? 'color:var(--hims-danger);font-weight:700' : ($expiring ? 'color:#d97706;font-weight:600' : '') }};font-size:12.5px">
                         {{ $cred->expiry_date ? \Carbon\Carbon::parse($cred->expiry_date)->format('M d, Y') : 'No expiry' }}
                     </td>
-                    <td><span class="hims-badge {{ $expired ? 'red' : ($expiring ? 'yellow' : 'green') }}">
+                    <td data-label="Status"><span class="hims-badge {{ $expired ? 'red' : ($expiring ? 'yellow' : 'green') }}">
                         {{ $expired ? 'Expired' : ($expiring ? 'Expiring Soon' : 'Valid') }}
                     </span></td>
-                    <td>
+                    <td data-label="Actions">
                         @can('view-audit-history')
                         <button type="button" class="btn-hims btn-hims-ghost btn-sm" data-history-resource-type="employee_credentials" data-history-resource-id="{{ $cred->credential_id }}"><i class="bi bi-clock-history"></i> History</button>
                         @endcan

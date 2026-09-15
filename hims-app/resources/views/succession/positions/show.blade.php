@@ -137,17 +137,17 @@
             <tbody>
                 @forelse($candidates as $candidate)
                 <tr>
-                    <td><strong>{{ $candidate->employee_name }}</strong></td>
-                    @if($canSeeConfidential)<td>
+                    <td data-label="Candidate"><strong>{{ $candidate->employee_name }}</strong></td>
+                    @if($canSeeConfidential)<td data-label="Readiness">
                         <span class="hims-badge {{ $candidate->readiness_level === 'ready_now' ? 'green' : 'blue' }}">
                             {{ $readinessLabels[$candidate->readiness_level] ?? ucfirst(str_replace('_',' ', (string) $candidate->readiness_level)) }}
                         </span>
                     </td>
-                    <td><span class="gap-chip {{ (int) $candidate->performance_score >= 4 ? 'positive' : 'negative' }}">{{ $candidate->performance_score }}/5</span></td>
-                    <td><span class="gap-chip {{ (int) $candidate->potential_score >= 4 ? 'positive' : 'negative' }}">{{ $candidate->potential_score }}/5</span></td>
-                    <td>{{ $nineBoxLabels[$candidate->nine_box_label] ?? ($candidate->nine_box_label ?? '—') }}</td>
-                    <td><span class="hims-badge gray">{{ ucfirst(str_replace('_',' ', (string) $candidate->status)) }}</span></td>@endif
-                    <td>
+                    <td data-label="Performance"><span class="gap-chip {{ (int) $candidate->performance_score >= 4 ? 'positive' : 'negative' }}">{{ $candidate->performance_score }}/5</span></td>
+                    <td data-label="Potential"><span class="gap-chip {{ (int) $candidate->potential_score >= 4 ? 'positive' : 'negative' }}">{{ $candidate->potential_score }}/5</span></td>
+                    <td data-label="9-Box">{{ $nineBoxLabels[$candidate->nine_box_label] ?? ($candidate->nine_box_label ?? '—') }}</td>
+                    <td data-label="Status"><span class="hims-badge gray">{{ ucfirst(str_replace('_',' ', (string) $candidate->status)) }}</span></td>@endif
+                    <td data-label="Actions">
                         <a href="{{ route('succession.candidates.show', $candidate->candidate_id) }}" class="btn-hims btn-hims-outline btn-sm">View</a>
                     </td>
                 </tr>

@@ -22,7 +22,7 @@
                 <span class="hims-badge {{ $venue->is_active ? 'green' : 'gray' }}">{{ $venue->is_active ? 'Active' : 'Offline' }}</span>
             </div>
             <div class="card-body">
-                <table style="width:100%;font-size:13px">
+                <table class="hims-kv" style="width:100%;font-size:13px">
                     <tr style="border-bottom:1px solid var(--hims-border)">
                         <td style="padding:7px 0;color:#6b7280">Building</td>
                         <td style="padding:7px 0;font-weight:600">{{ $venue->building ?? '—' }}</td>

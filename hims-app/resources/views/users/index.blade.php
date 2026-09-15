@@ -63,7 +63,7 @@
                 @foreach($users as $user)
                 @php $isLocked = isset($user->locked_until) && $user->locked_until && now()->lt($user->locked_until); @endphp
                 <tr>
-                    <td>
+                    <td data-label="Name">
                         <div style="display:flex;align-items:center;gap:10px">
                             <div style="width:34px;height:34px;background:var(--hims-primary-xlight);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--hims-primary);font-size:13px;flex-shrink:0">
                                 {{ strtoupper(substr($user->name,0,1)) }}
@@ -76,21 +76,21 @@
                             </div>
                         </div>
                     </td>
-                    <td style="font-size:13px;color:#6b7280">{{ $user->email }}</td>
-                    <td>
+                    <td data-label="Email" style="font-size:13px;color:#6b7280">{{ $user->email }}</td>
+                    <td data-label="Role">
                         <span class="hims-badge {{ $user->role === 'admin' ? 'red' : ($user->role === 'hr_manager' ? 'blue' : ($user->role === 'supervisor' ? 'yellow' : 'gray')) }}">
                             {{ ucfirst(str_replace('_',' ',$user->role ?? 'staff')) }}
                         </span>
                     </td>
-                    <td>
+                    <td data-label="Status">
                         @if($isLocked)
                             <span class="hims-badge red" title="Locked until {{ $user->locked_until }}"><i class="bi bi-lock-fill"></i> Locked</span>
                         @else
                             <span class="hims-badge green">Active</span>
                         @endif
                     </td>
-                    <td style="font-size:13px;color:#6b7280">{{ $user->employee_id ? '✓ Linked' : '—' }}</td>
-                    <td>
+                    <td data-label="Linked Employee" style="font-size:13px;color:#6b7280">{{ $user->employee_id ? '✓ Linked' : '—' }}</td>
+                    <td data-label="Actions">
                         <div style="display:flex;gap:6px;align-items:center">
                             @if($isLocked)
                             <button type="button" class="btn-hims btn-hims-outline btn-sm" data-modal-open="unlockModal-{{ $user->id }}"><i class="bi bi-unlock"></i> Unlock</button>

@@ -57,13 +57,13 @@
                     <tbody>
                         @forelse($team ?? [] as $member)
                         <tr>
-                            <td>
+                            <td data-label="Employee">
                                 <strong>{{ $member->first_name }} {{ $member->last_name }}</strong>
                                 <div style="font-size:11px;color:#9ca3af">{{ $member->position_title ?? '—' }}</div>
                             </td>
-                            <td>{{ $member->role_name }}</td>
-                            <td>{{ $member->latest_score ? number_format($member->latest_score,2) : '—' }}</td>
-                            <td>
+                            <td data-label="Role">{{ $member->role_name }}</td>
+                            <td data-label="Latest Score">{{ $member->latest_score ? number_format($member->latest_score,2) : '—' }}</td>
+                            <td data-label="Avg Gap">
                                 @if($member->assessments == 0)
                                     <span class="hims-badge gray">Not assessed</span>
                                 @else
@@ -72,7 +72,7 @@
                                     </span>
                                 @endif
                             </td>
-                            <td>
+                            <td data-label="Action">
                                 @can('run-gap-analysis')
                                 <a href="{{ route('competency.gap.employee', $member->employee_id) }}" class="btn-hims btn-hims-ghost btn-sm">Gap Analysis</a>
                                 @endcan
@@ -118,10 +118,10 @@
                     <tbody>
                         @forelse($competency_hotspots ?? [] as $row)
                         <tr>
-                            <td><strong>{{ $row->competency_name }}</strong></td>
-                            <td>{{ $row->required_proficiency }}/5</td>
-                            <td>{{ number_format((float) $row->avg_proficiency, 2) }}</td>
-                            <td><span class="gap-chip negative">{{ number_format((float) $row->avg_gap, 2) }}</span></td>
+                            <td data-label="Competency"><strong>{{ $row->competency_name }}</strong></td>
+                            <td data-label="Required">{{ $row->required_proficiency }}/5</td>
+                            <td data-label="Avg">{{ number_format((float) $row->avg_proficiency, 2) }}</td>
+                            <td data-label="Gap"><span class="gap-chip negative">{{ number_format((float) $row->avg_gap, 2) }}</span></td>
                         </tr>
                         @empty
                         <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:24px">No gaps recorded for your team.</td></tr>

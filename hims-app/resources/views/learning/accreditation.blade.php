@@ -92,18 +92,18 @@
             <tbody>
                 @forelse($employees as $employee)
                 <tr>
-                    <td>
+                    <td data-label="Employee">
                         <div style="font-weight:600">{{ $employee->last_name }}, {{ $employee->first_name }}</div>
                         <div style="font-size:11px;color:#9ca3af">{{ $employee->employee_code }}</div>
                     </td>
-                    <td>{{ $employee->department_name ?? '—' }}</td>
-                    <td>
+                    <td data-label="Department">{{ $employee->department_name ?? '—' }}</td>
+                    <td data-label="Role / Position">
                         {{ $employee->role_name ?? '—' }}
                         @if($employee->position_title)
                         <div style="font-size:11px;color:#9ca3af">{{ $employee->position_title }}</div>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Competency">
                         @if($employee->competency)
                             <strong>{{ $employee->competency->at_target }}</strong> / {{ $employee->competency->assessed }} at target
                             <div style="font-size:11px;color:#9ca3af">avg {{ $employee->competency->avg_proficiency }} proficiency</div>
@@ -111,7 +111,7 @@
                             <span class="hims-badge gray">Not assessed</span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Credentials">
                         @if($employee->credentials)
                             {{ $employee->credentials->total }} on file
                             <div style="font-size:11px">
@@ -129,7 +129,7 @@
                             <span class="hims-badge gray">None recorded</span>
                         @endif
                     </td>
-                    <td>
+                    <td data-label="Training">
                         @if($employee->training)
                             <strong>{{ $employee->training->completed }}</strong> / {{ $employee->training->enrolled }} complete
                             @if($employee->training->outstanding > 0)
@@ -139,8 +139,8 @@
                             <span class="hims-badge gray">No enrollments</span>
                         @endif
                     </td>
-                    <td>{{ $employee->training ? rtrim(rtrim(number_format($employee->training->cpd_hours, 1), '0'), '.') : '0' }} hrs</td>
-                    <td>
+                    <td data-label="CPD">{{ $employee->training ? rtrim(rtrim(number_format($employee->training->cpd_hours, 1), '0'), '.') : '0' }} hrs</td>
+                    <td data-label="Standing">
                         @if($employee->compliant)
                             <span class="hims-badge green">✓ Clear</span>
                         @else

@@ -40,12 +40,12 @@
             <tbody>
                 @forelse($positions ?? [] as $pos)
                 <tr>
-                    <td>
+                    <td data-label="Position">
                         <a href="{{ route('succession.positions.show', $pos->position_id) }}" style="font-weight:600;color:var(--hims-text-dark)">{{ $pos->position_title }}</a>
                     </td>
-                    <td style="font-size:12.5px">{{ $pos->department_name ?? '—' }}</td>
-                    <td style="font-size:12.5px">{{ $pos->current_holder_name ?? 'Vacant' }}</td>
-                    @if($canSeeConfidential)<td>
+                    <td data-label="Department" style="font-size:12.5px">{{ $pos->department_name ?? '—' }}</td>
+                    <td data-label="Current Holder" style="font-size:12.5px">{{ $pos->current_holder_name ?? 'Vacant' }}</td>
+                    @if($canSeeConfidential)<td data-label="Nominated Candidates">
                         <span class="hims-badge {{ $pos->candidates_count > 0 ? 'green' : 'red' }}">
                             {{ $pos->candidates_count ?? 0 }} candidate(s)
                         </span>
@@ -88,7 +88,7 @@
             <tbody>
                 @forelse($candidates ?? [] as $cand)
                 <tr>
-                    <td>
+                    <td data-label="Candidate">
                         <div style="display:flex;align-items:center;gap:9px">
                             <div style="width:32px;height:32px;background:var(--hims-primary-xlight);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--hims-primary-dark)">
                                 {{ strtoupper(substr($cand->first_name ?? 'U',0,1)) }}
@@ -99,20 +99,20 @@
                             </div>
                         </div>
                     </td>
-                    <td style="font-size:13px">{{ $cand->target_position ?? '—' }}</td>
-                    @if($canSeeConfidential)<td>
+                    <td data-label="Target Position" style="font-size:13px">{{ $cand->target_position ?? '—' }}</td>
+                    @if($canSeeConfidential)<td data-label="Readiness">
                         <span class="hims-badge {{ $cand->readiness_level === 'ready_now' ? 'green' : ($cand->readiness_level === '1_2_years' ? 'yellow' : 'gray') }}">
                             {{ str_replace('_',' ',ucfirst($cand->readiness_level ?? '—')) }}
                         </span>
                     </td>@endif
-                    <td>
+                    <td data-label="Dev Progress">
                         <div style="min-width:100px">
                             <div style="font-size:11px;color:#6b7280;margin-bottom:3px">{{ $cand->dev_progress ?? 0 }}%</div>
                             <div class="hims-progress"><div class="hims-progress-bar" style="width:{{ $cand->dev_progress ?? 0 }}%"></div></div>
                         </div>
                     </td>
-                    @if($canSeeConfidential)<td><span class="hims-badge {{ $cand->status === 'approved' ? 'green' : 'yellow' }}">{{ ucfirst($cand->status ?? 'proposed') }}</span></td>@endif
-                    <td>
+                    @if($canSeeConfidential)<td data-label="Status"><span class="hims-badge {{ $cand->status === 'approved' ? 'green' : 'yellow' }}">{{ ucfirst($cand->status ?? 'proposed') }}</span></td>@endif
+                    <td data-label="Actions">
                         <div class="d-flex gap-1">
                             <a href="{{ route('succession.candidates.show', $cand->candidate_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
                             @can('manage-succession')

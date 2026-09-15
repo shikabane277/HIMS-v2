@@ -39,19 +39,19 @@
             <tbody>
                 @forelse($assignments as $assignment)
                 <tr>
-                    <td>
+                    <td data-label="Course / Session">
                         <div style="font-weight:600">{{ $assignment->subject_name }}</div>
                         <div style="font-size:11px;color:#9ca3af">{{ ucfirst($assignment->subject_type) }} · assigned {{ \Carbon\Carbon::parse($assignment->created_at)->format('M d, Y') }}</div>
                     </td>
-                    <td>{{ $assignment->target_name }}</td>
-                    <td>
+                    <td data-label="Assigned To">{{ $assignment->target_name }}</td>
+                    <td data-label="Required By">
                         @if($assignment->required_by)
                             {{ \Carbon\Carbon::parse($assignment->required_by)->format('M d, Y') }}
                         @else
                             <span style="color:#9ca3af">No deadline</span>
                         @endif
                     </td>
-                    <td style="min-width:150px">
+                    <td data-label="Completion" style="min-width:150px">
                         <div class="d-flex justify-content-between" style="font-size:11.5px;margin-bottom:4px">
                             <span>{{ $assignment->compliance['complete'] }} / {{ $assignment->compliance['total'] }}</span>
                             <strong>{{ $assignment->compliance['rate'] }}%</strong>
@@ -62,7 +62,7 @@
                          and the roster tile, and links straight to the filtered
                          roster — so "who is short" is answered by a filter rather
                          than by hunting through a full list. --}}
-                    <td>
+                    <td data-label="Outstanding">
                         @if($assignment->compliance['overdue'] > 0)
                             <button type="button" class="hims-badge red" style="border:0;cursor:pointer"
                                     data-modal-open="assignmentRoster{{ $assignment->assignment_id }}"
@@ -75,7 +75,7 @@
                             <span class="hims-badge green">✓ Complete</span>
                         @endif
                     </td>
-                    <td><button type="button" class="btn-hims btn-hims-ghost btn-sm"
+                    <td data-label="Actions"><button type="button" class="btn-hims btn-hims-ghost btn-sm"
                                 data-modal-open="assignmentRoster{{ $assignment->assignment_id }}"
                                 data-roster-filter="all">Roster</button></td>
                 </tr>
@@ -106,19 +106,19 @@
             <tbody>
                 @forelse($atRisk->take(12) as $cycle)
                 <tr>
-                    <td>
+                    <td data-label="Employee">
                         <div style="font-weight:600">{{ $cycle->first_name }} {{ $cycle->last_name }}</div>
                         <div style="font-size:11px;color:#9ca3af">{{ $cycle->employee_code }}</div>
                     </td>
-                    <td>{{ $cycle->label }}</td>
-                    <td><strong>{{ $cycle->hours_attained }}</strong> / {{ $cycle->hours_required_snapshot }}</td>
-                    <td>
+                    <td data-label="Requirement">{{ $cycle->label }}</td>
+                    <td data-label="Hours"><strong>{{ $cycle->hours_attained }}</strong> / {{ $cycle->hours_required_snapshot }}</td>
+                    <td data-label="Cycle Ends">
                         {{ \Carbon\Carbon::parse($cycle->cycle_end)->format('M d, Y') }}
                         <div style="font-size:11px;color:#9ca3af">
                             {{ $cycle->days_left >= 0 ? $cycle->days_left.' day(s) left' : abs($cycle->days_left).' day(s) ago' }}
                         </div>
                     </td>
-                    <td>
+                    <td data-label="Standing">
                         @if($cycle->risk === 'shortfall')
                             <span class="hims-badge red">Short by {{ $cycle->hours_remaining }} hrs</span>
                         @else

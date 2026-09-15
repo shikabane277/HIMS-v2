@@ -83,16 +83,16 @@
                     <tbody>
                         @foreach($gaps as $g)
                         <tr>
-                            <td>
+                            <td data-label="Competency">
                                 <strong>{{ $g->competency_name }}</strong>
                                 @if($g->is_mandatory)<span class="hims-badge red" style="margin-left:6px;font-size:10px">Mandatory</span>@endif
                                 @if($g->competency_code)<div style="font-size:11px;color:#9ca3af;font-family:monospace">{{ $g->competency_code }}</div>@endif
                             </td>
-                            <td>{{ $g->category_name ?: '—' }}</td>
-                            <td class="text-center">{{ $g->required_proficiency }}</td>
-                            <td class="text-center">{{ $g->current_proficiency }}</td>
-                            <td class="text-center"><span class="gap-chip negative">{{ $g->gap }}</span></td>
-                            <td>{{ $g->assessed_date ? \Carbon\Carbon::parse($g->assessed_date)->format('d M Y') : '—' }}</td>
+                            <td data-label="Category">{{ $g->category_name ?: '—' }}</td>
+                            <td data-label="Required" class="text-center">{{ $g->required_proficiency }}</td>
+                            <td data-label="Current" class="text-center">{{ $g->current_proficiency }}</td>
+                            <td data-label="Gap" class="text-center"><span class="gap-chip negative">{{ $g->gap }}</span></td>
+                            <td data-label="Last Assessed">{{ $g->assessed_date ? \Carbon\Carbon::parse($g->assessed_date)->format('d M Y') : '—' }}</td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -129,11 +129,11 @@
                         @foreach($credentials as $cr)
                         @php $days = \App\Support\CredentialStatus::daysRemaining($cr->expiry_date); @endphp
                         <tr>
-                            <td>
+                            <td data-label="Credential">
                                 <strong>{{ $cr->credential_type }}</strong>
                                 @if($cr->issuing_body)<div style="font-size:11px;color:#9ca3af">{{ $cr->issuing_body }}</div>@endif
                             </td>
-                            <td>
+                            <td data-label="Expires">
                                 @if($cr->expiry_date)
                                     {{ \Carbon\Carbon::parse($cr->expiry_date)->format('d M Y') }}
                                     <div style="font-size:11px;color:#9ca3af">
@@ -143,7 +143,7 @@
                                     —
                                 @endif
                             </td>
-                            <td>
+                            <td data-label="Status">
                                 <span class="hims-badge {{ \App\Support\CredentialStatus::badgeClass($cr->status) }}">
                                     {{ \App\Support\CredentialStatus::label($cr->status) }}
                                 </span>
@@ -178,12 +178,12 @@
                         @foreach($upcomingReassessments as $ra)
                         @php $overdue = $ra->due_date < now()->toDateString(); @endphp
                         <tr>
-                            <td>
+                            <td data-label="Competency">
                                 <strong>{{ $ra->competency_name }}</strong>
                                 @if($ra->category_name)<div style="font-size:11px;color:#9ca3af">{{ $ra->category_name }}</div>@endif
                             </td>
-                            <td>{{ \Carbon\Carbon::parse($ra->last_assessed)->format('d M Y') }}</td>
-                            <td>
+                            <td data-label="Last Assessed">{{ \Carbon\Carbon::parse($ra->last_assessed)->format('d M Y') }}</td>
+                            <td data-label="Due">
                                 <span class="hims-badge {{ $overdue ? 'red' : 'yellow' }}">
                                     {{ \Carbon\Carbon::parse($ra->due_date)->format('d M Y') }}
                                 </span>
@@ -226,17 +226,17 @@
                     <tbody>
                         @foreach($enrollments as $en)
                         <tr>
-                            <td>
+                            <td data-label="Course">
                                 <strong>{{ $en->title }}</strong>
                                 <div style="font-size:11px;color:#9ca3af">{{ ucfirst(str_replace('_',' ',(string)$en->category)) }}</div>
                             </td>
-                            <td>
+                            <td data-label="Status">
                                 <span class="hims-badge {{ $en->status==='completed'?'green':($en->status==='in_progress'?'yellow':'gray') }}">
                                     {{ ucfirst(str_replace('_',' ',(string)$en->status)) }}
                                 </span>
                             </td>
-                            <td class="text-center">{{ (int)$en->progress_pct }}%</td>
-                            <td class="text-center">{{ (float)$en->cpd_hours }}</td>
+                            <td data-label="Progress" class="text-center">{{ (int)$en->progress_pct }}%</td>
+                            <td data-label="CPD" class="text-center">{{ (float)$en->cpd_hours }}</td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -265,14 +265,14 @@
                     <tbody>
                         @foreach($trainings as $tr)
                         <tr>
-                            <td><strong>{{ $tr->title }}</strong></td>
-                            <td>{{ $tr->session_date ? \Carbon\Carbon::parse($tr->session_date)->format('d M Y') : '—' }}</td>
-                            <td>
+                            <td data-label="Session"><strong>{{ $tr->title }}</strong></td>
+                            <td data-label="Date">{{ $tr->session_date ? \Carbon\Carbon::parse($tr->session_date)->format('d M Y') : '—' }}</td>
+                            <td data-label="Status">
                                 <span class="hims-badge {{ $tr->status==='attended'?'green':($tr->status==='registered'?'gray':'yellow') }}">
                                     {{ ucfirst((string)$tr->status) }}
                                 </span>
                             </td>
-                            <td class="text-center">{{ (float)$tr->cpd_hours }}</td>
+                            <td data-label="CPD" class="text-center">{{ (float)$tr->cpd_hours }}</td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -306,19 +306,19 @@
                     <tbody>
                         @foreach($cpd as $c)
                         <tr>
-                            <td><strong>{{ $c->activity_name }}</strong></td>
-                            <td>{{ \Carbon\Carbon::parse($c->date_earned)->format('d M Y') }}</td>
-                            <td>
+                            <td data-label="Activity"><strong>{{ $c->activity_name }}</strong></td>
+                            <td data-label="Date Earned">{{ \Carbon\Carbon::parse($c->date_earned)->format('d M Y') }}</td>
+                            <td data-label="Source">
                                 <span class="hims-badge blue" style="font-size:11px">
                                     {{ ucfirst((string)$c->source_type) }}
                                 </span>
                             </td>
-                            <td class="text-center">{{ (float)$c->cpd_hours }}</td>
+                            <td data-label="Hours" class="text-center">{{ (float)$c->cpd_hours }}</td>
                         </tr>
                         @endforeach
                         <tr style="background:var(--hims-primary-pale);font-weight:600">
                             <td colspan="3" class="text-end" style="padding-right:20px">Total</td>
-                            <td class="text-center">{{ number_format($cpdTotal,1) }}</td>
+                            <td data-label="Hours" class="text-center">{{ number_format($cpdTotal,1) }}</td>
                         </tr>
                     </tbody>
                 </table>

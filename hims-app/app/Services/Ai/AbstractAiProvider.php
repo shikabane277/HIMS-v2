@@ -36,6 +36,18 @@ abstract class AbstractAiProvider implements AiProvider
      * $scope is the caller's role-based access instruction from
      * AiAccessPolicy::scopeFor(), appended when present. It arrives per call
      * because this driver is a shared singleton — see AiProvider::ask().
+     *
+     * The no-markdown clause is a UI coupling, not a style preference. The rail
+     * renders every reply with `div.textContent = text` (layouts/hims.blade.php),
+     * which is deliberate — model output is untrusted, and innerHTML would make
+     * it an injection surface — so asterisks and backticks arrive on screen as
+     * themselves. Models differ sharply in how much markdown they volunteer:
+     * llama-3.3 rarely did, gpt-oss bolds and bullets by default, so the same
+     * app looked fine on one model and littered on the next. Asking for prose is
+     * the cheap half of the fix and the only half that cannot introduce a hole.
+     * The JSON callers (CompetencyGapAnalysisService) are unaffected: their own
+     * prompt asks for JSON explicitly, and decodeJson() strips ``` fences either
+     * way.
      */
     protected function systemContext(?string $scope = null): string
     {
@@ -44,6 +56,9 @@ abstract class AbstractAiProvider implements AiProvider
             .'succession planning, training schedules, and learning pathways. '
             .'Reply in English by default. Only switch to Tagalog or Taglish when the user clearly '
             .'writes to you in Tagalog or Taglish, and then match their language. Be concise and helpful. '
+            .'Write in plain prose: the chat panel shows your reply as literal text, so markdown is not '
+            .'rendered — do not use asterisks for bold, hash headings, or backticks. Where a list genuinely '
+            .'helps, write short lines each opening with "- ". '
             .'Always be professional and sensitive to healthcare context.'
             ."\n\n".HimsKnowledge::appGuide();
 
@@ -234,6 +249,52 @@ abstract class AbstractAiProvider implements AiProvider
     {
         return '⚠️ '.$this->label().' API key not configured. '
             .'Please add the relevant key to your .env file (see AI_PROVIDER settings).';
+    }
+
+    /**
+     * The .env keys a reader should go and edit, named in the failure message.
+     * Overridden per driver; one class serving two slots names both.
+     */
+    protected function modelEnvKeys(): string
+    {
+        return 'the model settings';
+    }
+
+    /**
+     * Every model in the chain was refused — or there was no chain.
+     *
+     * Shared by all three drivers because all three had the same bug: each one
+     * diagnosed a refused model, `continue`d past it, and then reported a generic
+     * "Unable to reach X with the configured models. Check the MODEL / API key in
+     * .env." Groq retiring llama-3.3-70b-versatile made the cost concrete — that
+     * message names the API key as a suspect when a refusal *proves* the key
+     * worked (the host had to authenticate the request to know the model was
+     * wrong), and it does not name the model that was actually refused, which the
+     * host had already said in as many words.
+     *
+     * The two cases are kept apart because they have different fixes and only one
+     * of them is a failure the host was ever asked about: an empty chain means
+     * models() returned nothing and no request left the building.
+     *
+     * @param  array<string, string>  $rejected  model name => the host's own reason
+     */
+    protected function noUsableModel(array $rejected): string
+    {
+        if ($rejected === []) {
+            return "⚠️ No model is configured for {$this->label()}, so no request was sent. "
+                ."Set {$this->modelEnvKeys()} in .env.";
+        }
+
+        $lines = [];
+
+        foreach ($rejected as $model => $reason) {
+            $lines[] = "• {$model} — {$reason}";
+        }
+
+        return "⚠️ {$this->label()} answered, so the API key works, but it refused every model configured for it:\n"
+            .implode("\n", $lines)
+            ."\nProviders retire models on a rolling basis. Check the host's current model list and update "
+            ."{$this->modelEnvKeys()} in .env.";
     }
 
     /* ───────── provider-agnostic JSON helpers (moved off GeminiService) ───────── */

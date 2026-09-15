@@ -7,6 +7,8 @@ use App\Services\Ai\AiAccessPolicy;
 use App\Services\Ai\AiActionExecutor;
 use App\Services\Ai\AiActionPlanner;
 use App\Services\Ai\AiActionRegistry;
+use App\Services\Ai\AiTypoCorrector;
+use App\Support\FuzzyMatch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -40,6 +42,27 @@ use Illuminate\Support\Str;
  * not perform through the UI is refused here too. Destructive actions are not
  * executed on the spot: the target is resolved, named back, and parked in
  * ai_chat_sessions.pending_action until the next message confirms it.
+ *
+ * SPELLING: every gate in front of the model is a literal string test —
+ * ACTION_VERBS is a word list, AiAccessPolicy::TOPICS is a pattern list, and
+ * AiEntityResolver is substring LIKE — so a single mistyped letter used to make
+ * a message invisible to all three at once. "crate a 2027 cycle" was answered
+ * with advice about creating cycles and nothing said the instruction had not been
+ * understood. AiTypoCorrector therefore reads the message once at the top of
+ * query() and the corrected text is what the gates and the planner see; the raw
+ * text is what is stored, replayed, audited and sent to the provider.
+ *
+ * Three parts of that split are load-bearing:
+ *
+ *  - The topic gate runs on the raw text first, exactly as before, and then again
+ *    on the corrected text when the reading differed. It can only ever add a
+ *    refusal — which closes a real hole, because "who is next in line for
+ *    succesion?" walked straight past a pattern list spelt correctly.
+ *  - The confirmation keyword for a destructive action is matched against the raw
+ *    message and is never fuzzy-matched. A mistyped "confrim" must not fire a
+ *    delete; it cancels, and says how to try again.
+ *  - The stored transcript keeps the person's own words. What the assistant read
+ *    them as is stated in the reply instead, so the record shows both.
  */
 class AiController extends Controller
 {
@@ -65,6 +88,7 @@ class AiController extends Controller
         private AiAccessPolicy $policy,
         private AiActionPlanner $planner,
         private AiActionExecutor $executor,
+        private AiTypoCorrector $typos,
     ) {}
 
     /* ───────────────────────────── sessions ───────────────────────────── */
@@ -191,6 +215,11 @@ class AiController extends Controller
         $user = auth()->user();
         $userId = auth()->id();
 
+        // How the assistant reads the message, which is not necessarily how it
+        // was typed. Computed once: the gates, the planner and the note below all
+        // have to agree on one reading.
+        $reading = $this->typos->correct($prompt);
+
         // An unknown or someone else's session id must not silently open a new
         // chat under this user — ownedSession() 404s instead.
         $session = isset($validated['session_id']) && $validated['session_id'] !== ''
@@ -222,16 +251,39 @@ class AiController extends Controller
         // this role cannot discuss is one it certainly cannot act on.
         $denied = $this->policy->deniedTopic($user, $prompt);
 
+        // TOPICS is a list of mostly multi-word phrases, so a misspelling walks
+        // through it: "who is next in line for succesion?" was not a succession
+        // question as far as the gate was concerned. Re-testing the corrected
+        // reading can only add a refusal, never remove one, which is the only
+        // direction this is allowed to move.
+        $readingMattered = false;
+
+        if ($denied === null && $reading['text'] !== $prompt) {
+            $denied = $this->policy->deniedTopic($user, $reading['text']);
+            $readingMattered = $denied !== null;
+        }
+
         $action = null;
 
         if ($denied !== null) {
             $response = $this->policy->refusal($denied);
         } else {
-            $action = $this->resolveAction($request, $session, $user, $prompt);
+            $action = $this->resolveAction($request, $session, $user, $prompt, $reading);
 
+            $readingMattered = $action !== null;
+
+            // The provider gets the words as typed. It reads around a typo
+            // natively, and a note beside an answer that ignored the correction
+            // would describe something that did not happen.
             $response = $action
                 ? $action['message']
                 : $this->ai->ask($prompt, $history, $this->policy->scopeFor($user));
+        }
+
+        // Only stated where the reading changed the outcome: an action that ran,
+        // or a topic refusal the raw spelling would have missed.
+        if ($readingMattered && ($note = $this->typos->note($reading['changes'])) !== '') {
+            $response = $note.' '.$response;
         }
 
         DB::table('ai_chat_messages')->insert([
@@ -304,17 +356,26 @@ class AiController extends Controller
      * answer it conversationally instead. Every branch that returns non-null has
      * already produced the exact text the user should see.
      *
+     * $prompt is what the person typed and $reading is AiTypoCorrector's reading
+     * of it. The corrected text drives the verb gate and the planner, because
+     * those are the string tests a typo defeats; the raw text arms the destructive
+     * confirmation and is what gets audited.
+     *
+     * @param  array{text: string, changes: array<string, string>}  $reading
      * @return array{message: string, status: ?string, pending: bool}|null
      */
-    private function resolveAction(Request $request, object $session, $user, string $prompt): ?array
+    private function resolveAction(Request $request, object $session, $user, string $prompt, array $reading): ?array
     {
         // A destructive action already offered and awaiting a yes/no takes
         // priority: "confirm" means that, not a fresh instruction.
         if ($pending = $this->pendingAction($session)) {
             $this->clearPending($session);
 
+            // The RAW message, never the corrected one, and never a fuzzy match.
+            // A near-miss of "confirm" is not consent to delete a record — the
+            // only safe reading of an unclear answer here is no.
             if (! preg_match('/^\s*(confirm|confirmed|yes|proceed|do it|go ahead)\b/i', $prompt)) {
-                return $this->reply('Cancelled — nothing was changed.', null);
+                return $this->reply('Cancelled — nothing was changed.'.$this->confirmHint($prompt), null);
             }
 
             $result = $this->executor->execute($pending, $user, $request);
@@ -322,11 +383,13 @@ class AiController extends Controller
             return $this->reply($result['message'], $result['ok'] ? 'ok' : 'error');
         }
 
-        if (! preg_match(self::ACTION_VERBS, $prompt)) {
+        $corrected = $reading['text'];
+
+        if (! preg_match(self::ACTION_VERBS, $corrected)) {
             return null;
         }
 
-        $plan = $this->planner->plan($prompt, $user);
+        $plan = $this->planner->plan($corrected, $user);
 
         if (! $plan) {
             return null;
@@ -341,8 +404,15 @@ class AiController extends Controller
             );
         }
 
+        // The audit keeps the words the person typed. The reading is recorded
+        // beside it only when it differed, so an auditor can see that "delet the
+        // uesr bob" was carried out as a delete of the user bob.
         $plan['prompt'] = $prompt;
         $plan['session_id'] = $session->id;
+
+        if ($corrected !== $prompt) {
+            $plan['prompt_corrected'] = $corrected;
+        }
 
         $spec = AiActionRegistry::get($plan['action'], $user);
 
@@ -379,6 +449,28 @@ class AiController extends Controller
     private function reply(string $message, ?string $status, bool $pending = false): array
     {
         return ['message' => $message, 'status' => $status, 'pending' => $pending];
+    }
+
+    /**
+     * The sentence appended when a cancellation looks like a mistyped "confirm".
+     *
+     * The cancel itself stands — this reports the near-miss rather than acting on
+     * it, which is the whole point: the destructive step is the one place where
+     * reading a typo generously would be the dangerous choice. Telling the person
+     * what happened costs nothing and saves them wondering why the delete they
+     * thought they approved did not happen.
+     */
+    private function confirmHint(string $prompt): string
+    {
+        if (! preg_match('/^\s*(\p{L}+)/u', $prompt, $match)) {
+            return '';
+        }
+
+        $near = FuzzyMatch::closest($match[1], ['confirm', 'proceed'], 2);
+
+        return $near === null
+            ? ''
+            : " If you meant “{$near}”, send the instruction again — a misspelt confirmation is always read as no.";
     }
 
     /**

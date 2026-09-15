@@ -1,0 +1,467 @@
+{
+  "intro": [
+    "Stories are grouped by the four roles the system actually implements (<code>users.role</code>): <strong>Staff</strong>, <strong>Supervisor</strong>, <strong>HR Manager</strong> and <strong>Administrator</strong>. A story is listed under the role that <em>initiates</em> it.",
+    "Acceptance criteria are written against observed behaviour, so each one is checkable. The <em>Implemented by</em> line names the route or class that satisfies the story, which is what makes this a traceability artefact and not a wish list."
+  ],
+  "note": "The role matrix these are derived from is <code>HIMS_SYSTEM_DOCUMENTATION.md</code> §3.1; per-screen visibility rules are in <code>HIMS_ACCESS_AND_VISIBILITY.md</code>.",
+  "roles": [
+    {
+      "role": "Staff",
+      "blurb": "A clinical or administrative employee with a login. Sees their own record and the hospital-wide surfaces, and nothing about anyone else's performance.",
+      "stories": [
+        {
+          "id": "US-01",
+          "story": "As a <strong>staff member</strong>, I want to see my own competency gaps and credential expiries on one dashboard, so that I know what to fix before someone tells me.",
+          "priority": "Must",
+          "points": 5,
+          "ac": [
+            "The dashboard shows my competency count, average gap and next credential expiry.",
+            "It shows no figures for any other employee.",
+            "A credential inside 30 days of expiry is banded <em>expiring</em>; past its date it is banded <em>expired</em> — computed on read, never from a stored column."
+          ],
+          "impl": "<code>DashboardController::index()</code>; <code>App\\Support\\CredentialStatus</code>"
+        },
+        {
+          "id": "US-02",
+          "story": "As a <strong>staff member</strong>, I want to read the review my supervisor wrote about me, so that the feedback reaches me rather than sitting in a file.",
+          "priority": "Must",
+          "points": 3,
+          "ac": [
+            "I can open reviews where I am the subject.",
+            "I can see per-KPI ratings, comments, strengths and improvement notes.",
+            "I cannot open a review belonging to anybody else.",
+            "I cannot change any score."
+          ],
+          "impl": "<code>performance.show</code>; <code>PerformanceController::canViewReview()</code>"
+        },
+        {
+          "id": "US-03",
+          "story": "As a <strong>staff member</strong>, I want to write a response to a finished review and later acknowledge it, so that my side is on the record without altering the reviewer's assessment.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "Response submission opens once the reviewer marks the review <em>finished</em>.",
+            "Acknowledgement becomes available only once the cycle is completed.",
+            "Submission and acknowledgement are timestamped separately.",
+            "Acknowledging locks my response permanently.",
+            "Reviewer scores remain unchanged and remain the source of record.",
+            "Both events land in <code>audit_trails</code> as <code>review_employee_response</code> / <code>review_acknowledged</code>."
+          ],
+          "impl": "<code>performance.reviews.respond</code>, <code>.acknowledge</code>"
+        },
+        {
+          "id": "US-04",
+          "story": "As a <strong>staff member</strong>, I want to log my CPD hours and see which of them have been verified, so that I can tell a real total from a claimed one.",
+          "priority": "Must",
+          "points": 5,
+          "ac": [
+            "I can log a CPD record from a modal on the CPD page.",
+            "Each record shows its verification state.",
+            "Only verified hours count toward a renewal cycle.",
+            "My own CPD page lists only my records."
+          ],
+          "impl": "<code>learning.cpd.store</code>; <code>RenewalCycleService::attainedHours()</code>"
+        },
+        {
+          "id": "US-05",
+          "story": "As a <strong>staff member</strong>, I want one page listing the training assigned to me and how far off I am, so that I am not surprised by a deadline.",
+          "priority": "Must",
+          "points": 5,
+          "ac": [
+            "The page lists every assignment naming me, whether directly or by department, role or all-staff fan-out.",
+            "Each row shows its due date and my completion state.",
+            "A null <code>required_by</code> is never shown as overdue.",
+            "Overdue uses the same definition as every other screen."
+          ],
+          "impl": "<code>learning.cycles.mine</code>; <code>RenewalCycleService::complianceFor()</code>"
+        },
+        {
+          "id": "US-06",
+          "story": "As a <strong>staff member</strong>, I want to register for a training session and be checked in when I attend, so that attendance is a record of presence and not of intent.",
+          "priority": "Must",
+          "points": 5,
+          "ac": [
+            "I can self-register for an upcoming session.",
+            "Registration is refused when the session is full.",
+            "Only a supervisor or above can mark me attended — check-in is the sole attendance mechanism for sessions.",
+            "I can submit feedback on a session I attended."
+          ],
+          "impl": "<code>training.sessions.register</code>, <code>.checkin</code>, <code>.feedback</code>"
+        },
+        {
+          "id": "US-07",
+          "story": "As a <strong>staff member</strong>, I want to recognise a colleague publicly or privately, so that appreciation is attributable either way.",
+          "priority": "Should",
+          "points": 5,
+          "ac": [
+            "A post names both sender and recipient in either mode.",
+            "Self-recognition is refused.",
+            "A private post is visible only to sender, recipient and HR/Admin moderators.",
+            "Comments and reactions inherit the post's audience.",
+            "Only approved public posts appear on the wall and in the leaderboard."
+          ],
+          "impl": "<code>recognition.posts.store</code>; <code>v_recognition_leaderboard</code>"
+        },
+        {
+          "id": "US-08",
+          "story": "As a <strong>staff member</strong>, I want to ask the assistant a question in plain language, so that I do not have to know which module holds the answer.",
+          "priority": "Should",
+          "points": 8,
+          "ac": [
+            "The assistant rail opens from the topbar on any page.",
+            "Answers are limited to data my role and reporting line already permit.",
+            "My saved conversations are visible only to me.",
+            "A provider outage returns a readable warning instead of an error page."
+          ],
+          "impl": "<code>AiController::query()</code>; <code>AiAccessPolicy</code>; ⚠️-prefixed failure contract"
+        },
+        {
+          "id": "US-09",
+          "story": "As a <strong>staff member</strong>, I want search and notifications to only ever take me somewhere I am allowed to be, so that the shell never dangles a link that then refuses me.",
+          "priority": "Must",
+          "points": 5,
+          "ac": [
+            "Search results come from an explicit source allow-list, each applying its module's scope before matching.",
+            "A row-level result scrolls to the row it names.",
+            "A notification about an employee I cannot see falls back to the module page rather than a forbidden deep link.",
+            "Read notifications stay visible; only their emphasis and the unread count change."
+          ],
+          "impl": "<code>GlobalSearchController</code>; <code>NotificationService::feedFor()</code>"
+        }
+      ]
+    },
+    {
+      "role": "Supervisor",
+      "blurb": "A people manager. Reach is the reporting line — the employees whose <code>supervisor_id</code> is this account's linked <code>employee_id</code> — plus themselves. Not the department.",
+      "stories": [
+        {
+          "id": "US-10",
+          "story": "As a <strong>supervisor</strong>, I want my dashboard and team lists to show my direct reports, so that I am accountable for a defined set of people.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "Core figures, team list, hotspots and recent reviews are direct-report scoped.",
+            "An employee who merely shares my department does not appear.",
+            "Credential alerts remain department-scoped and upcoming sessions remain hospital-wide — this mix is deliberate."
+          ],
+          "impl": "<code>Controller::scopeToVisibleEmployees()</code>; <code>DashboardController</code>"
+        },
+        {
+          "id": "US-11",
+          "story": "As a <strong>supervisor</strong>, I want to create a review only for someone I actually supervise, so that the dropdown itself states who I may legitimately assess.",
+          "priority": "Must",
+          "points": 13,
+          "ac": [
+            "The employee list on the create screen contains only legitimate subjects.",
+            "<code>reviewer_id === employee_id</code> is refused — there is no self-review.",
+            "There is no peer review; a review carries one voice, <code>supervisor_score</code>.",
+            "Creating a review in a cycle that has already ended is refused.",
+            "A second review for the same person and cycle redirects to the existing one instead of inserting."
+          ],
+          "impl": "<code>performance.reviews.create</code>; <code>pr_employee_cycle_reviewer_unique</code>"
+        },
+        {
+          "id": "US-12",
+          "story": "As a <strong>supervisor</strong>, I want to score a review against the KPI grid and see each KPI's real share of the final number, so that the weighting I am told about is the weighting that was applied.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "Each KPI takes a 1–5 rating and an optional comment.",
+            "The screen distinguishes <em>Average of KPI ratings</em> from <em>Final Score / weighted by KPI importance</em> and says why they differ.",
+            "Per-KPI share is apportioned by largest remainder so the column totals exactly 100%.",
+            "An unrated KPI leaves the denominator entirely rather than counting as zero."
+          ],
+          "impl": "<code>App\\Support\\KpiWeighting::displayShares()</code>"
+        },
+        {
+          "id": "US-13",
+          "story": "As a <strong>supervisor</strong>, I want a review to stop being editable when its cycle ends, so that the freeze does not depend on anyone remembering to close it.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "Editability is derived from <code>review_cycles.end_date</code> on every read.",
+            "A cycle ending today is open all day; the day after, writes are refused.",
+            "Only <em>draft</em> and <em>finished</em> are settable by hand; <em>completed</em> is nobody's to set.",
+            "The freeze holds with no scheduler running.",
+            "Any query for open reviews joins the cycle — the status column alone cannot answer it."
+          ],
+          "impl": "<code>CycleStatus</code>, <code>ReviewStatus</code>; <code>CycleStatus::whereNotEnded()</code>"
+        },
+        {
+          "id": "US-14",
+          "story": "As a <strong>supervisor</strong>, I want to assess competencies and record credentials for my reports, so that the gap register reflects what I have observed.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "Assessment and credential creation happen in modals on the competency page.",
+            "The employee list is scoped to my reports.",
+            "The gap is computed by the database, not typed in.",
+            "The change is written to <code>audit_trails</code>."
+          ],
+          "impl": "<code>competency.assessments.store</code>; two MySQL triggers"
+        },
+        {
+          "id": "US-15",
+          "story": "As a <strong>supervisor</strong>, I want to record a course completion for a report, so that nobody self-certifies their own mandatory training.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "Completion requires the <code>record-completion</code> gate and a supervisor-or-above role.",
+            "I can only record it for my own direct reports.",
+            "Completion credits a <em>verified</em> CPD record worth the course's <code>cpd_hours</code>.",
+            "Reopening is admin/HR only, because it withdraws evidence and deletes the CPD row.",
+            "Sessions are never completed this way — check-in is their only mechanism."
+          ],
+          "impl": "<code>learning.enrollments.complete</code> / <code>.reopen</code>"
+        },
+        {
+          "id": "US-16",
+          "story": "As a <strong>supervisor</strong>, I want to see an AI gap narrative grounded in what was actually written about my report, so that the advice cites evidence rather than inventing it.",
+          "priority": "Should",
+          "points": 8,
+          "ac": [
+            "The prompt receives the verbatim strengths, improvements and per-KPI comments across the last three cycles.",
+            "The screen renders the same grouped feedback the prompt was built from.",
+            "A cycle with nothing written is stated as an absence, not dropped.",
+            "When comment sharing is switched off, the model is told the text was withheld.",
+            "Comments are truncated for the prompt only; the screen shows them in full."
+          ],
+          "impl": "<code>App\\Support\\ReviewFeedback</code>; <code>CompetencyGapAnalysisService</code>"
+        },
+        {
+          "id": "US-17",
+          "story": "As a <strong>supervisor</strong>, I want to develop succession candidates from my own reports without seeing confidential ratings, so that development is possible without disclosure.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "I see only positions and candidates relevant to my direct reports.",
+            "Performance and potential scores, 9-box label, readiness, mentor and candidate status are redacted for me.",
+            "HR and Admin retain those fields.",
+            "I can still record leadership development milestones for my reports."
+          ],
+          "impl": "<code>SuccessionController</code>"
+        },
+        {
+          "id": "US-18",
+          "story": "As a <strong>supervisor</strong>, I want to assign required training to a person, a department, a role or everyone in one submission, so that a mandate does not take twenty clicks.",
+          "priority": "Must",
+          "points": 13,
+          "ac": [
+            "One modal posts <code>subjects[]</code> mixing <code>course:&lt;uuid&gt;</code> and <code>session:&lt;uuid&gt;</code> values.",
+            "One <code>training_assignments</code> row is created per subject, inside one transaction.",
+            "Both subject lists are searchable checkbox lists; filtering never clears a ticked box.",
+            "Roster visibility is filtered to what I may see, even where the target expanded globally."
+          ],
+          "impl": "<code>TrainingAssignmentService::assignMany()</code>"
+        }
+      ]
+    },
+    {
+      "role": "HR Manager",
+      "blurb": "Hospital-wide reach over the development modules and the confidential succession fields, but — deliberately — no blanket authority to review anybody.",
+      "stories": [
+        {
+          "id": "US-19",
+          "story": "As an <strong>HR manager</strong>, I want to open review cycles and maintain the KPI library, so that a review period has a defined start, end and measure.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "Cycles come in four types and are created and edited from modals.",
+            "A KPI carries target, unit, weight and applicable roles.",
+            "A weight is meaningful only next to the other weights on the same review.",
+            "Editing a cycle returns me to the page I opened the modal from."
+          ],
+          "impl": "<code>performance.cycles.store</code> / <code>.update</code>; <code>kpi_library</code>"
+        },
+        {
+          "id": "US-20",
+          "story": "As an <strong>HR manager</strong>, I want to review outside the reporting line only on a stated, logged basis, so that the exception is visible rather than assumed.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "My role grants no blanket review access.",
+            "Exactly four bases are valid: <code>no_supervisor</code>, <code>supervisor_unavailable</code>, <code>supervisor_is_subject</code>, <code>supervisor_account_unavailable</code>.",
+            "Each requires a typed reason.",
+            "The basis and reason are stamped on the review, badged in the UI, and written to <code>audit_trails</code> as <code>review_exception</code>."
+          ],
+          "impl": "<code>PerformanceController</code> exception path"
+        },
+        {
+          "id": "US-21",
+          "story": "As an <strong>HR manager</strong>, I want renewal rules and per-employee cycles, so that a licence requirement is enforced against the window it applies to.",
+          "priority": "Must",
+          "points": 13,
+          "ac": [
+            "A rule opens a cycle per employee with the requirement frozen at <code>hours_required_snapshot</code>.",
+            "Attained hours are summed from verified CPD on every read, never stored on the cycle.",
+            "Risk is rated <em>at risk</em> / <em>shortfall</em> / <em>met</em> from the current window.",
+            "A caller may hand in a visibility scope so the at-risk list respects reporting lines."
+          ],
+          "impl": "<code>RenewalCycleService</code>"
+        },
+        {
+          "id": "US-22",
+          "story": "As an <strong>HR manager</strong>, I want an accreditation report I can hand to a surveyor, so that evidence is produced rather than assembled by hand.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "One row per active employee.",
+            "Filterable by department, role and JCI standard.",
+            "The JCI code is read from <code>competency_categories</code>, one join above the competency.",
+            "Counts and badges are rendered together in the same cell."
+          ],
+          "impl": "<code>/learning/accreditation</code>"
+        },
+        {
+          "id": "US-23",
+          "story": "As an <strong>HR manager</strong>, I want to know which employees are tracked without a login, so that a compliance gap is not mistaken for an account gap.",
+          "priority": "Should",
+          "points": 3,
+          "ac": [
+            "The report names proxy-tracked employees and orphaned logins separately.",
+            "Compliance still governs an employee with no <code>users</code> row — the layer keys off <code>employee_id</code> only."
+          ],
+          "impl": "<code>/learning/accounts</code>"
+        },
+        {
+          "id": "US-24",
+          "story": "As an <strong>HR manager</strong>, I want a 9-box succession grid with the confidential fields intact, so that pipeline decisions can be made on complete information.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "Critical positions, candidates and readiness are visible hospital-wide.",
+            "The 9-box placement is derived in PHP from performance and potential.",
+            "Readiness evidence draws on competency and credential standing.",
+            "A quarterly review stamp can be recorded against a position."
+          ],
+          "impl": "<code>SuccessionController::readinessEvidence()</code>"
+        },
+        {
+          "id": "US-25",
+          "story": "As an <strong>HR manager</strong>, I want to moderate recognition and manage badges, so that the wall stays appropriate without becoming anonymous.",
+          "priority": "Must",
+          "points": 5,
+          "ac": [
+            "Moderation requires the <code>manage-recognition</code> gate.",
+            "Moderators can see private posts for moderation purposes.",
+            "Every moderation act is audited.",
+            "Sender and recipient stay identifiable in both modes."
+          ],
+          "impl": "<code>RecognitionController</code>"
+        },
+        {
+          "id": "US-26",
+          "story": "As an <strong>HR manager</strong>, I want expiring credentials to reach the employee, their supervisor and their department head, so that a lapse is somebody's problem before it becomes everybody's.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "A daily command scans expiry windows.",
+            "The alert-log ledger is the single dedupe path, so a re-run does not re-notify.",
+            "Escalation reaches all three recipients.",
+            "A department head who is out of chain gets the module page, not a forbidden deep link."
+          ],
+          "impl": "<code>hims:scan-credential-expiry</code>; <code>credential_alert_log</code>"
+        }
+      ]
+    },
+    {
+      "role": "Administrator",
+      "blurb": "Full functional reach plus account and platform administration. Still not exempt from review-authority rules.",
+      "stories": [
+        {
+          "id": "US-27",
+          "story": "As an <strong>administrator</strong>, I want to provision accounts myself, so that nobody self-registers into a hospital system.",
+          "priority": "Must",
+          "points": 5,
+          "ac": [
+            "Public registration is disabled.",
+            "I set the role and optionally link a <code>users.employee_id</code>.",
+            "Passwords are hashed with bcrypt at cost 12.",
+            "Five failed attempts lock the account.",
+            "Account changes are audited."
+          ],
+          "impl": "<code>UserController</code>; migration <code>..._000095</code>"
+        },
+        {
+          "id": "US-28",
+          "story": "As an <strong>administrator</strong>, I want the org chart separated from account permissions, so that promoting someone to manager is not the same act as granting them privileges.",
+          "priority": "Must",
+          "points": 8,
+          "ac": [
+            "<code>employees.is_people_manager</code> drives the org chart; <code>users.role</code> drives permissions.",
+            "A Reports To change cannot create a cycle in the reporting graph.",
+            "The change is audited."
+          ],
+          "impl": "<code>ReportingLineService</code>"
+        },
+        {
+          "id": "US-29",
+          "story": "As an <strong>administrator</strong>, I want to control what employee text may leave the hospital for an AI provider, so that data sharing is a decision rather than a default.",
+          "priority": "Must",
+          "points": 5,
+          "ac": [
+            "<code>ai_include_comments = '0'</code> stops written review comments reaching the provider entirely.",
+            "<code>ai_redact_names</code> blanks the subject's name parts and any <code>Patient</code>/<code>Pt.</code>-prefixed identifier.",
+            "Any read error on the settings table redacts rather than opens up.",
+            "The switches are read by the prompt builder itself, not by each caller."
+          ],
+          "impl": "<code>system_settings</code>; <code>ReviewFeedback::promptLines()</code>"
+        },
+        {
+          "id": "US-30",
+          "story": "As an <strong>administrator</strong>, I want to change AI provider without changing consumer code, so that a vendor decision is configuration.",
+          "priority": "Should",
+          "points": 8,
+          "ac": [
+            "Consumers depend on the <code>AiProvider</code> contract only.",
+            "<code>AI_PROVIDER</code> selects gemini, openai, anthropic or compatible; gemini is the default.",
+            "Model is env-configurable per provider.",
+            "A provider failure returns a warning string and never throws."
+          ],
+          "impl": "<code>AiManager</code>; <code>config/services.php</code>"
+        },
+        {
+          "id": "US-31",
+          "story": "As an <strong>administrator</strong>, I want the assistant to be able to perform writes on my behalf under the same RBAC as the UI, so that convenience does not become escalation.",
+          "priority": "Should",
+          "points": 21,
+          "ac": [
+            "The registry holds 30 actions, each derived from the route's own middleware.",
+            "A role check runs before the entity resolver.",
+            "Names are resolved to UUIDs rather than guessed.",
+            "A destructive plan requires explicit confirmation.",
+            "Every executed write is audited as an AI action.",
+            "Registry keys point at <code>.store</code> routes, never <code>.create</code> — which is what made deleting the GET create pages safe."
+          ],
+          "impl": "<code>AiActionRegistry</code> → <code>Planner</code> → <code>EntityResolver</code> → <code>Executor</code>"
+        },
+        {
+          "id": "US-32",
+          "story": "As an <strong>administrator</strong>, I want an audit endpoint over the recorded rows, so that sensitive changes are attributable — while knowing the coverage is partial.",
+          "priority": "Must",
+          "points": 5,
+          "ac": [
+            "<code>/audit/history</code> is HR/Admin only.",
+            "Rows carry actor, action, table, record and timestamp.",
+            "Ordinary reads and many ordinary UI edits are not tracked.",
+            "There is no hash chaining, and the table is not to be read as a complete history."
+          ],
+          "impl": "<code>App\\Support\\AuditTrail::record()</code>"
+        },
+        {
+          "id": "US-33",
+          "story": "As an <strong>administrator</strong>, I want a release's markup to be served with that release's stylesheet, so that a new component cannot render bare behind a four-hour cache.",
+          "priority": "Must",
+          "points": 3,
+          "ac": [
+            "Both unbuilt static assets append <code>substr(md5_file($path), 0, 8)</code>.",
+            "The stylesheet is loaded only via <code>@include('partials.app-css')</code>.",
+            "All four standalone <code>&lt;head&gt;</code> blocks go through the partial.",
+            "A bare <code>asset('css/hims.css')</code> anywhere fails the contract test."
+          ],
+          "impl": "<code>Unit\\AssetCacheBustingContractTest</code>"
+        }
+      ]
+    }
+  ]
+}

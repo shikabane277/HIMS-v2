@@ -1,0 +1,159 @@
+{
+  "intro": [
+    "This section is the layer that was missing. The <em>steps</em> of each process are already documented — <code>HIMS_SYSTEM_DOCUMENTATION.md</code> §4.A–§4.G walk them screen by screen, and §8 traces one end-to-end worked example. What follows is the architecture above those steps: the process taxonomy, who owns each process, where control passes between roles, and the invariants that hold across all of them.",
+    "The organising idea is that this module runs <strong>one long-running loop per employee</strong> — assess, identify a gap, close it, verify the closure, feed the result back into the next assessment — with three supporting cycles (credential renewal, succession, recognition) hanging off it at different frequencies."
+  ],
+  "landscapeCaption": "Figure 5.1 — Process landscape. The four value-chain processes run left to right; the four supporting processes cut across all of them. An arrow is a handover of control, not a data copy.",
+  "taxonomy": {
+    "intro": "Level 0 is the value chain. Level 1 is a process with a single accountable owner. Level 2 is the procedure a user carries out, and it is at Level 2 that the existing documentation takes over.",
+    "columns": ["L0 — Value chain", "L1 — Process", "Owner", "Trigger", "Cadence", "L2 detail lives in"],
+    "rows": [
+      {
+        "l0": "Measure performance",
+        "items": [
+          { "l1": "Review cycle administration", "owner": "HR Manager", "trigger": "Calendar period opens", "cadence": "Quarterly / annual", "ref": "SYS §4.A" },
+          { "l1": "Performance review execution", "owner": "Direct supervisor", "trigger": "Cycle open + subject in chain", "cadence": "Per cycle, per employee", "ref": "SYS §4.A, §8" },
+          { "l1": "Employee response &amp; acknowledgement", "owner": "Employee (subject)", "trigger": "Reviewer marks Finished", "cadence": "Per review", "ref": "SYS §4.A" },
+          { "l1": "Exception review authorisation", "owner": "HR Manager / Admin", "trigger": "Reporting line cannot supply a reviewer", "cadence": "By exception, always logged", "ref": "SYS §3, §7" }
+        ]
+      },
+      {
+        "l0": "Diagnose capability",
+        "items": [
+          { "l1": "Competency framework maintenance", "owner": "HR Manager", "trigger": "New role, standard or accreditation change", "cadence": "Annual / on change", "ref": "SYS §4.B" },
+          { "l1": "Competency assessment", "owner": "Direct supervisor", "trigger": "Review, onboarding or reassessment date", "cadence": "Per employee per competency", "ref": "SYS §4.B" },
+          { "l1": "Gap analysis &amp; narrative generation", "owner": "Supervisor / HR Manager", "trigger": "On demand from the gap screens", "cadence": "On demand", "ref": "SYS §4.C, §5.1" }
+        ]
+      },
+      {
+        "l0": "Close the gap",
+        "items": [
+          { "l1": "Catalogue &amp; pathway curation", "owner": "HR Manager", "trigger": "Gap pattern or new course offering", "cadence": "Continuous", "ref": "SYS §4.D" },
+          { "l1": "Required-training assignment", "owner": "Supervisor / HR Manager", "trigger": "Mandate, gap or accreditation requirement", "cadence": "On demand, fan-out", "ref": "SYS §4.D, §4.G" },
+          { "l1": "Session scheduling &amp; delivery", "owner": "HR Manager / Trainer", "trigger": "Assignment volume or calendar", "cadence": "Per session", "ref": "SYS §4.E" },
+          { "l1": "Completion recording", "owner": "Supervisor and above", "trigger": "Course finished or session attended", "cadence": "Per enrolment / registration", "ref": "SYS §4.D, §4.E" }
+        ]
+      },
+      {
+        "l0": "Prove the closure",
+        "items": [
+          { "l1": "CPD logging &amp; verification", "owner": "Employee logs, HR verifies", "trigger": "External or internal learning event", "cadence": "Continuous", "ref": "SYS §4.D" },
+          { "l1": "Renewal cycle settlement", "owner": "HR Manager", "trigger": "Rule window opens / closes", "cadence": "Per rule per employee", "ref": "SYS §4.G" },
+          { "l1": "Accreditation reporting", "owner": "HR Manager", "trigger": "Survey, audit or management request", "cadence": "On demand", "ref": "SYS §4.G" }
+        ]
+      },
+      {
+        "l0": "Supporting — runs across all four",
+        "support": true,
+        "items": [
+          { "l1": "Credential lifecycle &amp; expiry escalation", "owner": "HR Manager (system-initiated)", "trigger": "Daily scheduled scan", "cadence": "Daily 06:30 Asia/Manila", "ref": "SYS §4.B; ARCH §4" },
+          { "l1": "Succession pipeline management", "owner": "HR Manager", "trigger": "Critical-position review", "cadence": "Quarterly", "ref": "SYS §4.F" },
+          { "l1": "Recognition &amp; moderation", "owner": "Any employee; HR moderates", "trigger": "Peer action", "cadence": "Continuous", "ref": "SYS §4.F" },
+          { "l1": "Access administration &amp; audit", "owner": "Administrator", "trigger": "Joiner, mover, leaver, incident", "cadence": "Continuous", "ref": "SYS §3, §7; ARCH §3" }
+        ]
+      }
+    ]
+  },
+  "swimlaneCaption": "Figure 5.2 — Performance review, as a control-handover diagram. Each vertical band is a role; each box is a step that role owns exclusively. The two dashed gates are enforced by derived state, not by a stored status column or a scheduled job.",
+  "handovers": {
+    "intro": "The architecturally interesting part of this module is not the steps — it is the points where control passes and cannot pass back. Each of these is enforced in code, not by convention.",
+    "columns": ["Handover", "From → To", "What makes it one-way", "Enforced by"],
+    "rows": [
+      [
+        "Cycle opens",
+        "HR Manager → Supervisor",
+        "A review cannot be created in a cycle that has already ended, so a review is never born frozen.",
+        "<code>storeReview()</code> refusal; <code>CycleStatus</code>"
+      ],
+      [
+        "Review finished",
+        "Supervisor → Employee",
+        "Response submission unlocks only on <em>finished</em>. The reviewer keeps score authority throughout.",
+        "<code>performance.reviews.respond</code> guard"
+      ],
+      [
+        "Cycle ends",
+        "Supervisor → nobody",
+        "Editability is derived from <code>end_date</code> on every read, so the freeze holds even where no scheduler runs. <em>Completed</em> is nobody's to set by hand.",
+        "<code>ReviewStatus</code> → <code>CycleStatus</code>"
+      ],
+      [
+        "Employee acknowledges",
+        "Employee → nobody",
+        "Acknowledgement locks the response permanently; the two timestamps are stored separately so the sequence is provable.",
+        "<code>employee_acknowledged_at</code>"
+      ],
+      [
+        "Completion recorded",
+        "Supervisor → compliance layer",
+        "Nobody self-certifies. Completion is a statement about a person, so it needs the <code>record-completion</code> gate and a direct-report relationship; reopening is narrower still because it withdraws evidence.",
+        "<code>completeEnrollment()</code> / <code>reopenEnrollment()</code>"
+      ],
+      [
+        "CPD verified",
+        "Employee → HR Manager",
+        "Only verified hours count. Verification lands days after the log, which is why attained hours are summed on read rather than stored on the cycle.",
+        "<code>RenewalCycleService::attainedHours()</code>"
+      ],
+      [
+        "Session attended",
+        "Trainer/Supervisor → compliance layer",
+        "Check-in is a session's <em>only</em> completion mechanism, so one fact never has two writers.",
+        "<code>training.sessions.checkin</code>"
+      ],
+      [
+        "Candidate developed",
+        "Supervisor → HR Manager",
+        "A supervisor can develop a candidate without seeing the ratings that placed them: scores, 9-box label, readiness, mentor and status are redacted downward.",
+        "<code>SuccessionController</code> redaction"
+      ]
+    ]
+  },
+  "invariants": {
+    "intro": "Six rules hold across every process above. They are the reason the module behaves consistently rather than per-screen, and each one exists because its absence caused a real defect.",
+    "items": [
+      {
+        "title": "State that depends on a date is derived, never stored",
+        "body": "Credential expiry, cycle closure and review editability are all computed on read from a date column. There is no nightly job to set them, because an authorisation rule that depends on <code>schedule:run</code> being wired is one that fails open on any box where it is not. The cost is that <code>performance_reviews.status</code> only ever holds <em>draft</em> or <em>finished</em> — so any query wanting \"open reviews\" must join the cycle, and a filter on the column alone silently misses the third state.",
+        "owner": "<code>CredentialStatus</code>, <code>CycleStatus</code>, <code>ReviewStatus</code>"
+      },
+      {
+        "title": "The clock is the hospital's clock",
+        "body": "All three helpers ask \"has this date passed?\" against <code>now()</code>. Under the stock UTC default that question answered <em>no</em> for the first eight hours of every Philippine day — a cycle that ended yesterday stayed scoreable until 8am. <code>Asia/Manila</code> is therefore an authorisation setting, and a test pins it.",
+        "owner": "<code>config('app.timezone')</code>"
+      },
+      {
+        "title": "One fact, one writer",
+        "body": "Course completion has exactly one write path and sessions have a different one, so no fact is recorded in two places. <em>Overdue</em> has one definition, in the service, and the dashboard calls it rather than counting again — a second copy would be free to drift the first time either changed.",
+        "owner": "<code>RenewalCycleService::overdueCount()</code>"
+      },
+      {
+        "title": "Authority is identity, not role",
+        "body": "Reviewer legitimacy is the reporting line. Admin and HR have no blanket review access and reach outside the chain only through a logged exception on one of four bases. These checks are private controller methods rather than Gates, because a Gate closure receives only the user — and every rule here needs the review row.",
+        "owner": "<code>PerformanceController</code>"
+      },
+      {
+        "title": "Visibility is the reporting line, not the department",
+        "body": "<code>scopeToVisibleEmployees()</code> filters on <code>supervisor_id</code>. The rewrite changed behaviour in every module that calls it, which is why a test whose subject merely shares a department with the actor is now the <em>negative</em> case.",
+        "owner": "<code>Controller</code> base class"
+      },
+      {
+        "title": "Compliance governs people, not accounts",
+        "body": "Every compliance and notification path keys off <code>employees.employee_id</code>. An employee tracked by proxy — no login at all — is still assigned, still measured, still escalated about. That is the point, and the account-coverage report exists to name them.",
+        "owner": "<code>TrainingAssignmentService</code>, <code>NotificationService</code>"
+      }
+    ]
+  },
+  "aiProcess": {
+    "intro": "One process deserves separate treatment because it is the only one where a user's sentence becomes a database write. It is documented step-by-step in <code>HIMS_SYSTEM_DOCUMENTATION.md</code> §5.1; what matters architecturally is the order of the stages.",
+    "stages": [
+      { "n": 1, "name": "Verb pre-filter", "note": "Cheap rejection of anything that is plainly a question, before a model is involved." },
+      { "n": 2, "name": "Planner", "note": "Classifies the sentence to one of the catalogue's actions." },
+      { "n": 3, "name": "Registry role check", "note": "<strong>Before</strong> resolution. The catalogue's 30 entries derive their permission from the route's own middleware, so the assistant cannot outrank the UI." },
+      { "n": 4, "name": "Entity resolver", "note": "Names become UUIDs by lookup, not by generation." },
+      { "n": 5, "name": "Executor", "note": "Prefills and invokes the real controller — the same validation and the same authorisation the form would have hit." },
+      { "n": 6, "name": "Audit", "note": "The write is recorded as an AI action, with the actor still attributable." }
+    ],
+    "closing": "The role check sitting at stage 3 rather than stage 5 is the load-bearing detail: an unauthorised plan is refused before any entity is looked up, so the pipeline never confirms the existence of a record the caller may not see."
+  }
+}

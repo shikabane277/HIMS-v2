@@ -101,9 +101,15 @@ class AiManager
         return match ($driver) {
             'gemini' => new GeminiProvider($conf),
             'anthropic' => new AnthropicProvider($conf),
-            'openai' => new OpenAiProvider($conf, 'OpenAI'),
-            // Any OpenAI-compatible host (Groq, DeepSeek, xAI, Mistral, …).
-            'compatible' => new OpenAiProvider($conf, (string) ($conf['label'] ?? 'AI')),
+            'openai' => new OpenAiProvider($conf, 'OpenAI', 'OPENAI_MODEL'),
+            // Any OpenAI-compatible host (Groq, DeepSeek, xAI, Mistral, …). The
+            // env keys are passed in because one driver class serves two slots
+            // and only this method knows which one it is building.
+            'compatible' => new OpenAiProvider(
+                $conf,
+                (string) ($conf['label'] ?? 'AI'),
+                'AI_COMPATIBLE_MODEL / AI_COMPATIBLE_FALLBACK_MODELS',
+            ),
             default => throw new InvalidArgumentException("Unknown AI driver [{$driver}] for provider [{$name}]."),
         };
     }
