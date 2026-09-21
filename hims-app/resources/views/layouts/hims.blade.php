@@ -30,7 +30,7 @@
 <!-- SIDEBAR -->
 <aside class="hims-sidebar" id="sidebar">
     <a href="{{ route('dashboard') }}" class="sidebar-brand">
-        <div class="brand-icon">🏥</div>
+        <div class="brand-icon"><i class="bi bi-heart-pulse"></i></div>
         <div class="brand-text">
             <span class="brand-name">HIMS</span>
             <span class="brand-sub">Performance & Development</span>
@@ -40,24 +40,24 @@
     <nav class="sidebar-nav">
         <div class="sidebar-section-label">Overview</div>
         <a href="{{ route('dashboard') }}" class="sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-            <span class="nav-icon">📊</span> Dashboard
+            <span class="nav-icon"><i class="bi bi-grid-1x2"></i></span> Dashboard
         </a>
         {{-- Every role, including staff who have no directory access at all.
              The route resolves the signed-in user's own employee_id. --}}
         <a href="{{ route('employees.progression.mine') }}" class="sidebar-link {{ request()->routeIs('employees.progression*') ? 'active' : '' }}">
-            <span class="nav-icon">📈</span> My Development
+            <span class="nav-icon"><i class="bi bi-graph-up"></i></span> My Development
         </a>
 
         <div class="sidebar-section-label">HR Modules</div>
         <a href="{{ route('performance.index') }}" class="sidebar-link {{ request()->routeIs('performance.*') ? 'active' : '' }}">
-            <span class="nav-icon">📋</span> Performance
+            <span class="nav-icon"><i class="bi bi-clipboard-data"></i></span> Performance
         </a>
         <a href="{{ route('competency.index') }}" class="sidebar-link {{ request()->routeIs('competency.index') || request()->routeIs('competency.assessments.*') || request()->routeIs('competency.credentials.*') || request()->routeIs('competency.domains.*') ? 'active' : '' }}">
-            <span class="nav-icon">🎯</span> Competency
+            <span class="nav-icon"><i class="bi bi-bullseye"></i></span> Competency
         </a>
         @can('run-gap-analysis')
         <a href="{{ route('competency.gap.index') }}" class="sidebar-link {{ request()->routeIs('competency.gap.*') ? 'active' : '' }}">
-            <span class="nav-icon">🤖</span> AI Gap Analysis
+            <span class="nav-icon"><i class="bi bi-cpu"></i></span> AI Gap Analysis
         </a>
         @endcan
         {{-- One entry for the whole Learning module, both halves. The
@@ -66,14 +66,14 @@
              entry; they are now tabs inside Learning, gated individually by
              partials/learning-tabs.blade.php. `learning.*` covers all of them. --}}
         <a href="{{ route('learning.index') }}" class="sidebar-link {{ request()->routeIs('learning.*') || request()->routeIs('training.*') ? 'active' : '' }}">
-            <span class="nav-icon">📚</span> Learning
+            <span class="nav-icon"><i class="bi bi-book"></i></span> Learning
         </a>
         <a href="{{ route('recognition.index') }}" class="sidebar-link {{ request()->routeIs('recognition.*') ? 'active' : '' }}">
             <span class="nav-icon"><i class="bi bi-stars"></i></span> Recognition
         </a>
         @can('view-succession')
         <a href="{{ route('succession.index') }}" class="sidebar-link {{ request()->routeIs('succession.*') ? 'active' : '' }}">
-            <span class="nav-icon">🏆</span> Succession
+            <span class="nav-icon"><i class="bi bi-trophy"></i></span> Succession
         </a>
         @endcan
 
@@ -82,17 +82,17 @@
         @can('view-employees')
         {{-- Excludes employees.progression*, which has its own entry above. --}}
         <a href="{{ route('employees.index') }}" class="sidebar-link {{ request()->routeIs('employees.*') && ! request()->routeIs('employees.progression*') ? 'active' : '' }}">
-            <span class="nav-icon">👥</span> Employees
+            <span class="nav-icon"><i class="bi bi-people"></i></span> Employees
         </a>
         @endcan
         @can('manage-departments')
         <a href="{{ route('departments.index') }}" class="sidebar-link {{ request()->routeIs('departments.*') ? 'active' : '' }}">
-            <span class="nav-icon">🏢</span> Departments
+            <span class="nav-icon"><i class="bi bi-building"></i></span> Departments
         </a>
         @endcan
         @can('manage-users')
         <a href="{{ route('users.index') }}" class="sidebar-link {{ request()->routeIs('users.*') ? 'active' : '' }}">
-            <span class="nav-icon">🔐</span> Users & Access
+            <span class="nav-icon"><i class="bi bi-shield-lock"></i></span> Users & Access
         </a>
         @endcan
         @endcanany
@@ -109,7 +109,7 @@
         <form method="POST" action="{{ route('logout') }}">
             @csrf
             <a href="#" onclick="this.closest('form').submit()" class="sidebar-link" style="margin-top:4px">
-                <span class="nav-icon">🚪</span> Logout
+                <span class="nav-icon"><i class="bi bi-box-arrow-right"></i></span> Logout
             </a>
         </form>
     </div>
@@ -1002,6 +1002,7 @@
         if (localStorage.getItem(OPEN_KEY)) openRail(true);
     });
 </script>
+<script src="{{ asset('js/hims-select.js') }}?v={{ file_exists(public_path('js/hims-select.js')) ? filemtime(public_path('js/hims-select.js')) : 1 }}"></script>
 @stack('scripts')
 </body>
 </html>

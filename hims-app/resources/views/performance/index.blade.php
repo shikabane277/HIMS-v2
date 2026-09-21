@@ -20,13 +20,13 @@
 
 <div class="row g-3 mb-4">
     <div class="col-sm-4">
-        <div class="stat-card"><div class="stat-icon">🟢</div><div class="stat-value">{{ $stats['active'] ?? 0 }}</div><div class="stat-label">Active Cycles</div></div>
+        <div class="stat-card"><div class="stat-icon"><i class="bi bi-play-circle"></i></div><div class="stat-value">{{ $stats['active'] ?? 0 }}</div><div class="stat-label">Active Cycles</div></div>
     </div>
     <div class="col-sm-4">
-        <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-value">{{ $stats['pending'] ?? 0 }}</div><div class="stat-label">Pending Reviews</div></div>
+        <div class="stat-card"><div class="stat-icon"><i class="bi bi-hourglass-split"></i></div><div class="stat-value">{{ $stats['pending'] ?? 0 }}</div><div class="stat-label">Pending Reviews</div></div>
     </div>
     <div class="col-sm-4">
-        <div class="stat-card"><div class="stat-icon">🚨</div><div class="stat-value">{{ $stats['pips'] ?? 0 }}</div><div class="stat-label">Active PIPs</div></div>
+        <div class="stat-card"><div class="stat-icon"><i class="bi bi-exclamation-diamond"></i></div><div class="stat-value">{{ $stats['pips'] ?? 0 }}</div><div class="stat-label">Active PIPs</div></div>
     </div>
 </div>
 

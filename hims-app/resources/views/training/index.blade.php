@@ -18,10 +18,10 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value">{{ $stats['upcoming_sessions'] ?? 0 }}</div><div class="stat-label">Upcoming Sessions</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value">{{ $stats['total_registrations'] ?? 0 }}</div><div class="stat-label">Total Registrations</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value">{{ $stats['avg_attendance'] ?? 0 }}%</div><div class="stat-label">Avg Attendance</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-value">{{ $stats['avg_feedback_score'] ?? '—' }}</div><div class="stat-label">Avg Feedback Score</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-calendar-event"></i></div><div class="stat-value">{{ $stats['upcoming_sessions'] ?? 0 }}</div><div class="stat-label">Upcoming Sessions</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-people"></i></div><div class="stat-value">{{ $stats['total_registrations'] ?? 0 }}</div><div class="stat-label">Total Registrations</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-check2-circle"></i></div><div class="stat-value">{{ $stats['avg_attendance'] ?? 0 }}%</div><div class="stat-label">Avg Attendance</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-star"></i></div><div class="stat-value">{{ $stats['avg_feedback_score'] ?? '—' }}</div><div class="stat-label">Avg Feedback Score</div></div></div>
 </div>
 
 <div class="row g-3 mb-4">

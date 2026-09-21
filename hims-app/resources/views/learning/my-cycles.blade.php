@@ -40,9 +40,9 @@
 @endphp
 
 <div class="row g-3 mb-4">
-    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon">🔄</div><div class="stat-value">{{ $open->count() }}</div><div class="stat-label">Open Cycles</div></div></div>
-    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-value">{{ rtrim(rtrim(number_format($owed, 1), '0'), '.') }}</div><div class="stat-label">Hours Still Owed</div></div></div>
-    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-value">{{ $cycles->whereIn('risk', ['at_risk','shortfall'])->count() }}</div><div class="stat-label">Behind Pace</div></div></div>
+    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon"><i class="bi bi-arrow-repeat"></i></div><div class="stat-value">{{ $open->count() }}</div><div class="stat-label">Open Cycles</div></div></div>
+    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon"><i class="bi bi-stopwatch"></i></div><div class="stat-value">{{ rtrim(rtrim(number_format($owed, 1), '0'), '.') }}</div><div class="stat-label">Hours Still Owed</div></div></div>
+    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div><div class="stat-value">{{ $cycles->whereIn('risk', ['at_risk','shortfall'])->count() }}</div><div class="stat-label">Behind Pace</div></div></div>
 </div>
 
 @forelse($cycles as $cycle)

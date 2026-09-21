@@ -33,7 +33,8 @@
     --hims-shadow:        0 1px 3px rgba(22,163,74,.08), 0 4px 16px rgba(22,163,74,.06);
     --hims-shadow-md:     0 4px 24px rgba(22,163,74,.12), 0 1px 4px rgba(0,0,0,.04);
     --hims-shadow-lg:     0 8px 40px rgba(22,163,74,.18), 0 2px 8px rgba(0,0,0,.06);
-    --hims-transition:    all .18s cubic-bezier(.4,0,.2,1);
+    --hims-transition:    all .22s cubic-bezier(.4,0,.2,1);
+    --hims-spring:        cubic-bezier(.34,1.56,.64,1);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -112,7 +113,7 @@ body {
 .sidebar-link:hover {
     background: rgba(255,255,255,.1);
     color: #fff;
-    transform: translateX(2px);
+    transform: translateX(3px);
 }
 .sidebar-link.active {
     background: rgba(255,255,255,.15);
@@ -127,8 +128,10 @@ body {
     width: 3px; height: 60%;
     background: var(--hims-primary-light);
     border-radius: 0 3px 3px 0;
+    animation: slideInLeft .2s ease;
 }
-.sidebar-link .nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.sidebar-link .nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; transition: transform .2s var(--hims-spring); }
+.sidebar-link:hover .nav-icon { transform: scale(1.15); }
 .sidebar-link .nav-badge {
     margin-left: auto;
     background: var(--hims-danger);
@@ -224,7 +227,7 @@ body {
     transition: var(--hims-transition);
     position: relative;
 }
-.topbar-btn:hover { background: var(--hims-primary-xlight); transform: scale(1.05); }
+.topbar-btn:hover { background: var(--hims-primary-xlight); transform: scale(1.08); }
 .topbar-btn .notif-count {
     position: absolute;
     top: -4px; right: -5px;
@@ -252,19 +255,59 @@ body {
     background: #fff;
     border: 1px solid var(--hims-border);
     border-radius: 14px;
-    box-shadow: 0 12px 40px rgba(0,0,0,.14);
+    box-shadow: 0 16px 42px -6px rgba(0,0,0,.15), 0 6px 18px -2px rgba(0,0,0,.08);
     z-index: 1100;
     opacity: 0;
-    transform: translateY(-6px) scale(.98);
+    transform: translateY(-10px) scale(.94);
+    transform-origin: top right;
     pointer-events: none;
-    transition: opacity .16s ease, transform .16s ease;
+    transition: opacity .18s ease, transform .22s var(--hims-spring), visibility .2s;
+    visibility: hidden;
     overflow: hidden;
 }
 .topbar-dropdown.open {
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
+    visibility: visible;
+    animation: dropdownPopIn .28s var(--hims-spring) forwards;
 }
+
+/* Staggered entrance for dropdown items */
+.topbar-dropdown.open .notif-item,
+.topbar-dropdown.open .help-faq,
+.topbar-dropdown.open .global-search-box {
+    animation: dropdownItemPop .24s cubic-bezier(.16,1,.3,1) both;
+}
+.topbar-dropdown.open .notif-item:nth-child(1),
+.topbar-dropdown.open .help-faq:nth-child(1) { animation-delay: .02s; }
+.topbar-dropdown.open .notif-item:nth-child(2),
+.topbar-dropdown.open .help-faq:nth-child(2) { animation-delay: .05s; }
+.topbar-dropdown.open .notif-item:nth-child(3),
+.topbar-dropdown.open .help-faq:nth-child(3) { animation-delay: .08s; }
+.topbar-dropdown.open .notif-item:nth-child(4),
+.topbar-dropdown.open .help-faq:nth-child(4) { animation-delay: .11s; }
+.topbar-dropdown.open .notif-item:nth-child(5),
+.topbar-dropdown.open .help-faq:nth-child(5) { animation-delay: .14s; }
+
+/* Generic dropdown menus */
+.dropdown-menu,
+.dropdown-content,
+.hims-dropdown-menu {
+    border: 1px solid var(--hims-border);
+    border-radius: 12px;
+    box-shadow: 0 16px 42px -6px rgba(0,0,0,.14), 0 6px 18px -2px rgba(0,0,0,.08);
+    transform-origin: top right;
+    transition: opacity .18s ease, transform .22s var(--hims-spring);
+}
+.dropdown-menu.show,
+.dropdown-menu.open,
+.dropdown-content.open,
+.hims-dropdown-menu.open {
+    display: block;
+    animation: dropdownPopIn .28s var(--hims-spring) forwards;
+}
+
 .topbar-dropdown::before {
     content: '';
     position: absolute;
@@ -531,7 +574,7 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     border-radius: 0 0 0 80px;
     transition: var(--hims-transition);
 }
-.stat-card:hover { box-shadow: var(--hims-shadow-md); transform: translateY(-2px); }
+.stat-card:hover { box-shadow: var(--hims-shadow-md); transform: translateY(-3px); }
 .stat-card:hover::after { width: 100px; height: 100px; }
 .stat-card .stat-icon {
     width: 48px; height: 48px;
@@ -539,9 +582,12 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
     font-size: 22px;
+    color: var(--hims-primary);
     margin-bottom: 14px;
     z-index: 1; position: relative;
+    transition: transform .25s var(--hims-spring), background .2s ease;
 }
+.stat-card:hover .stat-icon { transform: scale(1.1); background: var(--hims-primary-xlight); }
 .stat-card .stat-value { font-size: 30px; font-weight: 800; color: var(--hims-text-dark); line-height: 1; }
 .stat-card .stat-label { font-size: 13px; color: var(--hims-gray); margin-top: 4px; font-weight: 500; }
 .stat-card .stat-change { font-size: 12px; margin-top: 8px; }
@@ -689,8 +735,215 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     border-color: var(--hims-primary);
     box-shadow: 0 0 0 3px rgba(22,163,74,.15);
 }
-.hims-input::placeholder { color: #9ca3af; }
-.hims-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2316a34a' d='M1 1l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+.hims-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2316a34a' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: border-color var(--hims-transition) ease, box-shadow var(--hims-transition) ease, transform .15s ease;
+}
+.hims-select:hover {
+    border-color: var(--hims-primary-light);
+}
+.hims-select:focus {
+    border-color: var(--hims-primary);
+    box-shadow: 0 0 0 3px rgba(22,163,74,.15);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+/* ═══════════════ CUSTOM ANIMATED SELECT ═══════════════ */
+.hims-select-wrapper {
+    position: relative;
+    width: 100%;
+    display: block;
+    box-sizing: border-box;
+}
+
+.hims-select-trigger {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 14px;
+    border: 1.5px solid var(--hims-border);
+    border-radius: var(--hims-radius-sm);
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--hims-text-dark);
+    background: var(--hims-white);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color var(--hims-transition) ease, box-shadow var(--hims-transition) ease, transform .15s ease, background-color .15s ease;
+    box-sizing: border-box;
+}
+
+.hims-select-trigger:hover {
+    border-color: var(--hims-primary-light);
+    background-color: #fafdfb;
+}
+
+.hims-select-trigger:focus-visible,
+.hims-select-wrapper.open .hims-select-trigger {
+    border-color: var(--hims-primary);
+    box-shadow: 0 0 0 3px rgba(22,163,74,.15);
+    outline: none;
+}
+
+.hims-select-trigger.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #f9fafb;
+}
+
+.hims-select-trigger-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+.hims-select-trigger-text.placeholder {
+    color: #9ca3af;
+}
+
+.hims-select-arrow {
+    color: var(--hims-primary);
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .25s var(--hims-spring);
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+
+.hims-select-wrapper.open .hims-select-arrow {
+    transform: rotate(180deg);
+}
+
+.hims-select-menu {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    width: 100%;
+    min-width: 160px;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1px solid var(--hims-border);
+    border-radius: 12px;
+    box-shadow: 0 16px 42px -6px rgba(0, 0, 0, 0.16), 0 4px 14px -2px rgba(0, 0, 0, 0.08);
+    z-index: 1200;
+    max-height: 240px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+    transform-origin: top center;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity .18s ease, transform .22s var(--hims-spring), visibility .18s;
+}
+
+.hims-select-wrapper.open .hims-select-menu {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    visibility: visible;
+    animation: dropdownPopIn .24s var(--hims-spring) forwards;
+}
+
+.hims-select-menu.opens-up {
+    top: auto;
+    bottom: calc(100% + 5px);
+    transform-origin: bottom center;
+}
+
+.hims-select-wrapper.open .hims-select-menu.opens-up {
+    animation: dropdownPopInUp .24s var(--hims-spring) forwards;
+}
+
+@keyframes dropdownPopInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
+    }
+    70% {
+        opacity: 1;
+        transform: translateY(-2px) scale(1.008);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.hims-select-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--hims-text-dark);
+    cursor: pointer;
+    transition: background .14s ease, transform .15s var(--hims-spring), color .14s ease;
+    user-select: none;
+}
+
+.hims-select-option:hover,
+.hims-select-option.focused {
+    background: var(--hims-primary-pale);
+    color: var(--hims-primary-dark);
+    transform: translateX(3px);
+}
+
+.hims-select-option.selected {
+    background: var(--hims-primary-xlight);
+    color: var(--hims-primary-dark);
+    font-weight: 600;
+}
+
+.hims-select-option .option-check {
+    color: var(--hims-primary);
+    font-size: 13px;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: opacity .15s ease, transform .2s var(--hims-spring);
+}
+
+.hims-select-option.selected .option-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.hims-select-option.is-placeholder {
+    color: #9ca3af;
+}
+
+.hims-select-option.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Staggered entrance for select menu options */
+.hims-select-wrapper.open .hims-select-option {
+    animation: dropdownItemPop .2s cubic-bezier(.16,1,.3,1) both;
+}
+.hims-select-wrapper.open .hims-select-option:nth-child(1) { animation-delay: .02s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(2) { animation-delay: .04s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(3) { animation-delay: .06s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(4) { animation-delay: .08s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(5) { animation-delay: .10s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(6) { animation-delay: .12s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(7) { animation-delay: .14s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(8) { animation-delay: .16s; }
 
 /* ═══════════════ PROGRESS BARS ═══════════════ */
 .hims-progress { height: 8px; background: var(--hims-primary-xlight); border-radius: 20px; overflow: hidden; }
@@ -1024,13 +1277,13 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
        horizontal scrollbar on the body. */
     transform: translateX(100%);
     visibility: hidden;
-    transition: transform .18s cubic-bezier(.4,0,.2,1), visibility 0s .18s;
+    transition: transform .25s cubic-bezier(.4,0,.2,1), visibility 0s .25s;
 }
 #ai-rail.open {
     transform: translateX(0);
     visibility: visible;
-    transition: transform .18s cubic-bezier(.4,0,.2,1), visibility 0s 0s;
-    box-shadow: -8px 0 32px rgba(5,46,22,.06);
+    transition: transform .25s var(--hims-spring), visibility 0s 0s;
+    box-shadow: -8px 0 32px rgba(5,46,22,.08);
 }
 
 /* ── Drag handle on the left edge ── */
@@ -1406,6 +1659,7 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
         left: 8px;
         width: auto;
         max-width: none;
+        transform-origin: top center;
     }
     /* The caret would now point at a trigger the panel is no longer beside. */
     .topbar-dropdown::before { display: none; }
@@ -1583,7 +1837,44 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
     from { opacity: 0; transform: translateY(16px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-.animate-in { animation: fadeInUp .3s ease forwards; }
+.animate-in { animation: fadeInUp .35s cubic-bezier(.4,0,.2,1) forwards; }
+
+@keyframes popIn {
+    from { opacity: 0; transform: scale(.92); }
+    to   { opacity: 1; transform: scale(1); }
+}
+.pop-in { animation: popIn .25s var(--hims-spring) forwards; }
+
+@keyframes dropdownPopIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.94);
+    }
+    70% {
+        opacity: 1;
+        transform: translateY(2px) scale(1.008);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes dropdownItemPop {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from { transform: translateY(-50%) scaleY(0); opacity: 0; }
+    to   { transform: translateY(-50%) scaleY(1); opacity: 1; }
+}
 
 @keyframes shimmer {
     0%   { background-position: -200% 0; }
@@ -1594,6 +1885,13 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
     border-radius: 6px;
+}
+
+/* Staggered stat-card entrance — each card pops in with a slight delay.
+   The animation-delay is set inline on the .stat-card elements that already
+   carry one; this just widens the base animation to include the pop. */
+.stat-card {
+    animation: popIn .35s var(--hims-spring) both;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1612,10 +1910,10 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
     display: none;
     position: fixed;
     inset: 0;
-    background: transparent;
+    background: rgba(5,46,22,.35);
     z-index: 1200;
     opacity: 0;
-    transition: opacity .2s ease;
+    transition: opacity .25s ease;
     padding: 20px;
     overflow-y: auto;
 }
@@ -1630,10 +1928,10 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
     width: 100%;
     max-width: 620px;
     margin: auto;
-    transform: translateY(-12px);
-    transition: transform .2s cubic-bezier(.4,0,.2,1);
+    transform: translateY(-16px) scale(.96);
+    transition: transform .3s var(--hims-spring);
 }
-.hims-modal-backdrop.shown .hims-modal { transform: translateY(0); }
+.hims-modal-backdrop.shown .hims-modal { transform: translateY(0) scale(1); }
 
 .hims-modal-header {
     display: flex; align-items: center; justify-content: space-between;

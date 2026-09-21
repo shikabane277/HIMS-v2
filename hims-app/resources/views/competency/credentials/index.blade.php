@@ -13,10 +13,10 @@
     @endcan
 </div>
 <div class="row g-3 mb-4">
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">📋</div><div class="stat-value">{{ $stats['total'] ?? 0 }}</div><div class="stat-label">Total Credentials</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value">{{ $stats['valid'] ?? 0 }}</div><div class="stat-label">Valid</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-value">{{ $stats['expiring'] ?? 0 }}</div><div class="stat-label">Expiring (30 days)</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">🔴</div><div class="stat-value">{{ $stats['expired'] ?? 0 }}</div><div class="stat-label">Expired</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-clipboard-data"></i></div><div class="stat-value">{{ $stats['total'] ?? 0 }}</div><div class="stat-label">Total Credentials</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-check2-circle"></i></div><div class="stat-value">{{ $stats['valid'] ?? 0 }}</div><div class="stat-label">Valid</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div><div class="stat-value">{{ $stats['expiring'] ?? 0 }}</div><div class="stat-label">Expiring (30 days)</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-exclamation-circle"></i></div><div class="stat-value">{{ $stats['expired'] ?? 0 }}</div><div class="stat-label">Expired</div></div></div>
 </div>
 <div class="hims-card">
     <div class="card-body" style="padding:0">

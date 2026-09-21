@@ -24,10 +24,10 @@
      @yield('content') for every page. --}}
 
 <div class="row g-3 mb-4">
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value">{{ $compliance['total'] }}</div><div class="stat-label">Assigned</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value">{{ $compliance['complete'] }}</div><div class="stat-label">Completed</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-value">{{ $compliance['outstanding'] }}</div><div class="stat-label">Outstanding</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">📊</div><div class="stat-value">{{ $compliance['rate'] }}%</div><div class="stat-label">Compliance Rate</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-people"></i></div><div class="stat-value">{{ $compliance['total'] }}</div><div class="stat-label">Assigned</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-check2-circle"></i></div><div class="stat-value">{{ $compliance['complete'] }}</div><div class="stat-label">Completed</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-hourglass-split"></i></div><div class="stat-value">{{ $compliance['outstanding'] }}</div><div class="stat-label">Outstanding</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-bar-chart-line"></i></div><div class="stat-value">{{ $compliance['rate'] }}%</div><div class="stat-label">Compliance Rate</div></div></div>
 </div>
 
 @if($compliance['overdue'] > 0)

@@ -3,7 +3,7 @@
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon"><i class="bi bi-people"></i></div>
             <div class="stat-value">{{ $stats['headcount'] ?? 0 }}</div>
             <div class="stat-label">Active Employees</div>
             <div class="stat-change up"><i class="bi bi-people"></i> {{ ($headcount_by_department ?? collect())->count() }} departments</div>
@@ -11,7 +11,7 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.06s">
-            <div class="stat-icon">📋</div>
+            <div class="stat-icon"><i class="bi bi-clipboard-data"></i></div>
             <div class="stat-value">{{ $stats['pending_reviews'] ?? 0 }}</div>
             <div class="stat-label">Reviews In Progress</div>
             <div class="stat-change up"><i class="bi bi-arrow-up-right"></i> Not yet completed</div>
@@ -19,7 +19,7 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.12s">
-            <div class="stat-icon">🔴</div>
+            <div class="stat-icon"><i class="bi bi-exclamation-circle"></i></div>
             <div class="stat-value">{{ $stats['expiring_credentials'] ?? 0 }}</div>
             <div class="stat-label">Expiring Licenses</div>
             <div class="stat-change down"><i class="bi bi-exclamation-triangle"></i> {{ $stats['expired_credentials'] ?? 0 }} already expired</div>
@@ -27,7 +27,7 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.18s">
-            <div class="stat-icon">🎯</div>
+            <div class="stat-icon"><i class="bi bi-bullseye"></i></div>
             <div class="stat-value">{{ $stats['critical_gaps'] ?? 0 }}</div>
             <div class="stat-label">Critical Skill Gaps</div>
             <div class="stat-change down"><i class="bi bi-dash-circle"></i> 2+ levels below required</div>
@@ -38,21 +38,21 @@
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in">
-            <div class="stat-icon">🎓</div>
+            <div class="stat-icon"><i class="bi bi-mortarboard"></i></div>
             <div class="stat-value">{{ $stats['active_enrollments'] ?? 0 }}</div>
             <div class="stat-label">Active Enrollments</div>
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.06s">
-            <div class="stat-icon">📅</div>
+            <div class="stat-icon"><i class="bi bi-calendar-event"></i></div>
             <div class="stat-value">{{ $stats['upcoming_sessions'] ?? 0 }}</div>
             <div class="stat-label">Upcoming Sessions</div>
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.12s">
-            <div class="stat-icon">⚠️</div>
+            <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
             <div class="stat-value">{{ $stats['overdue_training'] ?? 0 }}</div>
             <div class="stat-label">Overdue Required Training</div>
             <div class="stat-change down"><i class="bi bi-clock-history"></i> Past the required-by date</div>
@@ -61,7 +61,7 @@
     @if(isset($system))
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.18s">
-            <div class="stat-icon">🔐</div>
+            <div class="stat-icon"><i class="bi bi-shield-lock"></i></div>
             <div class="stat-value">{{ $system['user_accounts'] ?? 0 }}</div>
             <div class="stat-label">Login Accounts</div>
             @if(($system['unlinked_accounts'] ?? 0) > 0)
@@ -72,7 +72,7 @@
     @elseif(isset($unassessed_employees))
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.18s">
-            <div class="stat-icon">📝</div>
+            <div class="stat-icon"><i class="bi bi-pencil-square"></i></div>
             <div class="stat-value">{{ $unassessed_employees }}</div>
             <div class="stat-label">Never Assessed</div>
             <div class="stat-change down"><i class="bi bi-exclamation-circle"></i> No competency record</div>

@@ -18,28 +18,28 @@
 <div class="row g-3 mb-4">
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon"><i class="bi bi-people"></i></div>
             <div class="stat-value">{{ $total }}</div>
             <div class="stat-label">Total Users</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">🛡️</div>
+            <div class="stat-icon"><i class="bi bi-shield-check"></i></div>
             <div class="stat-value">{{ $users->where('role','admin')->count() }}</div>
             <div class="stat-label">Admins</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">💼</div>
+            <div class="stat-icon"><i class="bi bi-briefcase"></i></div>
             <div class="stat-value">{{ $users->whereIn('role',['hr_manager','supervisor'])->count() }}</div>
             <div class="stat-label">Managers</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">🔒</div>
+            <div class="stat-icon"><i class="bi bi-lock"></i></div>
             <div class="stat-value">{{ $users->filter(fn($u) => isset($u->locked_until) && $u->locked_until && now()->lt($u->locked_until))->count() }}</div>
             <div class="stat-label">Locked Accounts</div>
         </div>

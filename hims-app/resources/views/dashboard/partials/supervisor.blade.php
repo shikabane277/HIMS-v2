@@ -3,7 +3,7 @@
 @if(empty($stats))
 <div class="hims-card">
     <div class="card-body" style="text-align:center;padding:60px;color:#9ca3af">
-        <div style="font-size:48px;margin-bottom:12px">🏢</div>
+        <div style="font-size:48px;margin-bottom:12px"><i class="bi bi-building" style="color:var(--hims-primary)"></i></div>
         <div style="font-size:16px;font-weight:600;color:var(--hims-text-dark);margin-bottom:6px">No department linked</div>
         <p style="font-size:13px;max-width:420px;margin:0 auto">Your account is not linked to an employee profile with a department, so there is no team to show. Ask an administrator to link your account.</p>
     </div>
@@ -13,28 +13,28 @@
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon"><i class="bi bi-people"></i></div>
             <div class="stat-value">{{ $stats['team_size'] ?? 0 }}</div>
             <div class="stat-label">Team Members</div>
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.06s">
-            <div class="stat-icon">📋</div>
+            <div class="stat-icon"><i class="bi bi-clipboard-data"></i></div>
             <div class="stat-value">{{ $stats['pending_reviews'] ?? 0 }}</div>
             <div class="stat-label">Reviews In Progress</div>
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.12s">
-            <div class="stat-icon">🎯</div>
+            <div class="stat-icon"><i class="bi bi-bullseye"></i></div>
             <div class="stat-value">{{ $stats['critical_gaps'] ?? 0 }}</div>
             <div class="stat-label">Critical Skill Gaps</div>
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.18s">
-            <div class="stat-icon">⭐</div>
+            <div class="stat-icon"><i class="bi bi-star"></i></div>
             <div class="stat-value">{{ $stats['avg_team_score'] ? number_format($stats['avg_team_score'],2) : '—' }}</div>
             <div class="stat-label">Avg Team Score</div>
             <div class="stat-change up"><i class="bi bi-bar-chart"></i> Out of 5.00</div>

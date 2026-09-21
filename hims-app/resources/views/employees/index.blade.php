@@ -31,28 +31,28 @@
 <div class="row g-3 mb-4">
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon"><i class="bi bi-people"></i></div>
             <div class="stat-value">{{ $employees->total() }}</div>
             <div class="stat-label">Total Employees</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">✅</div>
+            <div class="stat-icon"><i class="bi bi-check2-circle"></i></div>
             <div class="stat-value">{{ $employees->where('employment_status','active')->count() }}</div>
             <div class="stat-label">Active Staff</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">🏢</div>
+            <div class="stat-icon"><i class="bi bi-building"></i></div>
             <div class="stat-value">{{ $departments->count() }}</div>
             <div class="stat-label">Departments</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">📋</div>
+            <div class="stat-icon"><i class="bi bi-clipboard-data"></i></div>
             <div class="stat-value">{{ $employees->pluck('role_name')->unique()->count() }}</div>
             <div class="stat-label">Roles on This Page</div>
         </div>
@@ -149,7 +149,7 @@
                 @empty
                 <tr>
                     <td colspan="7" class="text-center" style="color:#9ca3af;padding:48px">
-                        <div style="font-size:40px;margin-bottom:10px">👥</div>
+                        <div style="font-size:40px;margin-bottom:10px;color:#9ca3af"><i class="bi bi-people"></i></div>
                         @if(($filters['q'] ?? '') !== '' || ($filters['department'] ?? null))
                             No employees match that filter.
                             <a href="{{ route('employees.index') }}" class="text-primary-hims">Clear the filter</a>.

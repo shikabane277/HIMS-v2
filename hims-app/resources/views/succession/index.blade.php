@@ -18,9 +18,9 @@
 
 @if($canSeeConfidential)
 <div class="row g-3 mb-4">
-    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon">🏥</div><div class="stat-value">{{ $stats['critical_positions'] ?? 0 }}</div><div class="stat-label">Critical Positions</div></div></div>
-    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon">🌟</div><div class="stat-value">{{ $stats['ready_now'] ?? 0 }}</div><div class="stat-label">Ready Now</div></div></div>
-    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon">📈</div><div class="stat-value">{{ $stats['in_development'] ?? 0 }}</div><div class="stat-label">In Development</div></div></div>
+    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon"><i class="bi bi-heart-pulse"></i></div><div class="stat-value">{{ $stats['critical_positions'] ?? 0 }}</div><div class="stat-label">Critical Positions</div></div></div>
+    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon"><i class="bi bi-check-circle"></i></div><div class="stat-value">{{ $stats['ready_now'] ?? 0 }}</div><div class="stat-label">Ready Now</div></div></div>
+    <div class="col-sm-4"><div class="stat-card"><div class="stat-icon"><i class="bi bi-graph-up"></i></div><div class="stat-value">{{ $stats['in_development'] ?? 0 }}</div><div class="stat-label">In Development</div></div></div>
 </div>
 @else
 <div class="row g-3 mb-4">

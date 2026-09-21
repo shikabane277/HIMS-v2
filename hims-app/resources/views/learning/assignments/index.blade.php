@@ -22,10 +22,10 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">📌</div><div class="stat-value">{{ $stats['open_assignments'] }}</div><div class="stat-label">Assignments Still Outstanding</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-value">{{ $stats['at_risk'] }}</div><div class="stat-label">Cycles At Risk</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">🚫</div><div class="stat-value">{{ $stats['shortfall'] }}</div><div class="stat-label">Closed Short</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">📖</div><div class="stat-value">{{ $stats['rules'] }}</div><div class="stat-label">Active Renewal Rules</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-pin-angle"></i></div><div class="stat-value">{{ $stats['open_assignments'] }}</div><div class="stat-label">Assignments Still Outstanding</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div><div class="stat-value">{{ $stats['at_risk'] }}</div><div class="stat-label">Cycles At Risk</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-x-circle"></i></div><div class="stat-value">{{ $stats['shortfall'] }}</div><div class="stat-label">Closed Short</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-journal-text"></i></div><div class="stat-value">{{ $stats['rules'] }}</div><div class="stat-label">Active Renewal Rules</div></div></div>
 </div>
 
 <div class="hims-card mb-4">

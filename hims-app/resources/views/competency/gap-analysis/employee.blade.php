@@ -31,7 +31,7 @@
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card">
-            <div class="stat-icon">✅</div>
+            <div class="stat-icon"><i class="bi bi-check2-circle"></i></div>
             <div class="stat-value">{{ $s['readiness_pct'] }}%</div>
             <div class="stat-label">Requirement Readiness</div>
             <div class="stat-change up"><i class="bi bi-check2-circle"></i> {{ $s['met'] }} of {{ $s['competencies_required'] }} met</div>
@@ -39,7 +39,7 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card">
-            <div class="stat-icon">🔴</div>
+            <div class="stat-icon"><i class="bi bi-exclamation-circle"></i></div>
             <div class="stat-value">{{ $s['critical_gaps'] }}</div>
             <div class="stat-label">Critical Gaps</div>
             <div class="stat-change down"><i class="bi bi-exclamation-triangle"></i> {{ $s['moderate_gaps'] }} moderate</div>
@@ -47,7 +47,7 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card">
-            <div class="stat-icon">📊</div>
+            <div class="stat-icon"><i class="bi bi-bar-chart-line"></i></div>
             <div class="stat-value">{{ $s['latest_overall_score'] ? number_format((float) $s['latest_overall_score'],2) : '—' }}</div>
             <div class="stat-label">Latest Review Score</div>
             <div class="stat-change up"><i class="bi bi-bar-chart"></i> {{ $analysis['performance']['latest_cycle'] ?? 'No completed review' }}</div>
@@ -55,7 +55,7 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card">
-            <div class="stat-icon">🎓</div>
+            <div class="stat-icon"><i class="bi bi-mortarboard"></i></div>
             <div class="stat-value">{{ $s['cpd_hours_last_year'] }}</div>
             <div class="stat-label">CPD Hours (12 mo)</div>
             <div class="stat-change up"><i class="bi bi-mortarboard"></i> {{ $s['courses_completed'] }} courses, {{ $s['trainings_attended'] }} sessions</div>

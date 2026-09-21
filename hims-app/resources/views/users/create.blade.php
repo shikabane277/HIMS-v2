@@ -36,10 +36,10 @@
                         <div class="col-md-6">
                             <label class="hims-label">Role *</label>
                             <select name="role" class="hims-input hims-select" required>
-                                <option value="staff" {{ old('role') === 'staff' ? 'selected' : '' }}>👤 Staff</option>
-                                <option value="supervisor" {{ old('role') === 'supervisor' ? 'selected' : '' }}>💼 Supervisor</option>
-                                <option value="hr_manager" {{ old('role') === 'hr_manager' ? 'selected' : '' }}>🏢 HR Manager</option>
-                                <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>🛡️ Administrator</option>
+                                <option value="staff" {{ old('role') === 'staff' ? 'selected' : '' }}>Staff</option>
+                                <option value="supervisor" {{ old('role') === 'supervisor' ? 'selected' : '' }}>Supervisor</option>
+                                <option value="hr_manager" {{ old('role') === 'hr_manager' ? 'selected' : '' }}>HR Manager</option>
+                                <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Administrator</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -53,7 +53,10 @@
                         </div>
                         <div class="col-12 mt-1" style="background:var(--hims-primary-pale);border-radius:8px;padding:12px;font-size:12.5px;color:#6b7280;border:1px solid var(--hims-border)">
                             <strong style="color:var(--hims-primary)">Role access levels:</strong><br>
-                            🛡️ Admin — full access &nbsp;|&nbsp; 🏢 HR Manager — all modules &nbsp;|&nbsp; 💼 Supervisor — team management &nbsp;|&nbsp; 👤 Staff — view own data
+                            <span class="badge bg-white text-dark border me-1"><i class="bi bi-shield-lock text-primary-hims"></i> Admin</span> Full access &nbsp;|&nbsp;
+                            <span class="badge bg-white text-dark border me-1"><i class="bi bi-person-badge text-primary-hims"></i> HR Manager</span> All modules &nbsp;|&nbsp;
+                            <span class="badge bg-white text-dark border me-1"><i class="bi bi-people text-primary-hims"></i> Supervisor</span> Team management &nbsp;|&nbsp;
+                            <span class="badge bg-white text-dark border me-1"><i class="bi bi-person text-primary-hims"></i> Staff</span> View own data
                         </div>
                         <div class="col-12 d-flex gap-2 justify-content-end mt-2">
                             <a href="{{ route('users.index') }}" class="btn-hims btn-hims-outline">Cancel</a>

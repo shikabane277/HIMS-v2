@@ -17,10 +17,10 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">🎯</div><div class="stat-value">{{ $stats['total_competencies'] ?? 0 }}</div><div class="stat-label">Total Competencies</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">📊</div><div class="stat-value">{{ $stats['avg_gap'] ?? '0.0' }}</div><div class="stat-label">Avg Proficiency Gap</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">🟡</div><div class="stat-value">{{ $stats['expiring_soon'] ?? 0 }}</div><div class="stat-label">Expiring Credentials</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">🔴</div><div class="stat-value">{{ $stats['expired'] ?? 0 }}</div><div class="stat-label">Expired Credentials</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-bullseye"></i></div><div class="stat-value">{{ $stats['total_competencies'] ?? 0 }}</div><div class="stat-label">Total Competencies</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-bar-chart-line"></i></div><div class="stat-value">{{ $stats['avg_gap'] ?? '0.0' }}</div><div class="stat-label">Avg Proficiency Gap</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-clock-history"></i></div><div class="stat-value">{{ $stats['expiring_soon'] ?? 0 }}</div><div class="stat-label">Expiring Credentials</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-exclamation-circle"></i></div><div class="stat-value">{{ $stats['expired'] ?? 0 }}</div><div class="stat-label">Expired Credentials</div></div></div>
 </div>
 
 <div class="row g-3 mb-4">

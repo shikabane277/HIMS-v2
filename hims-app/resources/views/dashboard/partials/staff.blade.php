@@ -3,7 +3,7 @@
 @if(empty($stats))
 <div class="hims-card">
     <div class="card-body" style="text-align:center;padding:60px;color:#9ca3af">
-        <div style="font-size:48px;margin-bottom:12px">🔗</div>
+        <div style="font-size:48px;margin-bottom:12px"><i class="bi bi-link-45deg" style="color:var(--hims-primary)"></i></div>
         <div style="font-size:16px;font-weight:600;color:var(--hims-text-dark);margin-bottom:6px">No employee profile linked</div>
         <p style="font-size:13px;max-width:440px;margin:0 auto">Your login is not linked to an employee record yet, so your performance, training and learning history cannot be shown. Ask HR to link your account.</p>
     </div>
@@ -13,7 +13,7 @@
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in">
-            <div class="stat-icon">⭐</div>
+            <div class="stat-icon"><i class="bi bi-star"></i></div>
             <div class="stat-value">{{ $stats['latest_score'] ? number_format($stats['latest_score'],2) : '—' }}</div>
             <div class="stat-label">Latest Review Score</div>
             <div class="stat-change up"><i class="bi bi-bar-chart"></i> Out of 5.00</div>
@@ -21,7 +21,7 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.06s">
-            <div class="stat-icon">🎯</div>
+            <div class="stat-icon"><i class="bi bi-bullseye"></i></div>
             <div class="stat-value">{{ $stats['open_gaps'] ?? 0 }}</div>
             <div class="stat-label">Open Skill Gaps</div>
             <div class="stat-change {{ ($stats['open_gaps'] ?? 0) > 0 ? 'down' : 'up' }}"><i class="bi bi-bullseye"></i> Below required level</div>
@@ -29,7 +29,7 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.12s">
-            <div class="stat-icon">📚</div>
+            <div class="stat-icon"><i class="bi bi-book"></i></div>
             <div class="stat-value">{{ $stats['courses_active'] ?? 0 }}</div>
             <div class="stat-label">Courses In Progress</div>
             <div class="stat-change up"><i class="bi bi-check2-circle"></i> {{ $stats['courses_completed'] ?? 0 }} completed</div>
@@ -37,7 +37,7 @@
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.18s">
-            <div class="stat-icon">🕐</div>
+            <div class="stat-icon"><i class="bi bi-clock"></i></div>
             <div class="stat-value">{{ $stats['cpd_hours_year'] ?? 0 }}</div>
             <div class="stat-label">CPD Hours (12 mo)</div>
         </div>

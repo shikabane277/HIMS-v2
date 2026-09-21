@@ -18,28 +18,28 @@
 <div class="row g-3 mb-4">
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">🏢</div>
+            <div class="stat-icon"><i class="bi bi-building"></i></div>
             <div class="stat-value">{{ count($depts) }}</div>
             <div class="stat-label">Total Departments</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">🏥</div>
+            <div class="stat-icon"><i class="bi bi-hospital"></i></div>
             <div class="stat-value">{{ $depts->where('is_clinical',true)->count() }}</div>
             <div class="stat-label">Clinical</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">🗂️</div>
+            <div class="stat-icon"><i class="bi bi-folder2"></i></div>
             <div class="stat-value">{{ $depts->where('is_clinical',false)->count() }}</div>
             <div class="stat-label">Administrative</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="stat-card">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon"><i class="bi bi-people"></i></div>
             <div class="stat-value">{{ $depts->sum('employee_count') }}</div>
             <div class="stat-label">Total Staff</div>
         </div>
@@ -52,8 +52,8 @@
     <div class="col-sm-6 col-lg-4">
         <div class="hims-card" id="department-{{ $dept->department_id }}" style="height:100%;transition:.2s;scroll-margin-top:84px" onmouseover="this.style.boxShadow='var(--hims-shadow-md)'" onmouseout="this.style.boxShadow='var(--hims-shadow)'">
             <div class="card-header" style="padding:16px 20px">
-                <h5 style="font-size:14px">
-                    <span style="font-size:18px;margin-right:6px">{{ $dept->is_clinical ? '🏥' : '🗂️' }}</span>
+                <h5 style="font-size:14px;display:flex;align-items:center;gap:6px">
+                    {!! $dept->is_clinical ? '<i class="bi bi-hospital text-primary-hims"></i>' : '<i class="bi bi-folder2" style="color:#6b7280"></i>' !!}
                     {{ $dept->name }}
                 </h5>
                 <span class="hims-badge {{ $dept->is_clinical ? 'blue' : 'gray' }}">
@@ -96,7 +96,7 @@
     <div class="col-12">
         <div class="hims-card">
             <div class="card-body" style="text-align:center;padding:60px;color:#9ca3af">
-                <div style="font-size:48px;margin-bottom:12px">🏢</div>
+                <div style="font-size:48px;margin-bottom:12px;color:#9ca3af"><i class="bi bi-building"></i></div>
                 <div style="font-size:16px;font-weight:600;color:var(--hims-text-dark);margin-bottom:6px">No departments configured</div>
                 <div style="font-size:13px">Run the database seeder to populate departments.</div>
             </div>

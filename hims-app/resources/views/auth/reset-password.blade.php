@@ -37,7 +37,7 @@
 
     <div class="auth-card" style="animation:fadeInUp .4s ease forwards">
         <div class="auth-logo">
-            <div class="logo-icon">🏥</div>
+            <div class="logo-icon"><i class="bi bi-heart-pulse text-white" style="font-size:30px"></i></div>
             <h1>HIMS</h1>
             <p>Choose a New Password</p>
         </div>

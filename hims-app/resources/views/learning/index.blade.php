@@ -32,10 +32,10 @@
 @endif
 
 <div class="row g-3 mb-4">
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">📚</div><div class="stat-value">{{ $stats['total_courses'] ?? 0 }}</div><div class="stat-label">Total Courses</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value">{{ $stats['completions_this_month'] ?? 0 }}</div><div class="stat-label">Completions This Month</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">⏰</div><div class="stat-value">{{ $stats['avg_completion_rate'] ?? 0 }}%</div><div class="stat-label">Avg Completion Rate</div></div></div>
-    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-value">{{ $stats['certificates_issued'] ?? 0 }}</div><div class="stat-label">Certificates Issued</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-book"></i></div><div class="stat-value">{{ $stats['total_courses'] ?? 0 }}</div><div class="stat-label">Total Courses</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-check2-circle"></i></div><div class="stat-value">{{ $stats['completions_this_month'] ?? 0 }}</div><div class="stat-label">Completions This Month</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-speedometer2"></i></div><div class="stat-value">{{ $stats['avg_completion_rate'] ?? 0 }}%</div><div class="stat-label">Avg Completion Rate</div></div></div>
+    <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-award"></i></div><div class="stat-value">{{ $stats['certificates_issued'] ?? 0 }}</div><div class="stat-label">Certificates Issued</div></div></div>
 </div>
 
 {{-- The institutional half of Learning, in three numbers. Loaded only for
