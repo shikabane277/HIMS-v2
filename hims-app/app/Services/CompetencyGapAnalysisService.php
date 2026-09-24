@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\AiProvider;
 use App\Support\ReviewFeedback;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -644,10 +645,26 @@ class CompetencyGapAnalysisService
      */
     private function aiNarrative(array $analysis): ?array
     {
+        $employeeId = $analysis['employee']->employee_id ?? 'unknown';
+        $fingerprint = md5(json_encode([
+            $analysis['summary'] ?? [],
+            count($analysis['gaps'] ?? []),
+        ]));
+        $cacheKey = "ai_gap_narrative_{$employeeId}_{$fingerprint}";
+
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
         $prompt = $this->buildEmployeePrompt($analysis);
         $raw = $this->ai->ask($prompt);
+        $parsed = $this->parseAiJson($raw);
 
-        return $this->parseAiJson($raw);
+        if ($parsed && empty($parsed['unavailable'])) {
+            Cache::put($cacheKey, $parsed, now()->addHours(2));
+        }
+
+        return $parsed;
     }
 
     /**
@@ -658,6 +675,16 @@ class CompetencyGapAnalysisService
     {
         if ($analysis['weakest']->isEmpty()) {
             return null;
+        }
+
+        $deptId = $analysis['department']->department_id ?? 'all';
+        $fingerprint = md5(json_encode(
+            $analysis['weakest']->map(fn ($r) => [$r->competency_id, $r->avg_gap, $r->employees_below])->all()
+        ));
+        $cacheKey = "ai_gap_dept_{$deptId}_{$fingerprint}";
+
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
         }
 
         $lines = $analysis['weakest']->take(10)->map(fn ($r) => sprintf(
@@ -688,7 +715,14 @@ Return ONLY a JSON object, no markdown fences, with this shape:
 Be specific to the competencies listed. Do not invent data that is not shown.
 PROMPT;
 
-        return $this->parseAiJson($this->ai->ask($prompt));
+        $raw = $this->ai->ask($prompt);
+        $parsed = $this->parseAiJson($raw);
+
+        if ($parsed && empty($parsed['unavailable'])) {
+            Cache::put($cacheKey, $parsed, now()->addHours(2));
+        }
+
+        return $parsed;
     }
 
     /**
@@ -836,7 +870,48 @@ PROMPT;
             }
         }
 
+        // Fall back to auto-repairing truncated JSON if generation was capped at token limit.
+        $repaired = $this->repairTruncatedJson($cleaned);
+        if (is_array($repaired)) {
+            return $repaired;
+        }
+
         return ['unavailable' => true, 'message' => 'AI returned an unparseable response.', 'raw' => mb_substr($cleaned, 0, 800)];
+    }
+
+    /**
+     * Auto-repair JSON string cut off mid-stream by token limit constraints.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function repairTruncatedJson(string $json): ?array
+    {
+        $startPos = strpos($json, '{');
+        if ($startPos === false) {
+            return null;
+        }
+
+        $work = substr($json, $startPos);
+
+        // Remove trailing commas or dangling key colon prefixes
+        $work = preg_replace('/[,:]\s*$/', '', $work);
+
+        // If string quote is left open at truncation point, close it
+        $unescapedQuotes = substr_count(preg_replace('/\\\\"/','', $work), '"');
+        if ($unescapedQuotes % 2 !== 0) {
+            $work .= '"';
+        }
+
+        // Count unclosed brackets and braces
+        $openBrackets = max(0, substr_count($work, '[') - substr_count($work, ']'));
+        $openBraces = max(0, substr_count($work, '{') - substr_count($work, '}'));
+
+        $work .= str_repeat(']', $openBrackets);
+        $work .= str_repeat('}', $openBraces);
+
+        $decoded = json_decode($work, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     /**

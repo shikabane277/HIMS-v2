@@ -9,7 +9,7 @@
     function enhanceSelect(select) {
         if (!select || select.dataset.customized === 'true') return;
         if (select.hasAttribute('multiple')) return;
-        if (select.dataset.customSelect === 'false') return;
+        if (select.dataset.customSelect === 'false' || select.classList.contains('hims-select-native')) return;
 
         select.dataset.customized = 'true';
 
@@ -75,15 +75,31 @@
             const options = Array.from(select.options);
             const selectedOption = select.options[select.selectedIndex];
 
+            function updateTriggerContent(opt, isPlaceholder) {
+                triggerText.innerHTML = '';
+                if (opt && opt.dataset.icon) {
+                    const iconEl = document.createElement('i');
+                    iconEl.className = opt.dataset.icon + ' select-option-icon';
+                    triggerText.appendChild(iconEl);
+                    const labelEl = document.createElement('span');
+                    labelEl.textContent = opt.text;
+                    triggerText.appendChild(labelEl);
+                } else {
+                    triggerText.textContent = opt ? opt.text : '— Select —';
+                }
+                if (isPlaceholder) {
+                    triggerText.classList.add('placeholder');
+                } else {
+                    triggerText.classList.remove('placeholder');
+                }
+            }
+
             if (selectedOption && selectedOption.value !== '') {
-                triggerText.textContent = selectedOption.text;
-                triggerText.classList.remove('placeholder');
+                updateTriggerContent(selectedOption, false);
             } else if (selectedOption) {
-                triggerText.textContent = selectedOption.text;
-                triggerText.classList.add('placeholder');
+                updateTriggerContent(selectedOption, true);
             } else {
-                triggerText.textContent = '— Select —';
-                triggerText.classList.add('placeholder');
+                updateTriggerContent(null, true);
             }
 
             options.forEach((opt, idx) => {
@@ -99,7 +115,16 @@
 
                 const textSpan = document.createElement('span');
                 textSpan.className = 'option-label';
-                textSpan.textContent = opt.text;
+                if (opt.dataset.icon) {
+                    const iconEl = document.createElement('i');
+                    iconEl.className = opt.dataset.icon + ' select-option-icon';
+                    textSpan.appendChild(iconEl);
+                    const labelEl = document.createElement('span');
+                    labelEl.textContent = opt.text;
+                    textSpan.appendChild(labelEl);
+                } else {
+                    textSpan.textContent = opt.text;
+                }
 
                 const checkSpan = document.createElement('span');
                 checkSpan.className = 'option-check';
@@ -133,8 +158,11 @@
             document.querySelectorAll('.hims-select-wrapper.open').forEach(w => {
                 if (w !== wrapper) {
                     w.classList.remove('open');
+                    w.style.removeProperty('z-index');
                     const t = w.querySelector('.hims-select-trigger');
                     if (t) t.setAttribute('aria-expanded', 'false');
+                    const parentCard = w.closest('.hims-card, .card');
+                    if (parentCard) parentCard.style.removeProperty('z-index');
                 }
             });
 
@@ -148,6 +176,17 @@
             }
 
             wrapper.classList.add('open');
+            wrapper.style.zIndex = '99999';
+            const card = wrapper.closest('.hims-card, .card');
+            if (card) {
+                card.style.overflow = 'visible';
+                card.style.position = 'relative';
+                card.style.zIndex = '99998';
+            }
+            const cardBody = wrapper.closest('.card-body');
+            if (cardBody) {
+                cardBody.style.overflow = 'visible';
+            }
             trigger.setAttribute('aria-expanded', 'true');
 
             // Scroll selected option into view inside the dropdown menu
@@ -159,6 +198,11 @@
 
         function close() {
             wrapper.classList.remove('open');
+            wrapper.style.removeProperty('z-index');
+            const card = wrapper.closest('.hims-card, .card');
+            if (card) {
+                card.style.removeProperty('z-index');
+            }
             trigger.setAttribute('aria-expanded', 'false');
         }
 

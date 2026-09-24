@@ -7,11 +7,17 @@ use App\Support\CycleStatus;
 use App\Support\KpiWeighting;
 use App\Support\ReviewStatus;
 use Illuminate\Http\Request;
+use App\Services\PerformanceService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class PerformanceController extends Controller
 {
+    public function __construct(private ?PerformanceService $performanceService = null)
+    {
+        $this->performanceService ??= app(PerformanceService::class);
+    }
+
     /* ── REVIEW AUTHORITY ──────────────────────────────────────────────
      |
      | Who may read, open and score a review is decided by identity — the
@@ -27,125 +33,34 @@ class PerformanceController extends Controller
      | hold responsible for what it wrote.
      */
 
-    /**
-     * Constrain a review listing to what the acting account may legitimately
-     * see: their own reviews, reviews they authored, and reviews of the people
-     * who report to them.
-     *
-     * This deliberately does NOT defer to scopeToVisibleEmployees(): admin and
-     * HR hold no blanket read over performance reviews. An HR account that
-     * opened an exception review still sees it — through `pr.reviewer_id`,
-     * because they wrote it, not because of their role.
-     *
-     * Requires the query to join `performance_reviews as pr` and
-     * `employees as e`, which every review listing here already does.
-     */
     private function scopeToVisibleReviews($query)
     {
-        $actor = (string) ($this->currentEmployeeId() ?? '');
-
-        return $query->where(function ($q) use ($actor) {
-            $q->where('pr.employee_id', $actor)
-                ->orWhere('pr.reviewer_id', $actor)
-                ->orWhere('e.supervisor_id', $actor);
-        });
+        return $this->performanceService->scopeToVisibleReviews($query, $this->currentEmployeeId());
     }
 
-    /**
-     * The single-record form of the rule above.
-     */
     private function canViewReview(object $review): bool
     {
-        $actor = $this->currentEmployeeId();
-
-        if (! $actor) {
-            return false;
-        }
-
-        if ($review->employee_id === $actor || ($review->reviewer_id ?? null) === $actor) {
-            return true;
-        }
-
-        return DB::table('employees')->where('employee_id', $review->employee_id)->value('supervisor_id') === $actor;
+        return $this->performanceService->canViewReview($review, $this->currentEmployeeId());
     }
 
-    /**
-     * May this account write the scores on this review?
-     *
-     * Exactly one identity can: the employee named in `reviewer_id`. Not their
-     * department, not an admin, not the subject. `employee_id !== $actor` is
-     * checked again here even though storeReview() already refuses it, because a
-     * `reviewer_id` that somehow came to equal `employee_id` must still never be
-     * scoreable — this is the check that runs on every save.
-     *
-     * Says nothing about the cycle being open. Call reviewIsFrozen() for that;
-     * the two are separate questions and the error messages differ.
-     */
     private function canScoreReview(object $review): bool
     {
-        $actor = $this->currentEmployeeId();
-
-        return $actor !== null
-            && ($review->reviewer_id ?? null) === $actor
-            && $review->employee_id !== $actor;
+        return $this->performanceService->canScoreReview($review, $this->currentEmployeeId());
     }
 
-    /**
-     * Has this review's cycle ended, making it read-only for good?
-     *
-     * The single place the freeze is decided, so the score screen and the save
-     * handler can never disagree about it.
-     *
-     * @see ReviewStatus for why the rule is the date rather than a stored value
-     */
     private function reviewIsFrozen(object $review): bool
     {
-        return ReviewStatus::cycleHasEnded($review->cycle_end_date ?? null);
+        return $this->performanceService->reviewIsFrozen($review);
     }
 
-    /**
-     * Stamp each row of a review listing with its effective status and whether
-     * the acting identity can still score it, so a list shows a Score button
-     * only where the button would actually work.
-     *
-     * Both come out of the same place the save handler uses, which is what keeps
-     * a table from offering an action that 403s or a badge that contradicts the
-     * screen behind it.
-     *
-     * Requires the listing to select `rc.end_date as cycle_end_date` — without
-     * it every row reads as an open cycle. All three callers do.
-     */
     private function markScoreable($reviews)
     {
-        $stamp = function ($review) {
-            $review->effective_status = ReviewStatus::of($review->status ?? null, $review->cycle_end_date ?? null);
-            $review->can_score = $review->effective_status !== ReviewStatus::COMPLETED
-                && $this->canScoreReview($review);
-
-            return $review;
-        };
-
-        // `through()` on a paginator, `map()` on a plain collection — both list
-        // shapes appear here and both need the same stamp.
-        return method_exists($reviews, 'through') ? $reviews->through($stamp) : $reviews->map($stamp);
+        return $this->performanceService->markScoreable($reviews, $this->currentEmployeeId());
     }
 
-    /**
-     * Stamps each cycle with its effective status.
-     *
-     * The stored column cannot see the calendar, so anything that displays a
-     * cycle or counts one goes through here. Kept beside markScoreable(), which
-     * does the same job for a review, for the same reason.
-     */
     private function markCycleStatus($cycles)
     {
-        $stamp = function ($cycle) {
-            $cycle->effective_status = CycleStatus::of($cycle->status ?? null, $cycle->end_date ?? null);
-
-            return $cycle;
-        };
-
-        return method_exists($cycles, 'through') ? $cycles->through($stamp) : $cycles->map($stamp);
+        return $this->performanceService->markCycleStatus($cycles);
     }
 
     /* ── INDEX ── */

@@ -54,24 +54,23 @@ class AnthropicProvider extends AbstractAiProvider
                         ?? 'No response generated.';
                 }
 
-                // 404 (unknown model) — try the next configured model, keeping the
-                // reason so the final message can name it. See
-                // AbstractAiProvider::noUsableModel().
-                if ($response->status() === 404) {
-                    $rejected[$model] = trim((string) ($response->json('error.message') ?: 'not found'));
-                    Log::warning('Anthropic rejected model', ['model' => $model]);
+                if (in_array($response->status(), [401, 403], true)) {
+                    $msg = trim((string) ($response->json('error.message') ?: $response->body()));
+                    Log::warning('Anthropic API error', ['status' => $response->status(), 'body' => $response->body()]);
 
-                    continue;
+                    return "⚠️ Anthropic API Error ({$response->status()}): {$msg}";
                 }
 
-                $msg = $response->json('error.message') ?? $response->body();
-                Log::warning('Anthropic API error', ['status' => $response->status(), 'body' => $response->body()]);
+                $msg = trim((string) ($response->json('error.message') ?: $response->body()));
+                $rejected[$model] = "HTTP {$response->status()}: {$msg}";
+                Log::warning('Anthropic rejected/failed model', ['model' => $model, 'status' => $response->status(), 'body' => $response->body()]);
 
-                return "⚠️ Anthropic API Error ({$response->status()}): {$msg}";
+                continue;
             } catch (\Throwable $e) {
-                Log::error('Anthropic request failed', ['error' => $e->getMessage()]);
+                Log::error('Anthropic request failed', ['model' => $model, 'error' => $e->getMessage()]);
+                $rejected[$model] = 'Error: '.$e->getMessage();
 
-                return '⚠️ AI service error: '.$e->getMessage();
+                continue;
             }
         }
 

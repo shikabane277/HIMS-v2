@@ -18,10 +18,10 @@
 </div>
 
 @if($departments->isNotEmpty())
-<div class="hims-card mb-4">
-    <div class="card-body">
+<div class="hims-card mb-4" style="overflow:visible !important;position:relative;z-index:30">
+    <div class="card-body" style="overflow:visible !important;position:relative">
         <form method="GET" action="{{ route('competency.gap.index') }}" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-            <div style="flex:1;min-width:220px">
+            <div style="flex:1;min-width:220px;position:relative">
                 <label class="hims-label">Department</label>
                 <select name="department" class="hims-input hims-select">
                     <option value="">— All departments —</option>

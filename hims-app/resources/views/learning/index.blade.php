@@ -5,21 +5,21 @@
 @section('content')
 @include('partials.learning-tabs')
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2 style="font-size:20px;font-weight:700;margin:0">Course Catalogue &amp; Learning Pathways</h2>
-        <p style="color:#6b7280;font-size:13px;margin:4px 0 0">
-            What the hospital teaches, and the pathways it groups courses into. People are put on a
-            course from <strong>Required Training</strong> — a course enrolment is always something
-            somebody asked for, so it carries a deadline and shows up in the compliance figures.
+<div class="learning-header-container mb-4">
+    <div class="learning-header-content">
+        <h2 class="learning-header-title">Course Catalogue &amp; Learning Pathways</h2>
+        <p class="learning-header-desc">
+            What the hospital teaches, and the pathways it groups courses into.
+            <span class="desc-extra" id="learningDescExtra">People are put on a course from <strong>Required Training</strong> — a course enrolment is always something somebody asked for, so it carries a deadline and shows up in the compliance figures.</span>
+            <button type="button" class="learning-desc-toggle" id="learningDescToggle" onclick="toggleLearningDesc()" aria-expanded="false" title="Show more info"><i class="bi bi-info-circle"></i> Info</button>
         </p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="learning-header-actions">
         {{-- Open to every role: the person owing the hours is the one who earns them. --}}
-        <a href="{{ route('learning.cycles.mine') }}" class="btn-hims btn-hims-outline"><i class="bi bi-arrow-repeat"></i> My Renewal Cycles</a>
+        <a href="{{ route('learning.cycles.mine') }}" class="btn-hims btn-hims-outline"><i class="bi bi-arrow-repeat"></i> <span>My Renewal Cycles</span></a>
         @can('manage-learning')
-        <button type="button" class="btn-hims btn-hims-outline" data-modal-open="pathwayCreateModal"><i class="bi bi-diagram-2"></i> New Pathway</button>
-        <button type="button" class="btn-hims btn-hims-primary" data-modal-open="courseCreateModal"><i class="bi bi-plus-circle"></i> New Course</button>
+        <button type="button" class="btn-hims btn-hims-outline" data-modal-open="pathwayCreateModal"><i class="bi bi-diagram-2"></i> <span>New Pathway</span></button>
+        <button type="button" class="btn-hims btn-hims-primary" data-modal-open="courseCreateModal"><i class="bi bi-plus-circle"></i> <span>New Course</span></button>
         @endcan
     </div>
 </div>
@@ -214,4 +214,22 @@
     @include('learning.courses._edit-modal')
     @include('learning.pathways._create-modal')
 @endcan
+
+<script>
+function toggleLearningDesc() {
+    const extra = document.getElementById('learningDescExtra');
+    const btn = document.getElementById('learningDescToggle');
+    if (!extra || !btn) return;
+    const isExpanded = extra.classList.contains('expanded');
+    if (isExpanded) {
+        extra.classList.remove('expanded');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.innerHTML = '<i class="bi bi-info-circle"></i> Info';
+    } else {
+        extra.classList.add('expanded');
+        btn.setAttribute('aria-expanded', 'true');
+        btn.innerHTML = '<i class="bi bi-x-circle"></i> Less';
+    }
+}
+</script>
 @endsection

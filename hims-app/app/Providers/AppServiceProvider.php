@@ -32,6 +32,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Guard development database against accidental destruction during test runs
+        if ($this->app->environment('testing')) {
+            $dbConn = (string) config('database.default');
+            $dbName = (string) config("database.connections.{$dbConn}.database");
+            if ($dbConn === 'mysql' && $dbName === 'hims_v2') {
+                throw new \RuntimeException(
+                    'SAFETY ABORT: Test suite attempted to run against development database "hims_v2". Use SQLite :memory: or a scratch database.'
+                );
+            }
+        }
+
         $this->registerGates();
         $this->composeNotifications();
 

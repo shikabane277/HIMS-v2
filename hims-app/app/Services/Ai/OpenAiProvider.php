@@ -77,22 +77,23 @@ class OpenAiProvider extends AbstractAiProvider
                         ?? 'No response generated.';
                 }
 
-                // 404 (unknown model) or 400 with a model hint — try the next model.
-                if (in_array($response->status(), [400, 404], true) && $this->looksLikeModelError($response->json())) {
-                    $rejected[$model] = trim((string) ($response->json('error.message') ?: 'rejected as unknown'));
-                    Log::warning($this->label().' rejected model', ['model' => $model, 'status' => $response->status()]);
+                if (in_array($response->status(), [401, 403], true)) {
+                    $msg = trim((string) ($response->json('error.message') ?: $response->body()));
+                    Log::warning($this->label().' API error', ['status' => $response->status(), 'body' => $response->body()]);
 
-                    continue;
+                    return "⚠️ {$this->label()} API Error ({$response->status()}): {$msg}";
                 }
 
-                $msg = $response->json('error.message') ?? $response->body();
-                Log::warning($this->label().' API error', ['status' => $response->status(), 'body' => $response->body()]);
+                $msg = trim((string) ($response->json('error.message') ?: $response->body()));
+                $rejected[$model] = "HTTP {$response->status()}: {$msg}";
+                Log::warning($this->label().' model failed/rejected', ['model' => $model, 'status' => $response->status(), 'msg' => $msg]);
 
-                return "⚠️ {$this->label()} API Error ({$response->status()}): {$msg}";
+                continue;
             } catch (\Throwable $e) {
-                Log::error($this->label().' request failed', ['error' => $e->getMessage()]);
+                Log::error($this->label().' request failed', ['model' => $model, 'error' => $e->getMessage()]);
+                $rejected[$model] = 'Error: '.$e->getMessage();
 
-                return '⚠️ AI service error: '.$e->getMessage();
+                continue;
             }
         }
 

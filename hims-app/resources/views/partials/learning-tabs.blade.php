@@ -20,7 +20,7 @@
     match `training.*` route names, which is the one place the old module's naming
     survives.
 --}}
-<nav class="hims-tabs" aria-label="Learning sections">
+<nav class="hims-tabs hims-tabs-desktop" aria-label="Learning sections">
     <a href="{{ route('learning.index') }}"
        class="hims-tab {{ request()->routeIs('learning.index') || request()->routeIs('learning.courses.*') ? 'active' : '' }}">
         <i class="bi bi-grid"></i> Overview
@@ -64,3 +64,63 @@
     </a>
     @endcan
 </nav>
+
+{{-- Mobile view tab selector: replaces cluttered 3-row wrapped tabs on mobile screens --}}
+<div class="hims-tabs-mobile" aria-label="Learning section dropdown">
+    <div class="hims-tabs-mobile-card">
+        <label for="learningMobileTabSelect" class="hims-tabs-mobile-label">
+            <i class="bi bi-compass"></i> Section
+        </label>
+        <div class="hims-tabs-mobile-select-wrap">
+            <select id="learningMobileTabSelect"
+                    class="hims-input hims-select"
+                    onchange="if(this.value) window.location.href=this.value"
+                    aria-label="Select Learning Section">
+                <option value="{{ route('learning.index') }}"
+                        data-icon="bi bi-grid"
+                        {{ request()->routeIs('learning.index') || request()->routeIs('learning.courses.*') ? 'selected' : '' }}>
+                    Overview
+                </option>
+                @can('view-compliance')
+                <option value="{{ route('learning.assignments.index') }}"
+                        data-icon="bi bi-clipboard-check"
+                        {{ request()->routeIs('learning.assignments.*') ? 'selected' : '' }}>
+                    Required Training
+                </option>
+                <option value="{{ route('learning.renewals.index') }}"
+                        data-icon="bi bi-arrow-repeat"
+                        {{ request()->routeIs('learning.renewals.*') ? 'selected' : '' }}>
+                    Renewals
+                </option>
+                @endcan
+                <option value="{{ route('learning.cpd.index') }}"
+                        data-icon="bi bi-award"
+                        {{ request()->routeIs('learning.cpd.*') || request()->routeIs('learning.cycles.mine') ? 'selected' : '' }}>
+                    My CPD
+                </option>
+                <option value="{{ route('learning.pathways.index') }}"
+                        data-icon="bi bi-signpost-split"
+                        {{ request()->routeIs('learning.pathways.*') ? 'selected' : '' }}>
+                    Pathways
+                </option>
+                <option value="{{ route('training.index') }}"
+                        data-icon="bi bi-calendar-event"
+                        {{ request()->routeIs('training.index') || request()->routeIs('training.sessions.*') ? 'selected' : '' }}>
+                    Sessions
+                </option>
+                <option value="{{ route('training.venues.index') }}"
+                        data-icon="bi bi-geo-alt"
+                        {{ request()->routeIs('training.venues.*') ? 'selected' : '' }}>
+                    Venues
+                </option>
+                @can('view-compliance')
+                <option value="{{ route('learning.accreditation') }}"
+                        data-icon="bi bi-file-earmark-text"
+                        {{ request()->routeIs('learning.accreditation') || request()->routeIs('learning.accounts') ? 'selected' : '' }}>
+                    Reports
+                </option>
+                @endcan
+            </select>
+        </div>
+    </div>
+</div>

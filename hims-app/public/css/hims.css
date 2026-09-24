@@ -39,6 +39,11 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
 body {
     font-family: 'Inter', system-ui, sans-serif;
     background: var(--hims-surface);
@@ -544,7 +549,12 @@ body {
     margin-right: var(--hims-ai-offset);
     padding: 28px;
     min-height: calc(100vh - var(--hims-topbar-h));
+    max-width: calc(100vw - var(--hims-sidebar-w));
+    overflow-x: hidden;
     transition: margin-right .18s cubic-bezier(.4,0,.2,1);
+}
+body.ai-rail-docked .hims-main {
+    max-width: calc(100vw - var(--hims-sidebar-w) - var(--hims-ai-offset));
 }
 /* Suppress both transitions mid-drag: animating the reflow on every
    pointermove makes the resize lag behind the cursor. */
@@ -600,7 +610,13 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     border-radius: var(--hims-radius);
     border: 1px solid var(--hims-border);
     box-shadow: var(--hims-shadow);
+    max-width: 100%;
     overflow: hidden;
+}
+.hims-card:has(.hims-select-wrapper),
+.hims-card:has(select),
+.hims-card.overflow-visible {
+    overflow: visible;
 }
 .hims-card .card-header {
     padding: 18px 22px;
@@ -613,7 +629,29 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     color: var(--hims-primary-dark);
     display: flex; align-items: center; gap: 8px;
 }
-.hims-card .card-body { padding: 20px 22px; }
+.hims-card .card-body {
+    padding: 20px 22px;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.hims-card .card-body::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar {
+    height: 5px;
+}
+.hims-card .card-body::-webkit-scrollbar-track,
+.table-responsive::-webkit-scrollbar-track {
+    background: transparent;
+}
+.hims-card .card-body::-webkit-scrollbar-thumb,
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.hims-card .card-body::-webkit-scrollbar-thumb:hover,
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
 
 /* ═══════════════ TABLES ═══════════════ */
 .hims-table { width: 100%; border-collapse: separate; border-spacing: 0; }
@@ -737,9 +775,14 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
 }
 .hims-select {
     appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+    padding-right: 36px !important;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2316a34a' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 12px center;
+    background-position: right 14px center;
+    background-color: var(--hims-white);
     transition: border-color var(--hims-transition) ease, box-shadow var(--hims-transition) ease, transform .15s ease;
 }
 .hims-select:hover {
@@ -758,6 +801,16 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     width: 100%;
     display: block;
     box-sizing: border-box;
+}
+
+.hims-select-wrapper.open {
+    z-index: 99999 !important;
+}
+
+.hims-card:has(.hims-select-wrapper.open) {
+    z-index: 99998 !important;
+    position: relative !important;
+    overflow: visible !important;
 }
 
 .hims-select-trigger {
@@ -836,7 +889,7 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     border: 1px solid var(--hims-border);
     border-radius: 12px;
     box-shadow: 0 16px 42px -6px rgba(0, 0, 0, 0.16), 0 4px 14px -2px rgba(0, 0, 0, 0.08);
-    z-index: 1200;
+    z-index: 99999 !important;
     max-height: 240px;
     overflow-y: auto;
     overflow-x: hidden;
@@ -867,6 +920,21 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     animation: dropdownPopInUp .24s var(--hims-spring) forwards;
 }
 
+@keyframes dropdownPopIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.96);
+    }
+    70% {
+        opacity: 1;
+        transform: translateY(2px) scale(1.008);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 @keyframes dropdownPopInUp {
     0% {
         opacity: 0;
@@ -880,6 +948,21 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
         opacity: 1;
         transform: translateY(0) scale(1);
     }
+}
+
+@keyframes dropdownItemPop {
+    0% {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hims-select-wrapper.open .hims-select-option {
+    animation: dropdownItemPop .2s cubic-bezier(.16,1,.3,1) both;
 }
 
 .hims-select-option {
@@ -1111,6 +1194,7 @@ body.ai-resizing { cursor: col-resize; user-select: none; }
     width: 100%;
     padding-right: 12px;
     padding-left: 12px;
+    min-width: 0;
 }
 .col-12 { flex: 0 0 100%; max-width: 100%; }
 .col-11 { flex: 0 0 91.666667%; max-width: 91.666667%; }
@@ -2039,6 +2123,19 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
     scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
 }
+.hims-tabs::-webkit-scrollbar {
+    height: 4px;
+}
+.hims-tabs::-webkit-scrollbar-track {
+    background: transparent;
+}
+.hims-tabs::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.hims-tabs::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
 .hims-tab {
     display: inline-flex;
     align-items: center;
@@ -2068,20 +2165,292 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
 }
 .hims-tab i { font-size: 14px; }
 
-/* Below 768px the strip wraps to a second row instead of scrolling. The trade
-   described above only holds while the overflow is a tab or two: Learning has
-   eight, so on a phone a horizontal scroll hides most of a module behind a
-   gesture with nothing on screen to suggest it, and a second row of tabs is the
-   lesser evil.
+.select-option-icon {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 14px;
+    color: var(--hims-primary);
+    vertical-align: middle;
+}
 
-   This has to live *here*, after the base rules, rather than in the MOBILE
-   RESPONSIVE section with the rest of the phone layout. Both selectors are a
-   single class, a media query contributes no specificity of its own, and these
-   base rules sit 250 lines *below* that section — so an override written up
-   there loses the tie on source order and never applies. It was written up
-   there, and `overflow`, `gap` and `margin-bottom` all silently lost. */
+/* ═══════════════════════════════════════════════
+   MOBILE TABS DROPDOWN
+   On mobile screens, 8 tabs wrap into 3 cramped rows.
+   .hims-tabs-mobile provides a clean dropdown selector.
+═══════════════════════════════════════════════ */
+.hims-tabs-mobile {
+    display: none;
+    margin-bottom: 18px;
+}
+.hims-tabs-mobile-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--hims-white);
+    border: 1px solid var(--hims-border);
+    border-radius: var(--hims-radius-md);
+    padding: 6px 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.hims-tabs-mobile-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--hims-gray);
+    margin: 0;
+    white-space: nowrap;
+}
+.hims-tabs-mobile-label i {
+    color: var(--hims-primary);
+    font-size: 14px;
+}
+.hims-tabs-mobile-select-wrap {
+    flex: 1;
+    min-width: 0;
+}
+.hims-tabs-mobile-select-wrap .hims-select-wrapper {
+    width: 100% !important;
+}
+.hims-tabs-mobile-select-wrap .hims-select-trigger {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    padding: 7px 12px;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════
+   LEARNING HEADER & DESCRIPTION (Mobile & Desktop)
+═══════════════════════════════════════════════ */
+.learning-header-container {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    margin-bottom: 20px;
+}
+.learning-header-content {
+    flex: 1 1 420px;
+    min-width: min(100%, 280px);
+}
+.learning-header-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--hims-dark);
+}
+.learning-header-desc {
+    color: #6b7280;
+    font-size: 13px;
+    margin: 4px 0 0;
+    line-height: 1.5;
+}
+.learning-desc-toggle {
+    display: none;
+    background: none;
+    border: none;
+    padding: 0 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--hims-primary);
+    cursor: pointer;
+    vertical-align: baseline;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.learning-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+/* ── When AI Rail is docked or open, available horizontal space narrows significantly ── */
+body.ai-rail-docked .learning-header-container,
+body:has(#ai-rail.open) .learning-header-container {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 12px;
+}
+body.ai-rail-docked .learning-header-content,
+body:has(#ai-rail.open) .learning-header-content {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+}
+body.ai-rail-docked .learning-header-actions,
+body:has(#ai-rail.open) .learning-header-actions {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+body.ai-rail-docked .d-flex.justify-content-between.align-items-center,
+body:has(#ai-rail.open) .d-flex.justify-content-between.align-items-center {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+@media (max-width: 991.98px) {
+    .d-flex.justify-content-between.align-items-center {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+}
+.d-flex.justify-content-between.align-items-center > div:first-child {
+    min-width: 0;
+}
+
+@media (max-width: 1440px) {
+    /* Switch desktop tabs to clean section dropdown when docked */
+    body.ai-rail-docked .hims-tabs-desktop,
+    body:has(#ai-rail.open) .hims-tabs-desktop {
+        display: none !important;
+    }
+    body.ai-rail-docked .hims-tabs-mobile,
+    body:has(#ai-rail.open) .hims-tabs-mobile {
+        display: block !important;
+    }
+
+    /* Stack large 2-column splits (e.g. col-lg-8 / col-lg-4, col-xl-8 / col-xl-4, col-lg-7 / col-lg-5, col-lg-6 / col-lg-6) */
+    body.ai-rail-docked .col-lg-12,
+    body.ai-rail-docked .col-lg-11,
+    body.ai-rail-docked .col-lg-10,
+    body.ai-rail-docked .col-lg-9,
+    body.ai-rail-docked .col-lg-8,
+    body.ai-rail-docked .col-lg-7,
+    body.ai-rail-docked .col-lg-6,
+    body.ai-rail-docked .col-lg-5,
+    body.ai-rail-docked .col-lg-4,
+    body.ai-rail-docked .col-xl-12,
+    body.ai-rail-docked .col-xl-11,
+    body.ai-rail-docked .col-xl-10,
+    body.ai-rail-docked .col-xl-9,
+    body.ai-rail-docked .col-xl-8,
+    body.ai-rail-docked .col-xl-7,
+    body.ai-rail-docked .col-xl-6,
+    body.ai-rail-docked .col-xl-5,
+    body.ai-rail-docked .col-xl-4,
+    body:has(#ai-rail.open) .col-lg-12,
+    body:has(#ai-rail.open) .col-lg-11,
+    body:has(#ai-rail.open) .col-lg-10,
+    body:has(#ai-rail.open) .col-lg-9,
+    body:has(#ai-rail.open) .col-lg-8,
+    body:has(#ai-rail.open) .col-lg-7,
+    body:has(#ai-rail.open) .col-lg-6,
+    body:has(#ai-rail.open) .col-lg-5,
+    body:has(#ai-rail.open) .col-lg-4,
+    body:has(#ai-rail.open) .col-xl-12,
+    body:has(#ai-rail.open) .col-xl-11,
+    body:has(#ai-rail.open) .col-xl-10,
+    body:has(#ai-rail.open) .col-xl-9,
+    body:has(#ai-rail.open) .col-xl-8,
+    body:has(#ai-rail.open) .col-xl-7,
+    body:has(#ai-rail.open) .col-xl-6,
+    body:has(#ai-rail.open) .col-xl-5,
+    body:has(#ai-rail.open) .col-xl-4 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Stat cards: 4 per row becomes 2x2 grid */
+    body.ai-rail-docked .col-sm-3,
+    body.ai-rail-docked .col-md-3,
+    body.ai-rail-docked .col-lg-3,
+    body.ai-rail-docked .col-xl-3,
+    body:has(#ai-rail.open) .col-sm-3,
+    body:has(#ai-rail.open) .col-md-3,
+    body:has(#ai-rail.open) .col-lg-3,
+    body:has(#ai-rail.open) .col-xl-3 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+    }
+
+    /* 3-column stats / summaries: reflow gracefully */
+    body.ai-rail-docked .col-md-4,
+    body.ai-rail-docked .col-lg-4,
+    body.ai-rail-docked .col-xl-4,
+    body:has(#ai-rail.open) .col-md-4,
+    body:has(#ai-rail.open) .col-lg-4,
+    body:has(#ai-rail.open) .col-xl-4 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+    }
+}
+
+@media (max-width: 1100px) {
+    /* Below 1100px (content area <= 860px), stack columns cleanly even when rail is closed */
+    .col-lg-12,
+    .col-lg-11,
+    .col-lg-10,
+    .col-lg-9,
+    .col-lg-8,
+    .col-lg-7,
+    .col-lg-6,
+    .col-lg-5,
+    .col-lg-4,
+    .col-xl-12,
+    .col-xl-11,
+    .col-xl-10,
+    .col-xl-9,
+    .col-xl-8,
+    .col-xl-7,
+    .col-xl-6,
+    .col-xl-5,
+    .col-xl-4 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    .col-sm-3,
+    .col-md-3,
+    .col-lg-3,
+    .col-xl-3 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+    }
+
+    /* Below 1100px with rail docked (content area <= 500px), stack all stats full width */
+    body.ai-rail-docked .col-sm-3,
+    body.ai-rail-docked .col-md-3,
+    body.ai-rail-docked .col-lg-3,
+    body.ai-rail-docked .col-xl-3,
+    body.ai-rail-docked .col-md-4,
+    body.ai-rail-docked .col-lg-4,
+    body.ai-rail-docked .col-xl-4,
+    body.ai-rail-docked .col-sm-4,
+    body.ai-rail-docked .col-md-6,
+    body.ai-rail-docked .col-sm-6,
+    body:has(#ai-rail.open) .col-sm-3,
+    body:has(#ai-rail.open) .col-md-3,
+    body:has(#ai-rail.open) .col-lg-3,
+    body:has(#ai-rail.open) .col-xl-3,
+    body:has(#ai-rail.open) .col-md-4,
+    body:has(#ai-rail.open) .col-lg-4,
+    body:has(#ai-rail.open) .col-xl-4,
+    body:has(#ai-rail.open) .col-sm-4,
+    body:has(#ai-rail.open) .col-md-6,
+    body:has(#ai-rail.open) .col-sm-6 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+}
+
 @media (max-width: 768px) {
-    .hims-tabs {
+    .hims-tabs-desktop {
+        display: none !important;
+    }
+    .hims-tabs-mobile {
+        display: block !important;
+    }
+    .hims-tabs:not(.hims-tabs-desktop) {
         flex-wrap: wrap;
         /* `overflow-x: auto` has nothing left to scroll once the strip wraps,
            and the `overflow-y: hidden` beside it clips the 1px the tabs hang
@@ -2092,12 +2461,69 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
     /* The -1px that lets an active tab paint over the strip's border also pulls
        the row below it up by 1px once there is a row below it. */
     .hims-tab { margin-bottom: 0; }
+
+    .learning-header-container {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .learning-header-content {
+        flex: 0 0 auto;
+        width: 100%;
+        min-width: 0;
+    }
+    .learning-header-title {
+        font-size: 16.5px;
+        line-height: 1.3;
+    }
+    .learning-header-desc {
+        font-size: 12px;
+        margin-top: 3px;
+        line-height: 1.45;
+    }
+    .learning-header-desc .desc-extra {
+        display: none;
+    }
+    .learning-header-desc .desc-extra.expanded {
+        display: inline;
+        animation: dropdownPopIn 0.2s ease forwards;
+    }
+    .learning-desc-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+    }
+    .learning-header-actions {
+        margin-left: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+    }
+    .learning-header-actions .btn-hims {
+        padding: 7px 12px;
+        font-size: 12px;
+        flex: 1 1 calc(50% - 6px);
+        justify-content: center;
+    }
+    .learning-header-actions .btn-hims-primary {
+        flex: 1 1 100%;
+    }
 }
 
 @media (max-width: 576px) {
     /* Icons alone would be a guessing game, so the label stays and the padding
        gives way instead. */
     .hims-tab { padding: 9px 11px; font-size: 12.5px; }
+}
+
+@media (max-width: 480px) {
+    .learning-header-actions .btn-hims {
+        padding: 6px 10px;
+        font-size: 11.5px;
+    }
 }
 
 /* Utility overrides */

@@ -51,24 +51,23 @@ class GeminiProvider extends AbstractAiProvider
                         ?? 'No response generated.';
                 }
 
-                if ($response->status() === 404) {
-                    // Model unavailable for this key — try the next, but keep the
-                    // reason: it is the only thing that makes the final message
-                    // actionable. See AbstractAiProvider::noUsableModel().
-                    $rejected[$model] = trim((string) ($response->json('error.message') ?: 'not found for this key'));
-                    Log::warning('Gemini rejected model', ['model' => $model]);
+                if (in_array($response->status(), [401, 403], true)) {
+                    $msg = trim((string) ($response->json('error.message') ?: $response->body()));
+                    Log::warning('Gemini API error', ['status' => $response->status(), 'body' => $response->body()]);
 
-                    continue;
+                    return "⚠️ Gemini API Error ({$response->status()}): {$msg}";
                 }
 
-                $msg = $response->json('error.message') ?? $response->body();
-                Log::warning('Gemini API error', ['status' => $response->status(), 'body' => $response->body()]);
+                $msg = trim((string) ($response->json('error.message') ?: $response->body()));
+                $rejected[$model] = "HTTP {$response->status()}: {$msg}";
+                Log::warning('Gemini rejected/failed model', ['model' => $model, 'status' => $response->status(), 'body' => $response->body()]);
 
-                return "⚠️ Gemini API Error ({$response->status()}): {$msg}";
+                continue;
             } catch (\Throwable $e) {
-                Log::error('Gemini request failed', ['error' => $e->getMessage()]);
+                Log::error('Gemini request failed', ['model' => $model, 'error' => $e->getMessage()]);
+                $rejected[$model] = 'Error: '.$e->getMessage();
 
-                return '⚠️ AI service error: '.$e->getMessage();
+                continue;
             }
         }
 

@@ -56,7 +56,7 @@ return [
     'ai' => [
         'default' => env('AI_PROVIDER', 'gemini'),
         'temperature' => (float) env('AI_TEMPERATURE', 0.7),
-        'max_tokens' => (int) env('AI_MAX_TOKENS', 1024),
+        'max_tokens' => (int) env('AI_MAX_TOKENS', 2048),
         'timeout' => (int) env('AI_TIMEOUT', 30),
         'history_turns' => (int) env('AI_HISTORY_TURNS', 20),
         'history_chars' => (int) env('AI_HISTORY_CHARS', 12000),
@@ -75,6 +75,7 @@ return [
                 'driver' => 'openai',
                 'api_key' => env('OPENAI_API_KEY', ''),
                 'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
+                'fallback_models' => ['gpt-4o', 'gpt-3.5-turbo'],
                 'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
             ],
 
@@ -87,25 +88,15 @@ return [
                 'anthropic_version' => env('ANTHROPIC_VERSION', '2023-06-01'),
             ],
 
-            // One OpenAI-compatible slot for Groq / DeepSeek / xAI / Mistral /
-            // Together / OpenRouter / Ollama — set the base URL + key + model.
-            //
-            // Unlike gemini/anthropic, this slot's fallback chain comes from the
-            // environment rather than a literal here: the host behind it is not
-            // known at this point, so a hardcoded list of Groq model names would
-            // be nonsense pointed at DeepSeek or a local Ollama. It matters
-            // because these hosts retire models on a rolling basis — Groq
-            // dropped llama-3.3-70b-versatile, and with no chain to fall back
-            // through the assistant went dark on every question at once.
             'compatible' => [
                 'driver' => 'compatible',
                 'label' => env('AI_COMPATIBLE_LABEL', 'AI'),
                 'api_key' => env('AI_COMPATIBLE_API_KEY', ''),
-                'model' => env('AI_COMPATIBLE_MODEL', ''),
-                'fallback_models' => array_values(array_filter(array_map(
-                    'trim',
-                    explode(',', (string) env('AI_COMPATIBLE_FALLBACK_MODELS', ''))
-                ), fn (string $m): bool => $m !== '')),
+                'model' => env('AI_COMPATIBLE_MODEL', 'openai/gpt-oss-120b'),
+                'fallback_models' => array_values(array_unique(array_filter(array_merge(
+                    array_map('trim', explode(',', (string) env('AI_COMPATIBLE_FALLBACK_MODELS', ''))),
+                    ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant']
+                ), fn (string $m): bool => $m !== ''))),
                 'base_url' => env('AI_COMPATIBLE_BASE_URL', ''),
             ],
         ],

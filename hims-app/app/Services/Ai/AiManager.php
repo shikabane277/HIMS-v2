@@ -43,20 +43,30 @@ class AiManager
 
         $default = $this->normalise((string) ($this->config['default'] ?? 'gemini'));
 
-        // The default comes from AI_PROVIDER in .env — user input, effectively.
-        // A bad value must degrade, not 500 every page that touches AI.
-        try {
-            return $this->resolved[$default] ??= $this->make($default);
-        } catch (InvalidArgumentException $e) {
-            Log::error('Invalid AI_PROVIDER configured', [
-                'provider' => $default,
-                'available' => array_keys((array) ($this->config['providers'] ?? [])),
-            ]);
-
-            return $this->resolved[$default] = new NullAiProvider($default, array_keys(
-                (array) ($this->config['providers'] ?? [])
-            ));
+        if (isset($this->resolved['__chain__'])) {
+            return $this->resolved['__chain__'];
         }
+
+        $allProviders = array_keys((array) ($this->config['providers'] ?? []));
+        $chainKeys = array_values(array_unique(array_merge([$default], $allProviders)));
+
+        $instances = [];
+        foreach ($chainKeys as $key) {
+            try {
+                $p = $this->resolved[$key] ??= $this->make($key);
+                if (! ($p instanceof NullAiProvider)) {
+                    $instances[] = $p;
+                }
+            } catch (InvalidArgumentException $e) {
+                Log::warning("Skipping invalid AI provider [{$key}] in fallback chain", ['error' => $e->getMessage()]);
+            }
+        }
+
+        if (empty($instances)) {
+            $instances[] = new NullAiProvider($default, $allProviders);
+        }
+
+        return $this->resolved['__chain__'] = new FallbackAiProvider($instances);
     }
 
     /**
