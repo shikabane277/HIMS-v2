@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\TwoFactorAuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
@@ -32,6 +33,21 @@ Route::middleware('guest')->group(function () {
         ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+
+    Route::get('two-factor-challenge', [TwoFactorAuthenticatedSessionController::class, 'create'])
+        ->name('two-factor.show');
+
+    Route::post('two-factor-challenge', [TwoFactorAuthenticatedSessionController::class, 'store'])
+        ->name('two-factor.verify');
+
+    Route::post('two-factor-challenge/resend', [TwoFactorAuthenticatedSessionController::class, 'resend'])
+        ->name('two-factor.resend');
+
+    Route::get('two-factor-challenge/cancel', [TwoFactorAuthenticatedSessionController::class, 'destroy'])
+        ->name('two-factor.cancel');
+
+    Route::get('2fa', [TwoFactorAuthenticatedSessionController::class, 'create']);
+    Route::post('2fa', [TwoFactorAuthenticatedSessionController::class, 'store']);
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');

@@ -64,17 +64,17 @@
             </div>
 
             <div class="form-group">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-                    <label class="hims-label" for="password" style="margin:0"><i class="bi bi-lock"></i> Password</label>
-                    @if(Route::has('password.request'))
-                    <a href="{{ route('password.request') }}" style="font-size:12px;color:var(--hims-primary);text-decoration:none;font-weight:500">Forgot password?</a>
-                    @endif
-                </div>
+                <label class="hims-label" for="password"><i class="bi bi-lock"></i> Password</label>
                 <div class="input-with-icon">
                     <i class="bi bi-lock icon"></i>
                     <input type="password" id="password" name="password" class="hims-input" placeholder="Enter your password" required>
                     <button type="button" class="toggle-pw" onclick="togglePw()"><i class="bi bi-eye" id="pwEye"></i></button>
                 </div>
+                @if(Route::has('password.request'))
+                <div style="display:flex;justify-content:flex-end;margin-top:6px">
+                    <a href="{{ route('password.request') }}" style="font-size:12px;color:var(--hims-primary);text-decoration:none;font-weight:500">Forgot password?</a>
+                </div>
+                @endif
             </div>
 
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">

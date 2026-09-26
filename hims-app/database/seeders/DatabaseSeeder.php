@@ -123,7 +123,7 @@ class DatabaseSeeder extends Seeder
             'employee_code' => 'EMP-0009',
             'first_name' => 'HIMS',
             'last_name' => 'Administrator',
-            'email' => 'admin@hospital.ph',
+            'email' => 'claudiokhyelandrei@gmail.com',
             'department_id' => $adminDeptId,
             'role_id' => $adminRoleId,
             'position_title' => 'System Administrator',
@@ -133,7 +133,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $accounts = [
-            ['HIMS Administrator', 'admin@hospital.ph',       'admin',      $adminEmpId],
+            ['HIMS Administrator', 'claudiokhyelandrei@gmail.com', 'admin',      $adminEmpId],
             ['Luisa Garcia',       'l.garcia@hospital.ph',    'hr_manager', $empIds['EMP-0005']],
             ['Roberto Lim',        'r.lim@hospital.ph',       'staff',      $empIds['EMP-0006']],
             ['Maria Santos',       'm.santos@hospital.ph',    'supervisor', $empIds['EMP-0001']],
@@ -296,7 +296,7 @@ class DatabaseSeeder extends Seeder
 
         echo "✅ HIMS seed data installed successfully.\n";
         echo "   Logins (all password: password)\n";
-        echo "     admin@hospital.ph      — admin       (full access; reviews the 5 department heads)\n";
+        echo "     claudiokhyelandrei@gmail.com — admin       (full access; reviews the 5 department heads)\n";
         echo "     l.garcia@hospital.ph   — hr_manager  (org-wide HR; reviews Roberto Lim only)\n";
         echo "     m.santos@hospital.ph   — supervisor  (Nursing Services; reviews Jose Reyes + Miguel Torres)\n";
         echo "     j.reyes@hospital.ph    — staff       (own records; is the subject of a draft review)\n";

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\TwoFactorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,11 +25,21 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        $request->authenticate();
+        $user = $request->authenticate();
 
-        $request->session()->regenerate();
+        $code = TwoFactorService::generateCode();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user->update([
+            'two_factor_code' => hash('sha256', $code),
+            'two_factor_expires_at' => now()->addMinutes(10),
+        ]);
+
+        $request->session()->put('login.id', $user->id);
+        $request->session()->put('login.remember', $request->boolean('remember'));
+
+        TwoFactorService::sendCode($user, $code);
+
+        return redirect()->route('two-factor.show');
     }
 
     /**

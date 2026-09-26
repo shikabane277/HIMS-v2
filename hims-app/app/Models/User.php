@@ -11,8 +11,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['name', 'email', 'password', 'role', 'employee_id', 'email_verified_at'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['name', 'email', 'password', 'role', 'employee_id', 'email_verified_at', 'two_factor_code', 'two_factor_expires_at'])]
+#[Hidden(['password', 'remember_token', 'two_factor_code'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -27,8 +27,20 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'two_factor_expires_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Clear active two-factor challenge code.
+     */
+    public function resetTwoFactorCode(): void
+    {
+        $this->update([
+            'two_factor_code' => null,
+            'two_factor_expires_at' => null,
+        ]);
     }
 
     /* ---------------------------------------------------------------
