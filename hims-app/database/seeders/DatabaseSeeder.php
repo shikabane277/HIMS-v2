@@ -11,6 +11,10 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException('DatabaseSeeder cannot be run in production. Use `php artisan hims:create-admin` to provision the initial administrator account.');
+        }
+
         // ── 1. DEPARTMENTS ─────────────────────────────────
         $depts = [
             ['id' => Str::uuid(), 'name' => 'Nursing Services',        'code' => 'NS',  'is_clinical' => true],

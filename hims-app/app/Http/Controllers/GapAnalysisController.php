@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Objective 6 — AI-Assisted Competency Gap Analysis.
+ * Objective 6 — AI-Driven Competency Gap Analysis.
  *
  * Reads performance results, competency assessments against job requirements,
  * and training received, then reports the missing skills and how to close them.

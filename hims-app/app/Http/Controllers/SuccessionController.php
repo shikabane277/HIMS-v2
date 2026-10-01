@@ -100,7 +100,7 @@ class SuccessionController extends Controller
                 DB::raw("CONCAT(eh.first_name,' ',eh.last_name) AS current_holder_name"),
                 DB::raw('COUNT(sc.candidate_id) as candidates_count'))
             ->groupBy('cp.position_id', 'd.name', 'eh.first_name', 'eh.last_name'))
-            ->orderByRaw("FIELD(cp.vacancy_risk,'critical','high','medium','low')")
+            ->orderByRaw("CASE cp.vacancy_risk WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->get()
             ->each(function ($position) use ($canSeeConfidential) {
                 if (! $canSeeConfidential) {
@@ -162,7 +162,7 @@ class SuccessionController extends Controller
             ->leftJoin('employees as eh', 'cp.current_holder_id', '=', 'eh.employee_id')
             ->select('cp.*', 'd.name as department_name',
                 DB::raw("CONCAT(COALESCE(eh.first_name,''),' ',COALESCE(eh.last_name,'')) as current_holder_name"))
-            ->orderByRaw("FIELD(cp.vacancy_risk,'critical','high','medium','low')"))
+            ->orderByRaw("CASE cp.vacancy_risk WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END"))
             ->paginate(20);
 
         if (! $canSeeConfidential) {

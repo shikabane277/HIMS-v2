@@ -1,12 +1,12 @@
 @extends('layouts.hims')
 @section('title','AI Gap Analysis')
-@section('page-title','AI-Assisted Competency Gap Analysis')
+@section('page-title','AI-Driven Competency Gap Analysis')
 @section('breadcrumb','HIMS / Competency / Gap Analysis')
 
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-4" style="flex-wrap:wrap;gap:12px">
     <div>
-        <h2 style="font-size:20px;font-weight:700;margin:0">AI-Assisted Competency Gap Analysis</h2>
+        <h2 style="font-size:20px;font-weight:700;margin:0">AI-Driven Competency Gap Analysis</h2>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">
             Combines performance results, competency assessments against job requirements, and training received
             to identify missing skills and suggest improvements.

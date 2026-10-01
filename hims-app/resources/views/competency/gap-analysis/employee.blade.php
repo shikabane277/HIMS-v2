@@ -1,6 +1,6 @@
 @extends('layouts.hims')
 @section('title','Gap Analysis — '.$analysis['employee']->first_name.' '.$analysis['employee']->last_name)
-@section('page-title','AI-Assisted Competency Gap Analysis')
+@section('page-title','AI-Driven Competency Gap Analysis')
 @section('breadcrumb','HIMS / Competency / Gap Analysis / Employee')
 
 @section('content')
@@ -156,7 +156,12 @@
                     <div style="padding:11px 13px;background:{{ $sev === 'critical' ? '#fee2e2' : ($sev === 'low' ? '#f0fdf4' : '#fef3c7') }};border-radius:8px">
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
                             <strong style="font-size:13px">{{ $skill['skill'] ?? '—' }}</strong>
-                            <span class="hims-badge {{ $sev === 'critical' ? 'red' : ($sev === 'low' ? 'green' : 'yellow') }}">{{ ucfirst($sev) }}</span>
+                            <div style="display:flex;gap:6px;align-items:center">
+                                @if(!empty($skill['confidence']))
+                                <span class="hims-badge gray" style="font-size:11px">Confidence: {{ ucfirst($skill['confidence']) }}</span>
+                                @endif
+                                <span class="hims-badge {{ $sev === 'critical' ? 'red' : ($sev === 'low' ? 'green' : 'yellow') }}">{{ ucfirst($sev) }}</span>
+                            </div>
                         </div>
                         @if(!empty($skill['evidence']))
                         <div style="font-size:12px;color:#4b5563;margin-top:4px"><strong>Evidence:</strong> {{ $skill['evidence'] }}</div>
@@ -174,14 +179,28 @@
             <div class="mb-3">
                 <div class="hims-label" style="margin-bottom:8px">Suggested Development Plan</div>
                 <table class="hims-table">
-                    <thead><tr><th>Step</th><th>Method</th><th>Timeframe</th><th>Success Measure</th></tr></thead>
+                    <thead><tr><th>Step</th><th>Method</th><th>Timeframe</th><th>Evidence & Success Measure</th><th>Confidence</th></tr></thead>
                     <tbody>
                         @foreach($ai['development_plan'] as $step)
                         <tr>
                             <td data-label="Step"><strong>{{ $step['step'] ?? '—' }}</strong></td>
                             <td data-label="Method"><span class="hims-badge blue">{{ ucfirst(str_replace('_',' ', $step['method'] ?? '—')) }}</span></td>
                             <td data-label="Timeframe" style="font-size:12px">{{ $step['timeframe'] ?? '—' }}</td>
-                            <td data-label="Success Measure" style="font-size:12px;color:#6b7280">{{ $step['success_measure'] ?? '—' }}</td>
+                            <td data-label="Evidence & Success Measure" style="font-size:12px">
+                                @if(!empty($step['evidence']))
+                                    <div style="color:#4b5563;margin-bottom:3px"><strong>Evidence:</strong> {{ $step['evidence'] }}</div>
+                                @endif
+                                <div style="color:#6b7280">{{ $step['success_measure'] ?? '—' }}</div>
+                            </td>
+                            <td data-label="Confidence">
+                                @if(!empty($step['confidence']))
+                                    <span class="hims-badge {{ strtolower($step['confidence']) === 'high' ? 'green' : (strtolower($step['confidence']) === 'medium' ? 'yellow' : 'gray') }}">
+                                        {{ ucfirst($step['confidence']) }}
+                                    </span>
+                                @else
+                                    <span style="color:#9ca3af;font-size:12px">—</span>
+                                @endif
+                            </td>
                         </tr>
                         @endforeach
                     </tbody>

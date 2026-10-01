@@ -1,5 +1,5 @@
 @push('modals')
-<div class="hims-modal-backdrop" id="auditHistoryModal" style="display:none">
+<div class="hims-modal-backdrop" id="auditHistoryModal">
     <div class="hims-modal" style="max-width:640px">
         <div class="hims-modal-header">
             <h4><i class="bi bi-clock-history"></i> Change History</h4>

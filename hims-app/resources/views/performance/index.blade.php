@@ -151,4 +151,32 @@
     @include('performance.cycles._create-modal')
     @include('performance.cycles._edit-modal')
 @endcan
+
+@push('scripts')
+<script>
+(function () {
+    const filter = document.getElementById('cycleFilter');
+    if (!filter) return;
+
+    filter.addEventListener('change', function () {
+        const val = this.value.toLowerCase();
+        const rows = document.querySelectorAll('#cycleFilter')
+            ?.[0]?.closest('.hims-card')
+            ?.querySelectorAll('tbody tr') ?? [];
+
+        // Walk from the parent card's table
+        const card = filter.closest('.hims-card');
+        if (!card) return;
+        const trs = card.querySelectorAll('tbody tr');
+
+        trs.forEach(tr => {
+            if (!val) { tr.style.display = ''; return; }
+            const badge = tr.querySelector('.hims-badge');
+            const status = badge ? badge.textContent.trim().toLowerCase() : '';
+            tr.style.display = status === val ? '' : 'none';
+        });
+    });
+})();
+</script>
+@endpush
 @endsection

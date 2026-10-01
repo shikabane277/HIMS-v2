@@ -42,34 +42,29 @@ class LoginRequest extends FormRequest
      */
     public function authenticate(): User
     {
-        $user = User::where('email', $this->string('email'))->first();
-
-        if ($user && isset($user->locked_until) && $user->locked_until && now()->lt($user->locked_until)) {
-            throw ValidationException::withMessages([
-                'email' => 'This account is locked due to multiple failed login attempts. Please contact an administrator to unlock your account.',
-            ]);
-        }
-
         $this->ensureIsNotRateLimited();
 
+        $user = User::where('email', $this->string('email'))->first();
+
+        // Validate password FIRST — checking lockout before password validation
+        // would leak whether the email exists (timing + different error message).
         if (! Auth::validate($this->only('email', 'password'))) {
             RateLimiter::hit($this->throttleKey());
 
             if ($user) {
                 $attempts = (int) ($user->failed_login_attempts ?? 0) + 1;
-                $updateData = ['updated_at' => now()];
+                $updateData = [
+                    'failed_login_attempts' => $attempts,
+                    'updated_at'            => now(),
+                ];
 
-                // Only write columns if they exist in the schema
-                if (isset($user->failed_login_attempts)) {
-                    $updateData['failed_login_attempts'] = $attempts;
-                }
-                if (isset($user->locked_until) && $attempts >= 5) {
+                // Lock after 5 consecutive failures — no isset() guard needed,
+                // the migration guarantees these columns exist.
+                if ($attempts >= 5) {
                     $updateData['locked_until'] = now()->addMinutes(15);
                 }
 
-                if (count($updateData) > 1) {
-                    DB::table('users')->where('id', $user->id)->update($updateData);
-                }
+                DB::table('users')->where('id', $user->id)->update($updateData);
             }
 
             throw ValidationException::withMessages([
@@ -77,13 +72,22 @@ class LoginRequest extends FormRequest
             ]);
         }
 
-        if ($user && isset($user->failed_login_attempts)) {
-            DB::table('users')->where('id', $user->id)->update([
-                'failed_login_attempts' => 0,
-                'locked_until' => null,
-                'updated_at' => now(),
+        // Password is correct — now check if the account is locked.
+        // This prevents locked accounts from logging in even with correct creds,
+        // while using the same generic error so attackers can't distinguish
+        // "locked" from "wrong password".
+        if ($user->locked_until && now()->lt($user->locked_until)) {
+            throw ValidationException::withMessages([
+                'email' => trans('auth.failed'),
             ]);
         }
+
+        // Successful login — reset counters
+        DB::table('users')->where('id', $user->id)->update([
+            'failed_login_attempts' => 0,
+            'locked_until'          => null,
+            'updated_at'            => now(),
+        ]);
 
         RateLimiter::clear($this->throttleKey());
 

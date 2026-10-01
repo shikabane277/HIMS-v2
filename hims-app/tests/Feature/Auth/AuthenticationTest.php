@@ -196,6 +196,44 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_account_is_locked_after_five_consecutive_failed_login_attempts(): void
+    {
+        $user = User::factory()->create([
+            'password' => bcrypt('correct-password'),
+        ]);
+
+        for ($i = 1; $i <= 5; $i++) {
+            $response = $this->post('/login', [
+                'email'    => $user->email,
+                'password' => 'wrong-password',
+            ]);
+            $response->assertSessionHasErrors('email');
+            $this->assertGuest();
+        }
+
+        $user->refresh();
+        $this->assertEquals(5, $user->failed_login_attempts);
+        $this->assertNotNull($user->locked_until);
+        $this->assertTrue(now()->lt($user->locked_until));
+
+        // Attempting to log in with the CORRECT password should still fail while locked
+        $response = $this->post('/login', [
+            'email'    => $user->email,
+            'password' => 'correct-password',
+        ]);
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
+
+        // After lock expires (15 minutes), correct password should initiate 2FA
+        $this->travel(16)->minutes();
+
+        $response = $this->post('/login', [
+            'email'    => $user->email,
+            'password' => 'correct-password',
+        ]);
+        $response->assertRedirect(route('two-factor.show'));
+    }
+
     public function test_users_can_logout(): void
     {
         $user = User::factory()->create();

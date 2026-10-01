@@ -85,13 +85,21 @@ class PerformanceController extends Controller
             'pips' => DB::table('performance_improvement_plans')->where('status', 'active')->count(),
         ];
 
-        $cycles = $this->markCycleStatus(
-            DB::table('review_cycles as rc')
-                ->leftJoin('performance_reviews as pr', 'rc.cycle_id', '=', 'pr.cycle_id')
-                ->select('rc.*', DB::raw('COUNT(pr.review_id) as reviews_count'))
-                ->groupBy('rc.cycle_id')
-                ->orderByDesc('rc.start_date')->get()
-        );
+        $statusFilter = request('status');
+        $rawCycles = DB::table('review_cycles as rc')
+            ->leftJoin('performance_reviews as pr', 'rc.cycle_id', '=', 'pr.cycle_id')
+            ->select('rc.*', DB::raw('COUNT(pr.review_id) as reviews_count'))
+            ->groupBy('rc.cycle_id')
+            ->orderByDesc('rc.start_date')->get();
+
+        $cycles = $this->markCycleStatus($rawCycles);
+
+        if ($statusFilter) {
+            $cycles = $cycles->filter(function ($c) use ($statusFilter) {
+                return strtolower($c->effective_status) === strtolower($statusFilter)
+                    || strtolower($c->status) === strtolower($statusFilter);
+            });
+        }
 
         $reviews = DB::table('performance_reviews as pr')
             ->join('employees as e', 'pr.employee_id', '=', 'e.employee_id')
@@ -824,5 +832,111 @@ class PerformanceController extends Controller
         }
 
         DB::table('performance_reviews')->where('review_id', $reviewId)->update($update);
+    }
+
+    public function storeGoal(Request $request, $reviewId)
+    {
+        $review = DB::table('performance_reviews')->where('review_id', $reviewId)->first();
+        abort_if(! $review, 404);
+
+        $request->validate([
+            'goal_title'       => 'required|string|max:300',
+            'goal_description' => 'nullable|string',
+            'target_date'      => 'nullable|date',
+            'progress_pct'     => 'nullable|integer|min:0|max:100',
+            'status'           => 'nullable|in:not_started,in_progress,achieved,not_achieved',
+        ]);
+
+        $goalId = (string) Str::uuid();
+
+        DB::table('review_goals')->insert([
+            'goal_id'          => $goalId,
+            'review_id'        => $reviewId,
+            'employee_id'      => $review->employee_id,
+            'goal_title'       => $request->goal_title,
+            'goal_description' => $request->goal_description ?: $request->goal_title,
+            'target_date'      => $request->target_date ?: null,
+            'progress_pct'     => $request->progress_pct ?? 0,
+            'status'           => $request->status ?: 'not_started',
+            'created_at'       => now(),
+            'updated_at'       => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Review goal added.');
+    }
+
+    public function updateGoal(Request $request, $goalId)
+    {
+        $goal = DB::table('review_goals')->where('goal_id', $goalId)->first();
+        abort_if(! $goal, 404);
+
+        $request->validate([
+            'progress_pct' => 'nullable|integer|min:0|max:100',
+            'status'       => 'required|in:not_started,in_progress,achieved,not_achieved',
+        ]);
+
+        DB::table('review_goals')->where('goal_id', $goalId)->update([
+            'progress_pct' => $request->progress_pct ?? $goal->progress_pct,
+            'status'       => $request->status,
+            'updated_at'   => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Goal updated.');
+    }
+
+    public function storePip(Request $request, $reviewId)
+    {
+        $review = DB::table('performance_reviews')->where('review_id', $reviewId)->first();
+        abort_if(! $review, 404);
+
+        $request->validate([
+            'start_date'      => 'required|date',
+            'target_end_date' => 'required|date|after_or_equal:start_date',
+            'action_steps'    => 'required',
+            'notes'           => 'nullable|string',
+        ]);
+
+        $actionSteps = is_array($request->action_steps)
+            ? $request->action_steps
+            : array_values(array_filter(array_map('trim', explode("\n", (string) $request->action_steps))));
+
+        $pipId = (string) Str::uuid();
+
+        DB::table('performance_improvement_plans')->insert([
+            'pip_id'              => $pipId,
+            'employee_id'         => $review->employee_id,
+            'triggered_by_review' => $reviewId,
+            'status'              => 'initiated',
+            'action_steps'        => json_encode($actionSteps),
+            'start_date'          => $request->start_date,
+            'target_end_date'     => $request->target_end_date,
+            'supervisor_id'       => $review->reviewer_id,
+            'notes'               => $request->notes,
+            'created_at'          => now(),
+            'updated_at'          => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Performance Improvement Plan initiated.');
+    }
+
+    public function updatePip(Request $request, $pipId)
+    {
+        $pip = DB::table('performance_improvement_plans')->where('pip_id', $pipId)->first();
+        abort_if(! $pip, 404);
+
+        $request->validate([
+            'status'          => 'required|in:initiated,active,completed,extended,failed',
+            'actual_end_date' => 'nullable|date',
+            'notes'           => 'nullable|string',
+        ]);
+
+        DB::table('performance_improvement_plans')->where('pip_id', $pipId)->update([
+            'status'          => $request->status,
+            'actual_end_date' => $request->actual_end_date ?: ($request->status === 'completed' ? now()->toDateString() : null),
+            'notes'           => $request->notes ?? $pip->notes,
+            'updated_at'      => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Performance Improvement Plan updated.');
     }
 }

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * AI-Assisted Competency Gap Analysis.
+ * AI-Driven Competency Gap Analysis.
  *
  * Combines three signals the hospital already records — performance review
  * scores, competency assessments measured against the requirements of the
@@ -773,9 +773,8 @@ PROMPT;
         $cycleCount = count($analysis['performance']['feedback']);
 
         return <<<PROMPT
-You are a hospital competency development advisor for a Philippine hospital.
-Analyse the evidence below and identify this employee's missing skills and how
-to close them. Ground every statement in the data given; do not invent facts.
+You are an AI-driven hospital competency development advisor for a Philippine hospital.
+Analyse the evidence below to identify this employee's missing skills, uncover root causes from written supervisor feedback and performance metrics, and produce structured recommendations with supporting evidence and confidence levels. Ground every statement in the data given; do not invent facts.
 
 EMPLOYEE
 Name: {$e->first_name} {$e->last_name}
@@ -822,11 +821,11 @@ Return ONLY a JSON object, no markdown fences, with this exact shape:
     "concerns": ["short phrase drawn from the feedback", "..."]
   },
   "missing_skills": [
-    {"skill": "name", "evidence": "which data point shows this", "impact": "consequence if unaddressed", "severity": "critical|moderate|low"}
+    {"skill": "name", "evidence": "which data point shows this", "impact": "consequence if unaddressed", "severity": "critical|moderate|low", "confidence": "high|medium|low"}
   ],
   "root_causes": ["short phrase", "..."],
   "development_plan": [
-    {"step": "specific action", "method": "training|mentoring|supervised practice|reassessment|e-learning", "timeframe": "e.g. within 30 days", "success_measure": "how to verify"}
+    {"step": "specific action", "method": "training|mentoring|supervised practice|reassessment|e-learning", "timeframe": "e.g. within 30 days", "success_measure": "how to verify", "evidence": "data point supporting this recommendation", "confidence": "high|medium|low"}
   ],
   "training_already_tried": "note any gap that persisted despite training, or null",
   "strengths_to_leverage": ["short phrase", "..."]

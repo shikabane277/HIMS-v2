@@ -1,6 +1,6 @@
 @extends('layouts.hims')
 @section('title','Department Gap Analysis')
-@section('page-title','AI-Assisted Competency Gap Analysis')
+@section('page-title','AI-Driven Competency Gap Analysis')
 @section('breadcrumb','HIMS / Competency / Gap Analysis / Department')
 
 @section('content')

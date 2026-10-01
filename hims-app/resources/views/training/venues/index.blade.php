@@ -36,6 +36,29 @@
                         <td style="padding:7px 0;font-weight:700;color:var(--hims-primary)">{{ $venue->capacity }} pax</td>
                     </tr>
                 </table>
+                @can('manage-venues')
+                <div class="mt-3 d-flex gap-2 justify-content-end">
+                    <button type="button" class="btn-hims btn-hims-outline btn-sm"
+                            data-modal-open="venueEditModal"
+                            data-venue-edit
+                            data-action="{{ route('training.venues.update', $venue->venue_id) }}"
+                            data-name="{{ $venue->venue_name }}"
+                            data-building="{{ $venue->building }}"
+                            data-floor="{{ $venue->floor }}"
+                            data-capacity="{{ $venue->capacity }}"
+                            data-active="{{ $venue->is_active ? '1' : '0' }}">
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
+                    <form method="POST" action="{{ route('training.venues.destroy', $venue->venue_id) }}"
+                          onsubmit="return confirm('Delete venue {{ addslashes($venue->venue_name) }}?')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn-hims btn-sm" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 10px;cursor:pointer">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </div>
+                @endcan
             </div>
         </div>
     </div>
@@ -45,10 +68,17 @@
             <div class="card-body" style="text-align:center;padding:60px;color:#9ca3af">
                 <div style="font-size:48px;margin-bottom:12px">🏛️</div>
                 <div style="font-size:16px;font-weight:600;color:var(--hims-text-dark);margin-bottom:6px">No venues yet</div>
-                <a href="{{ route('training.venues.index') }}" class="btn-hims btn-hims-primary mt-2">Add First Venue</a>
+                @can('manage-venues')
+                <button type="button" class="btn-hims btn-hims-primary mt-2" data-modal-open="venueCreateModal">Add First Venue</button>
+                @endcan
             </div>
         </div>
     </div>
     @endforelse
 </div>
+
+@can('manage-venues')
+    @include('training.venues._create-modal')
+    @include('training.venues._edit-modal')
+@endcan
 @endsection

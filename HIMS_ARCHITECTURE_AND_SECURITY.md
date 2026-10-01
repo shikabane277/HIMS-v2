@@ -55,7 +55,7 @@ graph TD
 | **Database** | MySQL 8 (`DB_CONNECTION=mysql`). `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`; MySQL triggers auto-compute competency gap; **three statuses are derived rather than stored** — `App\Support\CredentialStatus` (credential expiry), `CycleStatus` (review cycle closed) and `ReviewStatus` (review frozen) all compute from a date on every read, in PHP and as bound SQL; 1 view. |
 | **Authentication** | Breeze v2.4 session auth on the `users` table. Login throttling = 5 attempts (`LoginRequest`), `throttle:6,1` on verification/password routes. Public self-registration is disabled — admins provision accounts via `UserController`. |
 | **Authorisation** | Gates defined in `AppServiceProvider::registerGates()` + the `role` route middleware, both keyed on `users.role`. See [§3.2](#32-granular-access-control-rbac). The AI assistant adds a third form — subject-matter RBAC applied in the controller rather than by middleware, see [§3.2.1](#321-subject-matter-rbac-for-the-ai-assistant). |
-| **Cache / session / queue** | `CACHE_STORE=database`, `SESSION_DRIVER=file`, `QUEUE_CONNECTION=database`. The application makes no `Cache::` calls of its own and dispatches no queued jobs. |
+| **Cache / session / queue** | `CACHE_STORE=database`, `SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`. The application makes no `Cache::` calls of its own and dispatches no queued jobs. |
 | **Timezone** | `APP_TIMEZONE=Asia/Manila` (`config/app.php`). **An authorization setting, not a display one** — the three derived statuses above all ask "has this date passed?" against `now()->toDateString()`, so under Laravel's stock UTC default a Philippine cycle stayed editable until 8am the day after it ended. See [§2.2.1](#221-review-and-cycle-status-are-derived-from-the-cycles-end-date). |
 | **AI Engine** | Provider-agnostic. Consumers depend on `App\Contracts\AiProvider`; `AiManager` resolves the driver from `AI_PROVIDER` (`gemini`\|`openai`\|`anthropic`\|`compatible`). Gemini is the default. See [§5](#5-ai-provider-layer). |
 | **Mail** | SMTP presets (`gmail`, `outlook`, `yahoo`) plus a Brevo HTTPS API transport. Used by password reset only. See [§4](#4-outbound-mail). |
@@ -628,7 +628,7 @@ The controls below are the ones the application actually enforces.
 *   **CSRF Protection**: Laravel's `VerifyCsrfToken` runs in the default `web` middleware group; all
     state-changing Blade forms emit `@csrf`.
 *   **Session cookie**: `HttpOnly` and `SameSite=Lax` by framework default. `SESSION_ENCRYPT=false` and
-    `SESSION_DRIVER=file` in the current environment. The `Secure` flag only applies over HTTPS — the local
+    `SESSION_DRIVER=database` in the current environment. The `Secure` flag only applies over HTTPS — the local
     environment runs `APP_ENV=local` / `APP_URL=http://localhost:8000`, so it is **not** set locally.
     `bootstrap/app.php` calls `trustProxies(at: '*')` so deployment behind a TLS-terminating proxy
     (Railway) yields correct HTTPS scheme and asset URLs.

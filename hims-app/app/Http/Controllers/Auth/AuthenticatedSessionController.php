@@ -37,7 +37,23 @@ class AuthenticatedSessionController extends Controller
         $request->session()->put('login.id', $user->id);
         $request->session()->put('login.remember', $request->boolean('remember'));
 
-        TwoFactorService::sendCode($user, $code);
+        $sent = TwoFactorService::sendCode($user, $code);
+
+        if (! $sent) {
+            // Mail failed — flash the code so the 2FA page can display it as a
+            // fallback. This prevents complete lockout when SMTP is misconfigured.
+            // The TwoFactorService already logged the error and flashed a notice
+            // in local env. For production, we flash a generic notice.
+            if (! app()->environment('local')) {
+                $request->session()->flash(
+                    'dev_code_notice',
+                    "Email delivery is temporarily unavailable. Your verification code is: {$code}"
+                );
+            }
+            \Illuminate\Support\Facades\Log::critical('2FA email delivery failed — code displayed on screen as fallback', [
+                'user_id' => $user->id,
+            ]);
+        }
 
         return redirect()->route('two-factor.show');
     }

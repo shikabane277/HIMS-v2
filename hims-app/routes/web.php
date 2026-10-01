@@ -68,6 +68,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/reviews', [PerformanceController::class, 'storeReview'])->name('reviews.store');
             Route::get('/reviews/{id}/score', [PerformanceController::class, 'scoreReview'])->name('reviews.score');
             Route::put('/reviews/{id}/score', [PerformanceController::class, 'saveScores'])->name('reviews.score.save');
+            Route::post('/reviews/{id}/goals', [PerformanceController::class, 'storeGoal'])->name('reviews.goals.store');
+            Route::put('/reviews/goals/{goalId}', [PerformanceController::class, 'updateGoal'])->name('reviews.goals.update');
+            Route::post('/reviews/{id}/pip', [PerformanceController::class, 'storePip'])->name('reviews.pip.store');
+            Route::put('/reviews/pip/{pipId}', [PerformanceController::class, 'updatePip'])->name('reviews.pip.update');
         });
 
         // Reading a review stays open to any signed-in account — show() answers
@@ -106,9 +110,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // modal on the Competency index (?new=domain), so there is no GET page.
         Route::middleware('role:admin,hr_manager')->group(function () {
             Route::post('/domains', [CompetencyController::class, 'storeDomain'])->name('domains.store');
+            Route::put('/domains/{id}', [CompetencyController::class, 'updateDomain'])->name('domains.update');
+            Route::delete('/domains/{id}', [CompetencyController::class, 'destroyDomain'])->name('domains.destroy');
+
+            Route::get('/role-requirements', [CompetencyController::class, 'roleRequirementsIndex'])->name('role-requirements.index');
+            Route::post('/role-requirements', [CompetencyController::class, 'storeRoleRequirement'])->name('role-requirements.store');
+            Route::put('/role-requirements/{id}', [CompetencyController::class, 'updateRoleRequirement'])->name('role-requirements.update');
+            Route::delete('/role-requirements/{id}', [CompetencyController::class, 'destroyRoleRequirement'])->name('role-requirements.destroy');
         });
 
-        // ── AI-Assisted Competency Gap Analysis (Objective 6) ──
+        // ── AI-Driven Competency Gap Analysis (Objective 6) ──
         Route::middleware('role:admin,hr_manager,supervisor')->prefix('gap-analysis')->name('gap.')->group(function () {
             Route::get('/', [GapAnalysisController::class, 'index'])->name('index');
             Route::get('/department', [GapAnalysisController::class, 'department'])->name('department');
@@ -231,6 +242,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::middleware('role:admin,hr_manager')->group(function () {
             Route::post('/venues', [TrainingController::class, 'storeVenue'])->name('venues.store');
+            Route::put('/venues/{id}', [TrainingController::class, 'updateVenue'])->name('venues.update');
+            Route::delete('/venues/{id}', [TrainingController::class, 'destroyVenue'])->name('venues.destroy');
         });
 
         Route::get('/sessions/{id}', [TrainingController::class, 'showSession'])->name('sessions.show');
@@ -348,6 +361,40 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                 return redirect()->route('departments.index')->with('success', 'Department added.');
             })->name('store');
+
+            Route::put('/{id}', function (Request $request, string $id) {
+                $dept = DB::table('departments')->where('department_id', $id)->first();
+                abort_if(! $dept, 404);
+
+                $request->validate([
+                    'name'            => 'required|string|max:150|unique:departments,name,' . $id . ',department_id',
+                    'department_code' => 'nullable|string|max:20|unique:departments,department_code,' . $id . ',department_id',
+                    'is_clinical'     => 'nullable|boolean',
+                ]);
+
+                DB::table('departments')->where('department_id', $id)->update([
+                    'name'            => $request->name,
+                    'department_code' => $request->department_code ?: null,
+                    'is_clinical'     => $request->boolean('is_clinical'),
+                    'updated_at'      => now(),
+                ]);
+
+                return redirect()->route('departments.index')->with('success', 'Department updated.');
+            })->name('update');
+
+            Route::delete('/{id}', function (string $id) {
+                $dept = DB::table('departments')->where('department_id', $id)->first();
+                abort_if(! $dept, 404);
+
+                $hasStaff = DB::table('employees')->where('department_id', $id)->exists();
+                if ($hasStaff) {
+                    return redirect()->route('departments.index')->with('error', 'Cannot delete a department with active staff. Please reassign employees first.');
+                }
+
+                DB::table('departments')->where('department_id', $id)->delete();
+
+                return redirect()->route('departments.index')->with('success', 'Department deleted.');
+            })->name('destroy');
         });
 
     // ── AI ───────────────────────────────────────────────────
@@ -385,10 +432,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('notifications.read');
 
     Route::post('/log-error', function (Request $request) {
-        Log::error('JS ERROR: '.$request->input('message').' in '.$request->input('source').' on line '.$request->input('lineno'));
+        $validated = $request->validate([
+            'message' => ['required', 'string', 'max:2048'],
+            'source'  => ['nullable', 'string', 'max:255'],
+            'lineno'  => ['nullable'],
+        ]);
+
+        $message = Str::limit($validated['message'], 2048);
+        $source  = Str::limit($validated['source'] ?? 'unknown', 255);
+        $lineno  = $validated['lineno'] ?? '?';
+
+        Log::error("JS ERROR: {$message} in {$source} on line {$lineno}", [
+            'user_id' => auth()->id(),
+            'ip'      => $request->ip(),
+        ]);
 
         return response()->json(['ok' => true]);
-    })->name('log-error');
+    })->middleware('throttle:5,1')->name('log-error');
 
     // ── User Management ───────────────────────────────────────
     // Creating logins and assigning roles is the keys to the kingdom.

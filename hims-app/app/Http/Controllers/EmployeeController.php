@@ -226,7 +226,7 @@ class EmployeeController extends Controller
             ->where('ce.employee_id', $id)
             ->whereIn('ce.status', ['enrolled', 'in_progress', 'completed'])
             ->select('ce.*', 'c.title', 'c.category', 'c.cpd_hours')
-            ->orderByRaw("FIELD(ce.status,'in_progress','enrolled','completed')")
+            ->orderByRaw("CASE ce.status WHEN 'in_progress' THEN 1 WHEN 'enrolled' THEN 2 WHEN 'completed' THEN 3 ELSE 4 END")
             ->orderByDesc('ce.enrollment_date')
             ->limit(10)->get();
 
@@ -254,23 +254,54 @@ class EmployeeController extends Controller
         // per competency counts, so a competency assessed three times shows once
         // off its most recent date. 90-day warning window, and overdue rows stay
         // in the list rather than disappearing once the date passes.
-        $latestAssessments = DB::table('competency_assessments')
+        $assessments = DB::table('competency_assessments')
             ->where('employee_id', $id)
-            ->select('competency_id',
-                DB::raw('MAX(assessed_date) as last_assessed'),
-                DB::raw('SUBSTRING_INDEX(GROUP_CONCAT(next_assessment_due ORDER BY assessed_date DESC), ",", 1) as override_due'))
-            ->groupBy('competency_id');
+            ->orderByDesc('assessed_date')
+            ->get()
+            ->unique('competency_id');
 
-        $upcomingReassessments = DB::table('competencies as c')
-            ->joinSub($latestAssessments, 'la', 'la.competency_id', '=', 'c.competency_id')
-            ->leftJoin('competency_categories as cc', 'c.category_id', '=', 'cc.category_id')
-            ->selectRaw('c.competency_id, c.competency_name, c.competency_code, cc.category_name,
-                la.last_assessed, c.reassessment_months, la.override_due,
-                COALESCE(la.override_due, DATE_ADD(la.last_assessed, INTERVAL c.reassessment_months MONTH)) as due_date')
-            ->whereRaw('(la.override_due IS NOT NULL OR c.reassessment_months IS NOT NULL)')
-            ->havingRaw('due_date IS NOT NULL AND due_date <= DATE_ADD(CURDATE(), INTERVAL 90 DAY)')
-            ->orderBy('due_date')
-            ->get();
+        $upcomingReassessments = collect();
+        if ($assessments->isNotEmpty()) {
+            $competencyIds = $assessments->pluck('competency_id')->toArray();
+            $competencies = DB::table('competencies as c')
+                ->leftJoin('competency_categories as cc', 'c.category_id', '=', 'cc.category_id')
+                ->whereIn('c.competency_id', $competencyIds)
+                ->select('c.competency_id', 'c.competency_name', 'c.competency_code', 'c.reassessment_months', 'cc.category_name')
+                ->get()
+                ->keyBy('competency_id');
+
+            $windowEnd = now()->addDays(90)->toDateString();
+
+            foreach ($assessments as $ca) {
+                $comp = $competencies->get($ca->competency_id);
+                if (! $comp) {
+                    continue;
+                }
+
+                $dueDate = null;
+                $overrideDue = $ca->next_assessment_due;
+                if ($overrideDue) {
+                    $dueDate = \Carbon\Carbon::parse($overrideDue)->toDateString();
+                } elseif ($comp->reassessment_months && $ca->assessed_date) {
+                    $dueDate = \Carbon\Carbon::parse($ca->assessed_date)->addMonths((int) $comp->reassessment_months)->toDateString();
+                }
+
+                if ($dueDate && $dueDate <= $windowEnd) {
+                    $upcomingReassessments->push((object) [
+                        'competency_id' => $comp->competency_id,
+                        'competency_name' => $comp->competency_name,
+                        'competency_code' => $comp->competency_code,
+                        'category_name' => $comp->category_name,
+                        'last_assessed' => $ca->assessed_date,
+                        'reassessment_months' => $comp->reassessment_months,
+                        'override_due' => $overrideDue,
+                        'due_date' => $dueDate,
+                    ]);
+                }
+            }
+
+            $upcomingReassessments = $upcomingReassessments->sortBy('due_date')->values();
+        }
 
         return view('employees.progression', compact(
             'employee', 'gaps', 'credentials', 'enrollments', 'trainings', 'cpd', 'cpdTotal', 'upcomingReassessments'

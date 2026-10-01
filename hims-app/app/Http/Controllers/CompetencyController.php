@@ -7,17 +7,24 @@ use App\Support\CredentialStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CompetencyController extends Controller
 {
     public function index(Request $request)
     {
+        $baseCreds = $this->scopeToVisibleEmployees(
+            DB::table('employee_credentials as ec')
+                ->join('employees as e', 'ec.employee_id', '=', 'e.employee_id'),
+            'e.employee_id'
+        );
+
         $stats = [
             'total_competencies' => DB::table('competencies')->count(),
             'avg_gap' => round(DB::table('competency_assessments')->avg('gap') ?? 0, 1),
-            'expiring_soon' => CredentialStatus::whereExpiring(DB::table('employee_credentials'))->count(),
-            'expired' => CredentialStatus::whereExpired(DB::table('employee_credentials'))->count(),
+            'expiring_soon' => CredentialStatus::whereExpiring(clone $baseCreds, 'ec.expiry_date')->count('ec.credential_id'),
+            'expired' => CredentialStatus::whereExpired(clone $baseCreds, 'ec.expiry_date')->count('ec.credential_id'),
         ];
 
         $departments = DB::table('departments')->orderBy('name')->get();
@@ -78,27 +85,49 @@ class CompetencyController extends Controller
 
         $this->authorizeEmployeeAccess($request->employee_id);
 
-        $assessedBy = $this->currentEmployeeId() ?? $request->employee_id;
+        $assessedBy = $this->currentEmployeeId();
+        if (! $assessedBy) {
+            return back()->withInput()->withErrors([
+                'employee_id' => 'Your user account must be linked to an employee profile to record competency assessments.',
+            ]);
+        }
+
+        $emp = DB::table('employees')->where('employee_id', $request->employee_id)->first();
+        $roleReq = $emp ? DB::table('role_competency_requirements')
+            ->where('role_id', $emp->role_id)
+            ->where('competency_id', $request->competency_id)
+            ->value('minimum_proficiency') : null;
+
+        $globalReq = DB::table('competencies')
+            ->where('competency_id', $request->competency_id)
+            ->value('required_proficiency');
+
+        $reqProf = $roleReq ?? $globalReq ?? 3;
+        $gap = (int) $request->current_proficiency - (int) $reqProf;
+
         $assessmentId = (string) Str::uuid();
 
         DB::table('competency_assessments')->insert([
-            'assessment_id' => $assessmentId,
-            'employee_id' => $request->employee_id,
-            'competency_id' => $request->competency_id,
-            'assessed_by' => $assessedBy,
-            'assessment_method' => $request->assessment_method ?: 'self_assessment',
+            'assessment_id'       => $assessmentId,
+            'employee_id'         => $request->employee_id,
+            'competency_id'       => $request->competency_id,
+            'assessed_by'         => $assessedBy,
+            'assessment_method'   => $request->assessment_method ?: 'supervisor_rating',
             'current_proficiency' => $request->current_proficiency,
-            'notes' => $request->notes,
-            'assessed_date' => $request->assessed_date ?: now()->toDateString(),
+            'gap'                 => $gap,
+            'notes'               => $request->notes,
+            'assessed_date'       => $request->assessed_date ?: now()->toDateString(),
             'next_assessment_due' => $request->next_assessment_due ?: now()->addYear()->toDateString(),
-            'created_at' => now(), 'updated_at' => now(),
+            'created_at'          => now(),
+            'updated_at'          => now(),
         ]);
 
         AuditTrail::record('store_assessment', 'competency_assessments', $assessmentId, afterState: [
-            'employee_id' => $request->employee_id,
-            'competency_id' => $request->competency_id,
+            'employee_id'         => $request->employee_id,
+            'competency_id'       => $request->competency_id,
             'current_proficiency' => $request->current_proficiency,
-            'assessment_method' => $request->assessment_method ?: 'self_assessment',
+            'gap'                 => $gap,
+            'assessment_method'   => $request->assessment_method ?: 'supervisor_rating',
         ]);
 
         return redirect()->route('competency.index')->with('success', 'Assessment recorded.');
@@ -116,20 +145,32 @@ class CompetencyController extends Controller
         $credentials = $this->scopeToVisibleEmployees($query, 'e.employee_id')->paginate(20);
 
         foreach ($credentials as $cred) {
+            $cred->decryption_failed = false;
             if ($cred->credential_number) {
                 try {
                     $cred->credential_number = Crypt::decryptString($cred->credential_number);
                 } catch (\Throwable $e) {
-                    // Fallback to plaintext
+                    $cred->decryption_failed = true;
+                    Log::warning('Credential decryption failed — possibly rotated APP_KEY or plaintext stored', [
+                        'credential_id' => $cred->credential_id,
+                        'employee_id'   => $cred->employee_id,
+                        'exception'     => $e->getMessage(),
+                    ]);
                 }
             }
         }
 
+        $baseStatsQuery = $this->scopeToVisibleEmployees(
+            DB::table('employee_credentials as ec')
+                ->join('employees as e', 'ec.employee_id', '=', 'e.employee_id'),
+            'e.employee_id'
+        );
+
         $stats = [
-            'total' => DB::table('employee_credentials')->count(),
-            'valid' => CredentialStatus::whereActive(DB::table('employee_credentials'))->count(),
-            'expiring' => CredentialStatus::whereExpiring(DB::table('employee_credentials'))->count(),
-            'expired' => CredentialStatus::whereExpired(DB::table('employee_credentials'))->count(),
+            'total'    => (clone $baseStatsQuery)->count('ec.credential_id'),
+            'valid'    => CredentialStatus::whereActive(clone $baseStatsQuery, 'ec.expiry_date')->count('ec.credential_id'),
+            'expiring' => CredentialStatus::whereExpiring(clone $baseStatsQuery, 'ec.expiry_date')->count('ec.credential_id'),
+            'expired'  => CredentialStatus::whereExpired(clone $baseStatsQuery, 'ec.expiry_date')->count('ec.credential_id'),
         ];
 
         $employees = $this->scopeToVisibleEmployees(DB::table('employees')->orderBy('first_name'), 'employee_id')->get();
@@ -215,5 +256,116 @@ class CompetencyController extends Controller
             ->get();
 
         return view('competency.domains.show', compact('domain', 'categories', 'competencies'));
+    }
+
+    public function updateDomain(Request $request, $id)
+    {
+        $domain = DB::table('competency_domains')->where('domain_id', $id)->first();
+        abort_if(! $domain, 404);
+
+        $request->validate([
+            'domain_name' => 'required|string|max:100',
+            'description' => 'nullable|string',
+        ]);
+
+        DB::table('competency_domains')->where('domain_id', $id)->update([
+            'domain_name' => $request->domain_name,
+            'description' => $request->description,
+            'updated_at'  => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Competency domain updated.');
+    }
+
+    public function destroyDomain($id)
+    {
+        $domain = DB::table('competency_domains')->where('domain_id', $id)->first();
+        abort_if(! $domain, 404);
+
+        $hasCategories = DB::table('competency_categories')->where('domain_id', $id)->exists();
+        if ($hasCategories) {
+            return redirect()->back()->with('error', 'Cannot delete domain that contains competency categories. Please remove or reassign categories first.');
+        }
+
+        DB::table('competency_domains')->where('domain_id', $id)->delete();
+
+        return redirect()->route('competency.index')->with('success', 'Competency domain deleted.');
+    }
+
+    public function roleRequirementsIndex(Request $request)
+    {
+        $roles = DB::table('roles')->orderBy('role_name')->get();
+        $competencies = DB::table('competencies')->orderBy('competency_name')->get();
+
+        $selectedRole = $request->query('role_id') ?: ($roles->first()->role_id ?? null);
+
+        $requirements = DB::table('role_competency_requirements as rcr')
+            ->join('competencies as c', 'rcr.competency_id', '=', 'c.competency_id')
+            ->join('roles as r', 'rcr.role_id', '=', 'r.role_id')
+            ->when($selectedRole, fn ($q, $id) => $q->where('rcr.role_id', $id))
+            ->select('rcr.*', 'c.competency_name', 'c.competency_code', 'c.required_proficiency as global_required', 'r.role_name')
+            ->orderBy('c.competency_name')
+            ->get();
+
+        return view('competency.role-requirements.index', compact('roles', 'competencies', 'selectedRole', 'requirements'));
+    }
+
+    public function storeRoleRequirement(Request $request)
+    {
+        $request->validate([
+            'role_id'             => 'required|string|exists:roles,role_id',
+            'competency_id'       => 'required|string|exists:competencies,competency_id',
+            'minimum_proficiency' => 'required|integer|min:1|max:5',
+            'is_critical'         => 'nullable|boolean',
+        ]);
+
+        $exists = DB::table('role_competency_requirements')
+            ->where('role_id', $request->role_id)
+            ->where('competency_id', $request->competency_id)
+            ->exists();
+
+        if ($exists) {
+            return back()->withInput()->withErrors([
+                'competency_id' => 'This competency is already mapped to the selected role.',
+            ]);
+        }
+
+        DB::table('role_competency_requirements')->insert([
+            'id'                  => (string) Str::uuid(),
+            'role_id'             => $request->role_id,
+            'competency_id'       => $request->competency_id,
+            'minimum_proficiency' => $request->minimum_proficiency,
+            'is_critical'         => $request->boolean('is_critical'),
+        ]);
+
+        return back()->with('success', 'Role competency requirement saved.');
+    }
+
+    public function updateRoleRequirement(Request $request, $id)
+    {
+        $req = DB::table('role_competency_requirements')->where('id', $id)->first();
+        abort_if(! $req, 404);
+
+        $request->validate([
+            'minimum_proficiency' => 'required|integer|min:1|max:5',
+            'is_critical'         => 'nullable|boolean',
+        ]);
+
+        DB::table('role_competency_requirements')->where('id', $id)->update([
+            'minimum_proficiency' => $request->minimum_proficiency,
+            'is_critical'         => $request->boolean('is_critical'),
+        ]);
+
+        return back()->with('success', 'Role competency requirement updated.');
+    }
+
+    public function destroyRoleRequirement($id)
+    {
+        $req = DB::table('role_competency_requirements')->where('id', $id)->first();
+        abort_if(! $req, 404);
+
+        DB::table('role_competency_requirements')->where('id', $id)->delete();
+
+        return back()->with('success', 'Role competency requirement removed.');
     }
 }

@@ -169,7 +169,7 @@ class DashboardController extends Controller
             ->whereIn('cp.vacancy_risk', ['high', 'critical'])
             ->groupBy('cp.position_id', 'cp.position_title', 'cp.vacancy_risk', 'd.name')
             ->havingRaw("SUM(CASE WHEN sc.readiness_level = 'ready_now' THEN 1 ELSE 0 END) = 0")
-            ->orderByRaw("FIELD(cp.vacancy_risk,'critical','high','medium')")
+            ->orderByRaw("CASE cp.vacancy_risk WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END")
             ->limit(5)->get();
 
         return [
@@ -345,7 +345,7 @@ class DashboardController extends Controller
             ->join('courses as c', 'ce.course_id', '=', 'c.course_id')
             ->where('ce.employee_id', $employeeId)
             ->select('c.course_id', 'c.title', 'c.cpd_hours', 'ce.status', 'ce.progress_pct', 'ce.due_date')
-            ->orderByRaw("FIELD(ce.status,'in_progress','enrolled','completed')")
+            ->orderByRaw("CASE ce.status WHEN 'in_progress' THEN 1 WHEN 'enrolled' THEN 2 WHEN 'completed' THEN 3 ELSE 4 END")
             ->limit(8)->get();
 
         $my_credentials = DB::table('employee_credentials')

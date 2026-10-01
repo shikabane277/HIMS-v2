@@ -9,6 +9,11 @@
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Monitor skills gaps, clinical credentials, and JCI competency compliance.</p>
     </div>
     <div class="d-flex gap-2">
+        @can('manage-competency-framework')
+            <a href="{{ route('competency.role-requirements.index') }}" class="btn-hims btn-hims-outline">
+                <i class="bi bi-shield-check"></i> Role Requirements
+            </a>
+        @endcan
         @can('manage-competency')
             <button type="button" class="btn-hims btn-hims-outline" data-modal-open="assessmentCreateModal"><i class="bi bi-clipboard-check"></i> New Assessment</button>
             <button type="button" class="btn-hims btn-hims-primary" data-modal-open="credentialCreateModal"><i class="bi bi-patch-check"></i> Add Credential</button>
@@ -121,7 +126,29 @@
                     <td data-label="Categories">{{ $domain->categories_count ?? 0 }}</td>
                     <td data-label="Competencies">{{ $domain->competencies_count ?? 0 }}</td>
                     <td data-label="JCI Reference"><span class="hims-badge blue">{{ $domain->jci_codes ?? 'SQE' }}</span></td>
-                    <td data-label="Actions"><a href="{{ route('competency.domains.show', $domain->domain_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a></td>
+                    <td data-label="Actions">
+                        <div class="d-flex gap-2">
+                            <a href="{{ route('competency.domains.show', $domain->domain_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
+                            @can('manage-competency-framework')
+                            <button type="button" class="btn-hims btn-hims-outline btn-sm"
+                                    data-modal-open="domainEditModal"
+                                    data-domain-edit
+                                    data-action="{{ route('competency.domains.update', $domain->domain_id) }}"
+                                    data-name="{{ $domain->domain_name }}"
+                                    data-desc="{{ $domain->description ?? '' }}">
+                                Edit
+                            </button>
+                            <form method="POST" action="{{ route('competency.domains.destroy', $domain->domain_id) }}"
+                                  onsubmit="return confirm('Delete competency domain {{ addslashes($domain->domain_name) }}?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn-hims btn-sm" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 10px;cursor:pointer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            @endcan
+                        </div>
+                    </td>
                 </tr>
                 @empty
                 <tr><td colspan="5" class="text-center" style="color:#9ca3af;padding:32px">No domains configured yet.</td></tr>
@@ -136,5 +163,6 @@
 @endcan
 @can('manage-competency-framework')
     @include('competency.domains._create-modal')
+    @include('competency.domains._edit-modal')
 @endcan
 @endsection

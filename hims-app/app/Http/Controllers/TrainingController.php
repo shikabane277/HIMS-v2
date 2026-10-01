@@ -186,6 +186,50 @@ class TrainingController extends Controller
         return redirect()->route('training.venues.index')->with('success', 'Venue added.');
     }
 
+    public function updateVenue(Request $request, string $id)
+    {
+        abort_unless(auth()->user()->can('manage-venues'), 403);
+
+        $venue = DB::table('training_venues')->where('venue_id', $id)->first();
+        abort_if(! $venue, 404);
+
+        $request->validate([
+            'venue_name' => 'required|string|max:150',
+            'building'   => 'nullable|string|max:100',
+            'floor'      => 'nullable|string|max:20',
+            'capacity'   => 'required|integer|min:1',
+            'is_active'  => 'nullable|boolean',
+        ]);
+
+        DB::table('training_venues')->where('venue_id', $id)->update([
+            'venue_name' => $request->venue_name,
+            'building'   => $request->building,
+            'floor'      => $request->floor,
+            'capacity'   => $request->capacity,
+            'is_active'  => $request->has('is_active') ? $request->boolean('is_active') : true,
+            'updated_at' => now(),
+        ]);
+
+        return redirect()->route('training.venues.index')->with('success', 'Venue updated.');
+    }
+
+    public function destroyVenue(string $id)
+    {
+        abort_unless(auth()->user()->can('manage-venues'), 403);
+
+        $venue = DB::table('training_venues')->where('venue_id', $id)->first();
+        abort_if(! $venue, 404);
+
+        $inUse = DB::table('training_sessions')->where('venue_id', $id)->exists();
+        if ($inUse) {
+            return redirect()->route('training.venues.index')->with('error', 'Cannot delete a venue with linked training sessions. Mark it offline instead.');
+        }
+
+        DB::table('training_venues')->where('venue_id', $id)->delete();
+
+        return redirect()->route('training.venues.index')->with('success', 'Venue deleted.');
+    }
+
     /**
      * Attendance check-in: instructors mark who showed up.
      *

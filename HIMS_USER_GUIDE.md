@@ -14,7 +14,7 @@ Welcome to the **HIMS Performance & Development Module**! This guide describes w
 3. [My Development](#3-my-development)
 4. [Performance Management](#4-performance-management)
 5. [Competency Management](#5-competency-management)
-6. [AI-Assisted Gap Analysis](#6-ai-assisted-gap-analysis)
+6. [AI-Driven Gap Analysis](#6-ai-driven-gap-analysis)
 7. [Learning Management](#7-learning-management)
 8. [Learning Oversight Tabs](#8-learning-oversight-tabs)
 9. [Training Management](#9-training-management)
@@ -350,7 +350,7 @@ The Competency page shows a department-level matrix of where proficiency falls s
 
 ---
 
-## 6. AI-Assisted Gap Analysis
+## 6. AI-Driven Gap Analysis
 
 **What it does:** Combines competency assessments, performance results, and training records to show where skills fall short of what a role requires, with AI-written commentary.
 

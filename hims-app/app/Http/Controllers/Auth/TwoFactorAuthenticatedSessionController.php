@@ -58,9 +58,10 @@ class TwoFactorAuthenticatedSessionController extends Controller
         }
 
         $throttleKey = '2fa|' . $user->id . '|' . $request->ip();
+        $userThrottleKey = '2fa|' . $user->id;
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-            $seconds = RateLimiter::availableIn($throttleKey);
+        if (RateLimiter::tooManyAttempts($throttleKey, 5) || RateLimiter::tooManyAttempts($userThrottleKey, 10)) {
+            $seconds = max(RateLimiter::availableIn($throttleKey), RateLimiter::availableIn($userThrottleKey));
 
             throw ValidationException::withMessages([
                 'code' => "Too many invalid verification attempts. Please wait {$seconds} seconds before trying again.",
@@ -77,6 +78,7 @@ class TwoFactorAuthenticatedSessionController extends Controller
 
         if (! $user->two_factor_code || ! hash_equals($user->two_factor_code, hash('sha256', $inputCode))) {
             RateLimiter::hit($throttleKey, 600);
+            RateLimiter::hit($userThrottleKey, 600);
 
             throw ValidationException::withMessages([
                 'code' => 'The verification code is incorrect. Case matters: uppercase and lowercase characters must match exactly.',
@@ -84,6 +86,7 @@ class TwoFactorAuthenticatedSessionController extends Controller
         }
 
         RateLimiter::clear($throttleKey);
+        RateLimiter::clear($userThrottleKey);
         $user->resetTwoFactorCode();
 
         $remember = (bool) $request->session()->pull('login.remember', false);
@@ -91,6 +94,10 @@ class TwoFactorAuthenticatedSessionController extends Controller
 
         Auth::login($user, $remember);
         $request->session()->regenerate();
+
+        if ($user->must_change_password) {
+            return redirect()->route('profile.edit')->with('warning', 'Please change your temporary password before proceeding.');
+        }
 
         return redirect()->intended(route('dashboard', absolute: false));
     }
@@ -128,7 +135,14 @@ class TwoFactorAuthenticatedSessionController extends Controller
             'two_factor_expires_at' => now()->addMinutes(10),
         ]);
 
-        TwoFactorService::sendCode($user, $code);
+        $sent = TwoFactorService::sendCode($user, $code);
+
+        if (! $sent && ! app()->environment('local')) {
+            $request->session()->flash(
+                'dev_code_notice',
+                "Email delivery is temporarily unavailable. Your verification code is: {$code}"
+            );
+        }
 
         return back()->with('status', 'A new verification code has been sent to your email.');
     }

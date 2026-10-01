@@ -166,22 +166,54 @@
 
         {{-- Goals --}}
         <div class="hims-card mb-3">
-            <div class="card-header"><h5><i class="bi bi-flag-fill"></i> Goals</h5></div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-flag-fill"></i> Goals</h5>
+                @can('manage-performance')
+                <button type="button" class="btn-hims btn-hims-primary btn-sm" data-modal-open="addGoalModal">
+                    <i class="bi bi-plus-circle"></i> Add Goal
+                </button>
+                @endcan
+            </div>
             <div class="card-body" style="padding:0">
                 <table class="hims-table">
-                    <thead><tr><th>Goal</th><th>Target</th><th>Achievement</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Goal</th><th>Target Date</th><th>Progress</th><th>Status</th>@can('manage-performance')<th>Action</th>@endcan</tr></thead>
                     <tbody>
                         @forelse($goals ?? [] as $g)
-                        {{-- Global search deep-links a goal hit to #review-goal-<id>; the
-                             anchor has to sit on the goal's own row. --}}
                         <tr id="review-goal-{{ $g->goal_id }}" style="scroll-margin-top:84px">
-                            <td data-label="Goal">{{ $g->goal_description }}</td>
-                            <td data-label="Target">{{ $g->target_value ?? '—' }}</td>
-                            <td data-label="Achievement">{{ $g->achievement_value ?? '—' }}</td>
-                            <td data-label="Status"><span class="hims-badge {{ $g->status === 'achieved' ? 'green' : ($g->status === 'not_achieved' ? 'red' : 'yellow') }}">{{ ucfirst(str_replace('_',' ',$g->status)) }}</span></td>
+                            <td data-label="Goal">
+                                <strong>{{ $g->goal_title ?? $g->goal_description }}</strong>
+                                @if(!empty($g->goal_description) && $g->goal_description !== ($g->goal_title ?? ''))
+                                    <div style="font-size:12px;color:#6b7280;margin-top:2px">{{ $g->goal_description }}</div>
+                                @endif
+                            </td>
+                            <td data-label="Target Date" style="font-size:12.5px;color:#6b7280">{{ $g->target_date ? \Carbon\Carbon::parse($g->target_date)->format('M d, Y') : '—' }}</td>
+                            <td data-label="Progress">
+                                <div style="min-width:70px">
+                                    <div style="font-size:11px;color:#6b7280;margin-bottom:2px">{{ $g->progress_pct ?? 0 }}%</div>
+                                    <div class="hims-progress" style="height:5px"><div class="hims-progress-bar" style="width:{{ $g->progress_pct ?? 0 }}%"></div></div>
+                                </div>
+                            </td>
+                            <td data-label="Status">
+                                <span class="hims-badge {{ $g->status === 'achieved' ? 'green' : ($g->status === 'not_achieved' ? 'red' : 'yellow') }}">
+                                    {{ ucfirst(str_replace('_',' ',$g->status)) }}
+                                </span>
+                            </td>
+                            @can('manage-performance')
+                            <td data-label="Action">
+                                <button type="button" class="btn-hims btn-hims-ghost btn-sm"
+                                        data-modal-open="editGoalModal"
+                                        data-goal-edit
+                                        data-action="{{ route('performance.reviews.goals.update', $g->goal_id) }}"
+                                        data-title="{{ $g->goal_title ?? $g->goal_description }}"
+                                        data-progress="{{ $g->progress_pct ?? 0 }}"
+                                        data-status="{{ $g->status }}">
+                                    Update
+                                </button>
+                            </td>
+                            @endcan
                         </tr>
                         @empty
-                        <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:24px">No goals set.</td></tr>
+                        <tr><td colspan="{{ auth()->user()->can('manage-performance') ? 5 : 4 }}" class="text-center" style="color:#9ca3af;padding:24px">No goals set yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -190,17 +222,241 @@
 
         {{-- PIP --}}
         @if($pip ?? null)
-        <div class="hims-card" style="border:2px solid var(--hims-danger)">
-            <div class="card-header" style="background:#fee2e2">
-                <h5 style="color:var(--hims-danger)"><i class="bi bi-exclamation-triangle-fill"></i> Performance Improvement Plan (PIP)</h5>
-                <span class="hims-badge red">{{ ucfirst($pip->status) }}</span>
+        <div class="hims-card mb-3" style="border:2px solid var(--hims-danger)">
+            <div class="card-header d-flex justify-content-between align-items-center" style="background:#fee2e2">
+                <h5 style="color:var(--hims-danger);margin:0"><i class="bi bi-exclamation-triangle-fill"></i> Performance Improvement Plan (PIP)</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="hims-badge red">{{ ucfirst($pip->status) }}</span>
+                    @can('manage-performance')
+                    <button type="button" class="btn-hims btn-hims-outline btn-sm"
+                            data-modal-open="updatePipModal"
+                            data-pip-edit
+                            data-action="{{ route('performance.reviews.pip.update', $pip->pip_id) }}"
+                            data-status="{{ $pip->status }}"
+                            data-notes="{{ $pip->notes ?? '' }}">
+                        Update PIP
+                    </button>
+                    @endcan
+                </div>
             </div>
             <div class="card-body">
-                <div style="font-size:13px;margin-bottom:8px"><strong>Start:</strong> {{ $pip->start_date ?? '—' }} &nbsp;|&nbsp; <strong>End:</strong> {{ $pip->end_date ?? '—' }}</div>
-                <div style="font-size:13px">{{ $pip->reason ?? '—' }}</div>
+                <div style="font-size:13px;margin-bottom:8px">
+                    <strong>Start:</strong> {{ $pip->start_date ?? '—' }} &nbsp;|&nbsp;
+                    <strong>Target End:</strong> {{ $pip->target_end_date ?? '—' }}
+                    @if($pip->actual_end_date)
+                    &nbsp;|&nbsp; <strong>Actual End:</strong> {{ $pip->actual_end_date }}
+                    @endif
+                </div>
+                @if($pip->action_steps)
+                    @php $steps = is_string($pip->action_steps) ? json_decode($pip->action_steps, true) : $pip->action_steps; @endphp
+                    @if(is_array($steps) && count($steps) > 0)
+                    <div style="font-size:12.5px;margin-bottom:8px">
+                        <strong>Action Steps:</strong>
+                        <ul style="margin:4px 0 0 18px;padding:0">
+                            @foreach($steps as $step)
+                                <li>{{ is_array($step) ? json_encode($step) : $step }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endif
+                @endif
+                @if($pip->notes)
+                <div style="font-size:12.5px;color:#4b5563"><strong>Notes:</strong> {{ $pip->notes }}</div>
+                @endif
             </div>
         </div>
+        @else
+        @can('manage-performance')
+        <div class="mb-3">
+            <button type="button" class="btn-hims btn-hims-outline btn-sm" style="color:var(--hims-danger);border-color:var(--hims-danger)" data-modal-open="createPipModal">
+                <i class="bi bi-exclamation-triangle"></i> Initiate PIP
+            </button>
+        </div>
+        @endcan
         @endif
     </div>
 </div>
+
+@can('manage-performance')
+@push('modals')
+{{-- Add Goal Modal --}}
+<div class="hims-modal-backdrop" id="addGoalModal">
+    <div class="hims-modal" style="max-width:520px">
+        <div class="hims-modal-header">
+            <h5><i class="bi bi-flag-fill"></i> Add Review Goal</h5>
+            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
+        </div>
+        <form method="POST" action="{{ route('performance.reviews.goals.store', $review->review_id) }}">
+            @csrf
+            <div class="hims-modal-body">
+                <div class="mb-3">
+                    <label class="hims-label">Goal Title *</label>
+                    <input type="text" name="goal_title" class="hims-input" required placeholder="e.g. Complete Advanced Medication Administration Training">
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Description / Specific Target</label>
+                    <textarea name="goal_description" class="hims-input" rows="2" placeholder="Details of the expected outcome..."></textarea>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="hims-label">Target Date</label>
+                        <input type="date" name="target_date" class="hims-input">
+                    </div>
+                    <div class="col-6">
+                        <label class="hims-label">Initial Status</label>
+                        <select name="status" class="hims-input hims-select">
+                            <option value="not_started">Not Started</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="achieved">Achieved</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="hims-modal-footer">
+                <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
+                <button type="submit" class="btn-hims btn-hims-primary"><i class="bi bi-check-circle"></i> Save Goal</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Edit Goal Modal --}}
+<div class="hims-modal-backdrop" id="editGoalModal">
+    <div class="hims-modal" style="max-width:440px">
+        <div class="hims-modal-header">
+            <h5><i class="bi bi-pencil-square"></i> Update Goal Progress</h5>
+            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
+        </div>
+        <form method="POST" id="editGoalForm" action="">
+            @csrf
+            @method('PUT')
+            <div class="hims-modal-body">
+                <div class="mb-3">
+                    <label class="hims-label">Goal</label>
+                    <input type="text" id="eg_title" class="hims-input" readonly disabled style="background:#f1f5f9">
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Progress Percentage (0–100%)</label>
+                    <input type="number" name="progress_pct" id="eg_progress" class="hims-input" min="0" max="100">
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Status</label>
+                    <select name="status" id="eg_status" class="hims-input hims-select" required>
+                        <option value="not_started">Not Started</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="achieved">Achieved</option>
+                        <option value="not_achieved">Not Achieved</option>
+                    </select>
+                </div>
+            </div>
+            <div class="hims-modal-footer">
+                <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
+                <button type="submit" class="btn-hims btn-hims-primary"><i class="bi bi-check-circle"></i> Update</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Initiate PIP Modal --}}
+<div class="hims-modal-backdrop" id="createPipModal">
+    <div class="hims-modal" style="max-width:540px">
+        <div class="hims-modal-header">
+            <h5><i class="bi bi-exclamation-triangle-fill text-danger"></i> Initiate Performance Improvement Plan</h5>
+            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
+        </div>
+        <form method="POST" action="{{ route('performance.reviews.pip.store', $review->review_id) }}">
+            @csrf
+            <div class="hims-modal-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="hims-label">Start Date *</label>
+                        <input type="date" name="start_date" class="hims-input" required value="{{ date('Y-m-d') }}">
+                    </div>
+                    <div class="col-6">
+                        <label class="hims-label">Target End Date *</label>
+                        <input type="date" name="target_end_date" class="hims-input" required value="{{ date('Y-m-d', strtotime('+90 days')) }}">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Action Steps (one per line) *</label>
+                    <textarea name="action_steps" class="hims-input" rows="4" required placeholder="Weekly 1-on-1 check-ins&#10;Complete clinical pharmacology review course&#10;Re-audit medication delivery at 60 days"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Supervisor Notes</label>
+                    <textarea name="notes" class="hims-input" rows="2" placeholder="Specific performance concerns identified during review..."></textarea>
+                </div>
+            </div>
+            <div class="hims-modal-footer">
+                <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
+                <button type="submit" class="btn-hims btn-hims-primary" style="background:var(--hims-danger);border-color:var(--hims-danger)"><i class="bi bi-check-circle"></i> Initiate PIP</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Update PIP Modal --}}
+<div class="hims-modal-backdrop" id="updatePipModal">
+    <div class="hims-modal" style="max-width:480px">
+        <div class="hims-modal-header">
+            <h5><i class="bi bi-pencil-square"></i> Update PIP Status</h5>
+            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
+        </div>
+        <form method="POST" id="updatePipForm" action="">
+            @csrf
+            @method('PUT')
+            <div class="hims-modal-body">
+                <div class="mb-3">
+                    <label class="hims-label">Status *</label>
+                    <select name="status" id="up_status" class="hims-input hims-select" required>
+                        <option value="initiated">Initiated</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed Successfully</option>
+                        <option value="extended">Extended</option>
+                        <option value="failed">Failed / Escalated</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Actual End Date</label>
+                    <input type="date" name="actual_end_date" id="up_end_date" class="hims-input">
+                </div>
+                <div class="mb-3">
+                    <label class="hims-label">Notes</label>
+                    <textarea name="notes" id="up_notes" class="hims-input" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="hims-modal-footer">
+                <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
+                <button type="submit" class="btn-hims btn-hims-primary"><i class="bi bi-check-circle"></i> Save PIP Update</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endpush
+
+@include('partials.modal-js')
+
+@push('scripts')
+<script>
+document.addEventListener('click', function(e) {
+    const goalBtn = e.target.closest('[data-goal-edit]');
+    if (goalBtn) {
+        const form = document.getElementById('editGoalForm');
+        form.action = goalBtn.dataset.action;
+        document.getElementById('eg_title').value = goalBtn.dataset.title;
+        document.getElementById('eg_progress').value = goalBtn.dataset.progress;
+        document.getElementById('eg_status').value = goalBtn.dataset.status;
+        return;
+    }
+    const pipBtn = e.target.closest('[data-pip-edit]');
+    if (pipBtn) {
+        const form = document.getElementById('updatePipForm');
+        form.action = pipBtn.dataset.action;
+        document.getElementById('up_status').value = pipBtn.dataset.status;
+        document.getElementById('up_notes').value = pipBtn.dataset.notes || '';
+    }
+});
+</script>
+@endpush
+@endcan
+
 @endsection

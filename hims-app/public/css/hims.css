@@ -1675,7 +1675,7 @@ body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
        screen — a flex item will not shrink below its own min-content width until
        told it may, so the title block used to hold `.topbar-left` open at the
        width of its longest word. But a clamp only converts a horizontal overflow
-       into a vertical one. Measured after that change, "AI-Assisted Competency
+       into a vertical one. Measured after that change, "AI-Driven Competency
        Gap Analysis" still needed three lines at 372px and six at 320px against a
        two-line clamp, so the title was cut mid-phrase on both common phone
        widths — and the bar had 14px of slack left inside its 64px, which is not
