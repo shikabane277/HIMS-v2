@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class FallbackAiProvider implements AiProvider
 {
     /**
-     * @param array<int, AiProvider> $providers
+     * @param  array<int, AiProvider>  $providers
      */
     public function __construct(private array $providers) {}
 

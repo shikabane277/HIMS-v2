@@ -51,6 +51,11 @@
         </div>
     </div>
 
+    <div class="ai-privacy-notice" style="font-size:10.5px;color:#6b7280;padding:6px 12px;background:#f8fafc;border-top:1px solid #e5e7eb;line-height:1.35">
+        <i class="bi bi-shield-check" style="color:#2563eb"></i>
+        <strong>Data Privacy (RA 10173):</strong> Prompts are logged &amp; processed strictly for hospital HR analytics. Do not submit sensitive patient health records.
+    </div>
+
     <div id="ai-input-row">
         <textarea id="ai-input" placeholder="Ask me anything…" rows="1"
                   aria-label="Message the AI assistant"></textarea>

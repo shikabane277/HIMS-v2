@@ -11,8 +11,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['name', 'email', 'password', 'role', 'employee_id', 'email_verified_at', 'two_factor_code', 'two_factor_expires_at'])]
-#[Hidden(['password', 'remember_token', 'two_factor_code'])]
+#[Fillable(['name', 'email', 'password', 'role', 'is_active', 'employee_id', 'email_verified_at', 'two_factor_code', 'two_factor_expires_at', 'totp_secret'])]
+#[Hidden(['password', 'remember_token', 'two_factor_code', 'totp_secret'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -29,6 +29,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'two_factor_expires_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 

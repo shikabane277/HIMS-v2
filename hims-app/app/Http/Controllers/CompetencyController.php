@@ -60,10 +60,10 @@ class CompetencyController extends Controller
         $domains = DB::table('competency_domains as d')
             ->leftJoin('competency_categories as cc', 'd.domain_id', '=', 'cc.domain_id')
             ->leftJoin('competencies as c', 'cc.category_id', '=', 'c.category_id')
-            ->select('d.domain_id', 'd.domain_name',
+            ->select('d.domain_id', 'd.domain_name', 'd.description', 'd.is_active',
                 DB::raw('COUNT(DISTINCT cc.category_id) as categories_count'),
                 DB::raw('COUNT(DISTINCT c.competency_id) as competencies_count'))
-            ->groupBy('d.domain_id', 'd.domain_name')->get();
+            ->groupBy('d.domain_id', 'd.domain_name', 'd.description', 'd.is_active')->get();
 
         $employees = $this->scopeToVisibleEmployees(DB::table('employees')->orderBy('first_name'), 'employee_id')->get();
         $competencies = DB::table('competencies')->orderBy('competency_name')->get();
@@ -108,26 +108,26 @@ class CompetencyController extends Controller
         $assessmentId = (string) Str::uuid();
 
         DB::table('competency_assessments')->insert([
-            'assessment_id'       => $assessmentId,
-            'employee_id'         => $request->employee_id,
-            'competency_id'       => $request->competency_id,
-            'assessed_by'         => $assessedBy,
-            'assessment_method'   => $request->assessment_method ?: 'supervisor_rating',
+            'assessment_id' => $assessmentId,
+            'employee_id' => $request->employee_id,
+            'competency_id' => $request->competency_id,
+            'assessed_by' => $assessedBy,
+            'assessment_method' => $request->assessment_method ?: 'supervisor_rating',
             'current_proficiency' => $request->current_proficiency,
-            'gap'                 => $gap,
-            'notes'               => $request->notes,
-            'assessed_date'       => $request->assessed_date ?: now()->toDateString(),
+            'gap' => $gap,
+            'notes' => $request->notes,
+            'assessed_date' => $request->assessed_date ?: now()->toDateString(),
             'next_assessment_due' => $request->next_assessment_due ?: now()->addYear()->toDateString(),
-            'created_at'          => now(),
-            'updated_at'          => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         AuditTrail::record('store_assessment', 'competency_assessments', $assessmentId, afterState: [
-            'employee_id'         => $request->employee_id,
-            'competency_id'       => $request->competency_id,
+            'employee_id' => $request->employee_id,
+            'competency_id' => $request->competency_id,
             'current_proficiency' => $request->current_proficiency,
-            'gap'                 => $gap,
-            'assessment_method'   => $request->assessment_method ?: 'supervisor_rating',
+            'gap' => $gap,
+            'assessment_method' => $request->assessment_method ?: 'supervisor_rating',
         ]);
 
         return redirect()->route('competency.index')->with('success', 'Assessment recorded.');
@@ -153,8 +153,8 @@ class CompetencyController extends Controller
                     $cred->decryption_failed = true;
                     Log::warning('Credential decryption failed — possibly rotated APP_KEY or plaintext stored', [
                         'credential_id' => $cred->credential_id,
-                        'employee_id'   => $cred->employee_id,
-                        'exception'     => $e->getMessage(),
+                        'employee_id' => $cred->employee_id,
+                        'exception' => $e->getMessage(),
                     ]);
                 }
             }
@@ -167,10 +167,10 @@ class CompetencyController extends Controller
         );
 
         $stats = [
-            'total'    => (clone $baseStatsQuery)->count('ec.credential_id'),
-            'valid'    => CredentialStatus::whereActive(clone $baseStatsQuery, 'ec.expiry_date')->count('ec.credential_id'),
+            'total' => (clone $baseStatsQuery)->count('ec.credential_id'),
+            'valid' => CredentialStatus::whereActive(clone $baseStatsQuery, 'ec.expiry_date')->count('ec.credential_id'),
             'expiring' => CredentialStatus::whereExpiring(clone $baseStatsQuery, 'ec.expiry_date')->count('ec.credential_id'),
-            'expired'  => CredentialStatus::whereExpired(clone $baseStatsQuery, 'ec.expiry_date')->count('ec.credential_id'),
+            'expired' => CredentialStatus::whereExpired(clone $baseStatsQuery, 'ec.expiry_date')->count('ec.credential_id'),
         ];
 
         $employees = $this->scopeToVisibleEmployees(DB::table('employees')->orderBy('first_name'), 'employee_id')->get();
@@ -213,6 +213,120 @@ class CompetencyController extends Controller
         ]);
 
         return redirect()->route('competency.credentials.index')->with('success', 'Credential added.');
+    }
+
+    public function downloadCredentialsTemplate()
+    {
+        abort_unless(auth()->user()->can('manage-competency'), 403);
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="credentials_import_template.csv"',
+        ];
+
+        return response()->stream(function () {
+            $handle = fopen('php://output', 'w');
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($handle, ['employee_code', 'credential_type', 'credential_number', 'issuing_body', 'issue_date', 'expiry_date']);
+            fputcsv($handle, ['EMP-0001', 'PRC Medical License', '0123456', 'Professional Regulation Commission', '2024-01-01', '2027-01-01']);
+            fputcsv($handle, ['EMP-0002', 'BLS Certification', 'BLS-9921', 'American Heart Association', '2025-06-01', '2027-06-01']);
+            fclose($handle);
+        }, 200, $headers);
+    }
+
+    public function importCredentialsCsv(Request $request)
+    {
+        abort_unless(auth()->user()->can('manage-competency'), 403);
+
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:5120',
+        ]);
+
+        $file = $request->file('csv_file');
+        $handle = fopen($file->getRealPath(), 'r');
+        if (! $handle) {
+            return back()->with('error', 'Unable to open CSV file.');
+        }
+
+        $bom = fread($handle, 3);
+        if ($bom !== chr(0xEF).chr(0xBB).chr(0xBF)) {
+            rewind($handle);
+        }
+
+        $header = fgetcsv($handle);
+        if (! $header) {
+            fclose($handle);
+
+            return back()->with('error', 'CSV file is empty.');
+        }
+
+        $header = array_map(fn ($h) => trim(strtolower($h)), $header);
+        $imported = 0;
+        $skipped = 0;
+
+        $employeesByCode = DB::table('employees')->get()->keyBy(fn ($e) => strtoupper($e->employee_code));
+        $employeesByEmail = DB::table('employees')->get()->keyBy(fn ($e) => strtolower($e->email));
+
+        DB::beginTransaction();
+        try {
+            while (($row = fgetcsv($handle)) !== false) {
+                if (empty(array_filter($row))) {
+                    continue;
+                }
+
+                $data = array_combine($header, array_pad($row, count($header), ''));
+                $codeOrEmail = trim($data['employee_code'] ?? ($data['email'] ?? ''));
+                $type = trim($data['credential_type'] ?? '');
+
+                if (empty($codeOrEmail) || empty($type)) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $emp = $employeesByCode->get(strtoupper($codeOrEmail)) ?? $employeesByEmail->get(strtolower($codeOrEmail));
+                if (! $emp) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $credId = (string) Str::uuid();
+                $credNumber = trim($data['credential_number'] ?? ($data['license_number'] ?? ''));
+                $encNumber = $credNumber ? Crypt::encryptString($credNumber) : null;
+                $issueDate = ! empty($data['issue_date']) ? date('Y-m-d', strtotime($data['issue_date'])) : null;
+                $expiryDate = ! empty($data['expiry_date']) ? date('Y-m-d', strtotime($data['expiry_date'])) : null;
+
+                DB::table('employee_credentials')->insert([
+                    'credential_id' => $credId,
+                    'employee_id' => $emp->employee_id,
+                    'credential_type' => $type,
+                    'credential_number' => $encNumber,
+                    'issuing_body' => trim($data['issuing_body'] ?? ''),
+                    'issue_date' => $issueDate,
+                    'expiry_date' => $expiryDate,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $imported++;
+            }
+
+            DB::commit();
+            fclose($handle);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            fclose($handle);
+
+            return back()->with('error', 'Credentials CSV import failed: '.$e->getMessage());
+        }
+
+        $msg = "Imported {$imported} credentials successfully.";
+        if ($skipped > 0) {
+            $msg .= " ({$skipped} invalid or unmatched rows skipped)";
+        }
+
+        return redirect()->route('competency.credentials.index')->with('success', $msg);
     }
 
     /**
@@ -266,15 +380,38 @@ class CompetencyController extends Controller
         $request->validate([
             'domain_name' => 'required|string|max:100',
             'description' => 'nullable|string',
+            'is_active' => 'nullable|boolean',
         ]);
 
-        DB::table('competency_domains')->where('domain_id', $id)->update([
+        $updates = [
             'domain_name' => $request->domain_name,
             'description' => $request->description,
-            'updated_at'  => now(),
-        ]);
+            'updated_at' => now(),
+        ];
+
+        if ($request->has('is_active')) {
+            $updates['is_active'] = $request->boolean('is_active');
+        }
+
+        DB::table('competency_domains')->where('domain_id', $id)->update($updates);
 
         return redirect()->back()->with('success', 'Competency domain updated.');
+    }
+
+    public function toggleDomainStatus($id)
+    {
+        $domain = DB::table('competency_domains')->where('domain_id', $id)->first();
+        abort_if(! $domain, 404);
+
+        $newStatus = ! ($domain->is_active ?? true);
+        DB::table('competency_domains')->where('domain_id', $id)->update([
+            'is_active' => $newStatus,
+            'updated_at' => now(),
+        ]);
+
+        $statusText = $newStatus ? 'activated' : 'deactivated';
+
+        return redirect()->back()->with('success', "Competency domain {$statusText} successfully.");
     }
 
     public function destroyDomain($id)
@@ -313,10 +450,10 @@ class CompetencyController extends Controller
     public function storeRoleRequirement(Request $request)
     {
         $request->validate([
-            'role_id'             => 'required|string|exists:roles,role_id',
-            'competency_id'       => 'required|string|exists:competencies,competency_id',
+            'role_id' => 'required|string|exists:roles,role_id',
+            'competency_id' => 'required|string|exists:competencies,competency_id',
             'minimum_proficiency' => 'required|integer|min:1|max:5',
-            'is_critical'         => 'nullable|boolean',
+            'is_critical' => 'nullable|boolean',
         ]);
 
         $exists = DB::table('role_competency_requirements')
@@ -331,11 +468,11 @@ class CompetencyController extends Controller
         }
 
         DB::table('role_competency_requirements')->insert([
-            'id'                  => (string) Str::uuid(),
-            'role_id'             => $request->role_id,
-            'competency_id'       => $request->competency_id,
+            'id' => (string) Str::uuid(),
+            'role_id' => $request->role_id,
+            'competency_id' => $request->competency_id,
             'minimum_proficiency' => $request->minimum_proficiency,
-            'is_critical'         => $request->boolean('is_critical'),
+            'is_critical' => $request->boolean('is_critical'),
         ]);
 
         return back()->with('success', 'Role competency requirement saved.');
@@ -348,12 +485,12 @@ class CompetencyController extends Controller
 
         $request->validate([
             'minimum_proficiency' => 'required|integer|min:1|max:5',
-            'is_critical'         => 'nullable|boolean',
+            'is_critical' => 'nullable|boolean',
         ]);
 
         DB::table('role_competency_requirements')->where('id', $id)->update([
             'minimum_proficiency' => $request->minimum_proficiency,
-            'is_critical'         => $request->boolean('is_critical'),
+            'is_critical' => $request->boolean('is_critical'),
         ]);
 
         return back()->with('success', 'Role competency requirement updated.');

@@ -896,7 +896,7 @@ PROMPT;
         $work = preg_replace('/[,:]\s*$/', '', $work);
 
         // If string quote is left open at truncation point, close it
-        $unescapedQuotes = substr_count(preg_replace('/\\\\"/','', $work), '"');
+        $unescapedQuotes = substr_count(preg_replace('/\\\\"/', '', $work), '"');
         if ($unescapedQuotes % 2 !== 0) {
             $work .= '"';
         }

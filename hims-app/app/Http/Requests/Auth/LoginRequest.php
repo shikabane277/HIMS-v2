@@ -55,7 +55,7 @@ class LoginRequest extends FormRequest
                 $attempts = (int) ($user->failed_login_attempts ?? 0) + 1;
                 $updateData = [
                     'failed_login_attempts' => $attempts,
-                    'updated_at'            => now(),
+                    'updated_at' => now(),
                 ];
 
                 // Lock after 5 consecutive failures — no isset() guard needed,
@@ -72,7 +72,14 @@ class LoginRequest extends FormRequest
             ]);
         }
 
-        // Password is correct — now check if the account is locked.
+        // Password is correct — check if account is deactivated.
+        if (isset($user->is_active) && ! $user->is_active) {
+            throw ValidationException::withMessages([
+                'email' => 'This account has been deactivated. Please contact your system administrator.',
+            ]);
+        }
+
+        // Check if the account is locked.
         // This prevents locked accounts from logging in even with correct creds,
         // while using the same generic error so attackers can't distinguish
         // "locked" from "wrong password".
@@ -85,8 +92,8 @@ class LoginRequest extends FormRequest
         // Successful login — reset counters
         DB::table('users')->where('id', $user->id)->update([
             'failed_login_attempts' => 0,
-            'locked_until'          => null,
-            'updated_at'            => now(),
+            'locked_until' => null,
+            'updated_at' => now(),
         ]);
 
         RateLimiter::clear($this->throttleKey());

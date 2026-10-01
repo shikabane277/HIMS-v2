@@ -12,9 +12,14 @@
             to identify missing skills and suggest improvements.
         </p>
     </div>
-    <a href="{{ route('competency.gap.department', request()->only('department')) }}" class="btn-hims btn-hims-primary">
-        <i class="bi bi-robot"></i> Run Department Analysis
-    </a>
+    <div class="d-flex gap-2">
+        <a href="{{ route('competency.role-requirements.index') }}" class="btn-hims btn-hims-outline">
+            <i class="bi bi-sliders"></i> Role Requirements
+        </a>
+        <a href="{{ route('competency.gap.department', request()->only('department')) }}" class="btn-hims btn-hims-primary">
+            <i class="bi bi-robot"></i> Run Department Analysis
+        </a>
+    </div>
 </div>
 
 @if($departments->isNotEmpty())

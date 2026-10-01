@@ -42,6 +42,11 @@
         <i class="bi bi-award"></i> My CPD
     </a>
 
+    <a href="{{ route('learning.certificates.index') }}"
+       class="hims-tab {{ request()->routeIs('learning.certificates.*') ? 'active' : '' }}">
+        <i class="bi bi-patch-check"></i> Certificates
+    </a>
+
     <a href="{{ route('learning.pathways.index') }}"
        class="hims-tab {{ request()->routeIs('learning.pathways.*') ? 'active' : '' }}">
         <i class="bi bi-signpost-split"></i> Pathways
@@ -97,6 +102,11 @@
                         data-icon="bi bi-award"
                         {{ request()->routeIs('learning.cpd.*') || request()->routeIs('learning.cycles.mine') ? 'selected' : '' }}>
                     My CPD
+                </option>
+                <option value="{{ route('learning.certificates.index') }}"
+                        data-icon="bi bi-patch-check"
+                        {{ request()->routeIs('learning.certificates.*') ? 'selected' : '' }}>
+                    Certificates
                 </option>
                 <option value="{{ route('learning.pathways.index') }}"
                         data-icon="bi bi-signpost-split"

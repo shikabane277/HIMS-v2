@@ -154,6 +154,43 @@ class UserController extends Controller
         return response()->json(['data' => $logs]);
     }
 
+    public function exportAuditTrail(Request $request)
+    {
+        $logs = DB::table('audit_trails as a')
+            ->leftJoin('users as u', 'a.user_id', '=', 'u.id')
+            ->select('a.audit_id', 'a.timestamp', 'a.action', 'a.resource_type', 'a.resource_id', 'a.ip_address', 'u.name as actor_name', 'a.after_state')
+            ->orderByDesc('a.timestamp')
+            ->limit(2000)
+            ->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="hims-audit-trail-'.now()->format('Y-m-d').'.csv"',
+        ];
+
+        $callback = function () use ($logs) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($file, ['Audit ID', 'Timestamp', 'Action / Event', 'Resource Type', 'Resource ID', 'Actor', 'IP Address', 'Details']);
+
+            foreach ($logs as $log) {
+                fputcsv($file, [
+                    $log->audit_id,
+                    $log->timestamp,
+                    $log->action,
+                    $log->resource_type,
+                    $log->resource_id,
+                    $log->actor_name ?: 'System',
+                    $log->ip_address,
+                    is_string($log->after_state) ? $log->after_state : json_encode($log->after_state),
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
     public function destroy(User $user)
     {
         if ($user->id === auth()->id()) {
@@ -171,8 +208,32 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', "User \"{$name}\" deleted.");
     }
 
+    public function toggleActive($id)
+    {
+        $user = User::findOrFail($id);
+        if ($user->id === auth()->id()) {
+            return back()->with('error', 'You cannot deactivate your own account.');
+        }
+
+        if ($user->role === 'admin' && $user->is_active && $this->adminCount() <= 1) {
+            return back()->with('error', 'This is the only active administrator account and cannot be deactivated.');
+        }
+
+        $newStatus = ! (bool) ($user->is_active ?? true);
+        $user->is_active = $newStatus;
+        $user->save();
+
+        AuditTrail::record('user_account_status_toggled', 'users', (string) $user->id, afterState: [
+            'is_active' => $newStatus,
+            'user_id' => $user->id,
+            'email' => $user->email,
+        ]);
+
+        return redirect()->route('users.index')->with('success', "Account for {$user->name} has been ".($newStatus ? 'activated.' : 'deactivated.'));
+    }
+
     private function adminCount(): int
     {
-        return User::where('role', 'admin')->count();
+        return User::where('role', 'admin')->where('is_active', true)->count();
     }
 }

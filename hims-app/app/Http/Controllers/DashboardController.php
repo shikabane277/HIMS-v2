@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\TrainingAssignmentService;
 use App\Support\CredentialStatus;
 use App\Support\CycleStatus;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -172,13 +173,30 @@ class DashboardController extends Controller
             ->orderByRaw("CASE cp.vacancy_risk WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END")
             ->limit(5)->get();
 
+        $review_trends = DB::table('performance_reviews')
+            ->select('created_at', 'overall_score')
+            ->whereNotNull('created_at')
+            ->orderBy('created_at')
+            ->get()
+            ->groupBy(function ($r) {
+                return Carbon::parse($r->created_at)->format('M Y');
+            })
+            ->map(function ($group, $month) {
+                return [
+                    'month' => $month,
+                    'count' => $group->count(),
+                    'avg_score' => round((float) $group->avg('overall_score'), 2),
+                ];
+            })
+            ->values();
+
         return [
             'stats' => $stats,
             'headcount_by_department' => $headcount_by_department,
             'competency_hotspots' => $competency_hotspots,
             'recent_reviews' => $recent_reviews,
             'risk_positions' => $risk_positions,
-
+            'review_trends' => $review_trends,
             'credential_alerts' => $this->credentialAlerts(),
         ];
     }

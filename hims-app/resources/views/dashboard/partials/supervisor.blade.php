@@ -10,6 +10,23 @@
 </div>
 @else
 
+<div class="p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3 animate-in" style="background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);color:white;border-radius:10px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)">
+    <div class="d-flex align-items-center gap-3">
+        <div style="background:rgba(255,255,255,0.15);width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px">
+            <i class="bi bi-hospital"></i>
+        </div>
+        <div>
+            <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;opacity:0.85;font-weight:600">Department Head Console</div>
+            <div style="font-size:17px;font-weight:700">{{ $scope ?? 'Department Overview' }}</div>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <span class="badge" style="background:rgba(255,255,255,0.2);padding:6px 12px;font-size:12px;font-weight:500;border-radius:6px">
+            <i class="bi bi-people-fill"></i> {{ $stats['team_size'] ?? 0 }} Supervised Personnel
+        </span>
+    </div>
+</div>
+
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in">

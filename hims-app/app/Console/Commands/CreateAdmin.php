@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 
 class CreateAdmin extends Command
 {
@@ -20,6 +21,11 @@ class CreateAdmin extends Command
         {--force : Skip confirmation prompt}';
 
     /**
+     * The console command aliases.
+     */
+    protected $aliases = ['hims:first-admin'];
+
+    /**
      * The console command description.
      */
     protected $description = 'Create a new administrator account with linked employee profile';
@@ -30,18 +36,18 @@ class CreateAdmin extends Command
     public function handle(): int
     {
         $email = $this->option('email') ?? $this->ask('Admin email address');
-        $name  = $this->option('name')  ?? $this->ask('Admin display name', 'HIMS Administrator');
+        $name = $this->option('name') ?? $this->ask('Admin display name', 'HIMS Administrator');
 
         $password = $this->option('password')
-            ?? $this->secret('Admin password (min 8 characters)');
+            ?? $this->secret('Admin password (min 10 characters with upper, lower, number, symbol)');
 
         // ── Validate inputs ────────────────────────────────────────
         $validator = Validator::make(
             compact('email', 'name', 'password'),
             [
-                'email'    => ['required', 'email', 'unique:users,email'],
-                'name'     => ['required', 'string', 'max:255'],
-                'password' => ['required', 'string', 'min:8'],
+                'email' => ['required', 'email', 'unique:users,email'],
+                'name' => ['required', 'string', 'max:255'],
+                'password' => ['required', 'string', Password::defaults()],
             ]
         );
 
@@ -49,6 +55,7 @@ class CreateAdmin extends Command
             foreach ($validator->errors()->all() as $error) {
                 $this->error($error);
             }
+
             return self::FAILURE;
         }
 
@@ -62,6 +69,7 @@ class CreateAdmin extends Command
 
             if (! $this->confirm('Create this administrator account?')) {
                 $this->info('Cancelled.');
+
                 return self::SUCCESS;
             }
         }
@@ -74,12 +82,12 @@ class CreateAdmin extends Command
         if (! $adminDept) {
             $adminDeptId = (string) Str::uuid();
             DB::table('departments')->insert([
-                'department_id'   => $adminDeptId,
-                'name'            => 'Hospital Administration',
+                'department_id' => $adminDeptId,
+                'name' => 'Hospital Administration',
                 'department_code' => 'ADM',
-                'is_clinical'     => false,
-                'created_at'      => now(),
-                'updated_at'      => now(),
+                'is_clinical' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         } else {
             $adminDeptId = $adminDept->department_id;
@@ -92,13 +100,13 @@ class CreateAdmin extends Command
         if (! $adminRole) {
             $adminRoleId = (string) Str::uuid();
             DB::table('roles')->insert([
-                'role_id'       => $adminRoleId,
-                'role_name'     => 'System Administrator',
-                'role_slug'     => 'system_admin',
+                'role_id' => $adminRoleId,
+                'role_name' => 'System Administrator',
+                'role_slug' => 'system_admin',
                 'department_id' => $adminDeptId,
-                'is_clinical'   => false,
-                'created_at'    => now(),
-                'updated_at'    => now(),
+                'is_clinical' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         } else {
             $adminRoleId = $adminRole->role_id;
@@ -114,7 +122,7 @@ class CreateAdmin extends Command
             ? ((int) substr($lastCode, 4)) + 1
             : 1;
 
-        $employeeCode = 'EMP-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        $employeeCode = 'EMP-'.str_pad($nextNum, 4, '0', STR_PAD_LEFT);
 
         // ── Create employee + user in a transaction ────────────────
         DB::transaction(function () use ($email, $name, $password, $adminDeptId, $adminRoleId, $employeeCode) {
@@ -122,40 +130,40 @@ class CreateAdmin extends Command
 
             $nameParts = explode(' ', $name, 2);
             $firstName = $nameParts[0];
-            $lastName  = $nameParts[1] ?? 'Administrator';
+            $lastName = $nameParts[1] ?? 'Administrator';
 
             DB::table('employees')->insert([
-                'employee_id'       => $employeeId,
-                'employee_code'     => $employeeCode,
-                'first_name'        => $firstName,
-                'last_name'         => $lastName,
-                'email'             => $email,
-                'department_id'     => $adminDeptId,
-                'role_id'           => $adminRoleId,
-                'position_title'    => 'System Administrator',
-                'hire_date'         => now()->toDateString(),
+                'employee_id' => $employeeId,
+                'employee_code' => $employeeCode,
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'email' => $email,
+                'department_id' => $adminDeptId,
+                'role_id' => $adminRoleId,
+                'position_title' => 'System Administrator',
+                'hire_date' => now()->toDateString(),
                 'employment_status' => 'active',
-                'created_at'        => now(),
-                'updated_at'        => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             DB::table('users')->insert([
-                'name'              => $name,
-                'email'             => $email,
-                'password'          => Hash::make($password),
-                'role'              => 'admin',
-                'employee_id'       => $employeeId,
+                'name' => $name,
+                'email' => $email,
+                'password' => Hash::make($password),
+                'role' => 'admin',
+                'employee_id' => $employeeId,
                 'email_verified_at' => now(),
                 'must_change_password' => true,
-                'created_at'        => now(),
-                'updated_at'        => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         });
 
-        $this->info("✅ Admin account created successfully.");
+        $this->info('✅ Admin account created successfully.');
         $this->line("   Email: {$email}");
         $this->line("   Employee Code: {$employeeCode}");
-        $this->line("   The user will be forced to change their password on first login.");
+        $this->line('   The user will be forced to change their password on first login.');
 
         return self::SUCCESS;
     }

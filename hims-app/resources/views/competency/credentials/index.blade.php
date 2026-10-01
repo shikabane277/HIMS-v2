@@ -9,7 +9,14 @@
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Track professional licenses, board certifications, and clinical credentials.</p>
     </div>
     @can('manage-competency')
-        <button type="button" class="btn-hims btn-hims-primary" data-modal-open="credentialCreateModal"><i class="bi bi-patch-plus-fill"></i> Add Credential</button>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn-hims btn-hims-outline" data-modal-open="importCredentialModal">
+                <i class="bi bi-file-earmark-arrow-up"></i> Import CSV
+            </button>
+            <button type="button" class="btn-hims btn-hims-primary" data-modal-open="credentialCreateModal">
+                <i class="bi bi-patch-plus-fill"></i> Add Credential
+            </button>
+        </div>
     @endcan
 </div>
 <div class="row g-3 mb-4">
@@ -70,9 +77,46 @@
 
 @can('manage-competency')
     @include('competency.credentials._create-modal')
+
+<div class="hims-modal-backdrop" id="importCredentialModal" role="dialog" aria-modal="true">
+    <div class="hims-modal">
+        <div class="hims-modal-header">
+            <h5><i class="bi bi-file-earmark-arrow-up"></i> Import Credentials from CSV</h5>
+            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
+        </div>
+        <form method="POST" action="{{ route('competency.credentials.import') }}" enctype="multipart/form-data">
+            @csrf
+            <div class="hims-modal-body">
+                <p style="font-size:13px;color:#6b7280;margin-bottom:14px">
+                    Upload a CSV file to batch-import licenses and certifications linked to staff employee codes.
+                </p>
+                <div class="mb-3">
+                    <label class="hims-label" for="cred_csv">Select CSV File *</label>
+                    <input type="file" name="csv_file" id="cred_csv" class="hims-input" accept=".csv,text/csv" required>
+                </div>
+                <div class="p-3" style="background:#f8fafc;border-radius:6px;font-size:12.5px;color:#4b5563">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong>Expected Columns:</strong>
+                        <a href="{{ route('competency.credentials.import.template') }}" class="btn-hims btn-hims-ghost btn-sm" style="padding:2px 8px;font-size:12px">
+                            <i class="bi bi-download"></i> Download Template
+                        </a>
+                    </div>
+                    <code style="display:block;font-size:11px;color:#2563eb;word-break:break-all">
+                        employee_code, credential_type, credential_number, issuing_body, issue_date, expiry_date
+                    </code>
+                </div>
+            </div>
+            <div class="hims-modal-footer">
+                <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
+                <button type="submit" class="btn-hims btn-hims-primary"><i class="bi bi-upload"></i> Upload & Import</button>
+            </div>
+        </form>
+    </div>
+</div>
 @endcan
 
 @can('view-audit-history')
 @include('partials._audit_history_modal')
 @endcan
+@include('partials.modal-js')
 @endsection

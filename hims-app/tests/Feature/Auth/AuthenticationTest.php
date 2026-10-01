@@ -204,7 +204,7 @@ class AuthenticationTest extends TestCase
 
         for ($i = 1; $i <= 5; $i++) {
             $response = $this->post('/login', [
-                'email'    => $user->email,
+                'email' => $user->email,
                 'password' => 'wrong-password',
             ]);
             $response->assertSessionHasErrors('email');
@@ -218,7 +218,7 @@ class AuthenticationTest extends TestCase
 
         // Attempting to log in with the CORRECT password should still fail while locked
         $response = $this->post('/login', [
-            'email'    => $user->email,
+            'email' => $user->email,
             'password' => 'correct-password',
         ]);
         $response->assertSessionHasErrors('email');
@@ -228,7 +228,7 @@ class AuthenticationTest extends TestCase
         $this->travel(16)->minutes();
 
         $response = $this->post('/login', [
-            'email'    => $user->email,
+            'email' => $user->email,
             'password' => 'correct-password',
         ]);
         $response->assertRedirect(route('two-factor.show'));

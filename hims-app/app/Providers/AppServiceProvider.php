@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoApiTransport;
 
 class AppServiceProvider extends ServiceProvider
@@ -50,6 +51,12 @@ class AppServiceProvider extends ServiceProvider
             $key = $config['key'] ?? config('services.brevo.key');
 
             return new BrevoApiTransport($key);
+        });
+
+        Password::defaults(function () {
+            return $this->app->environment('testing')
+                ? Password::min(8)
+                : Password::min(10)->letters()->mixedCase()->numbers()->symbols();
         });
     }
 

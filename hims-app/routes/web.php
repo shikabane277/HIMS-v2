@@ -11,6 +11,7 @@ use App\Http\Controllers\LearningController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecognitionController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SuccessionController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\UserController;
@@ -25,6 +26,9 @@ use Illuminate\Support\Str;
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
+// Public verification for QR codes and certificate links
+Route::get('/certificates/{code}', [LearningController::class, 'showCertificate'])->name('certificates.verify');
 
 /*
 |--------------------------------------------------------------------------
@@ -91,6 +95,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             });
             Route::get('/{id}', [PerformanceController::class, 'showCycle'])->name('show');
         });
+
+        Route::prefix('kpis')->name('kpis.')->middleware('role:admin,hr_manager')->group(function () {
+            Route::get('/', [PerformanceController::class, 'kpiIndex'])->name('index');
+            Route::post('/', [PerformanceController::class, 'kpiStore'])->name('store');
+            Route::put('/{id}', [PerformanceController::class, 'kpiUpdate'])->name('update');
+            Route::post('/{id}/toggle-status', [PerformanceController::class, 'kpiToggleStatus'])->name('toggle-status');
+        });
     });
 
     // ── Competency Management ────────────────────────────────
@@ -103,6 +114,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // (Add Credential also on the credentials index) and post straight here.
         Route::middleware('role:admin,hr_manager,supervisor')->group(function () {
             Route::post('/assessments', [CompetencyController::class, 'storeAssessment'])->name('assessments.store');
+            Route::get('/credentials/import/template', [CompetencyController::class, 'downloadCredentialsTemplate'])->name('credentials.import.template');
+            Route::post('/credentials/import', [CompetencyController::class, 'importCredentialsCsv'])->name('credentials.import');
             Route::post('/credentials', [CompetencyController::class, 'storeCredential'])->name('credentials.store');
         });
 
@@ -111,6 +124,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::middleware('role:admin,hr_manager')->group(function () {
             Route::post('/domains', [CompetencyController::class, 'storeDomain'])->name('domains.store');
             Route::put('/domains/{id}', [CompetencyController::class, 'updateDomain'])->name('domains.update');
+            Route::patch('/domains/{id}/toggle-status', [CompetencyController::class, 'toggleDomainStatus'])->name('domains.toggle-status');
             Route::delete('/domains/{id}', [CompetencyController::class, 'destroyDomain'])->name('domains.destroy');
 
             Route::get('/role-requirements', [CompetencyController::class, 'roleRequirementsIndex'])->name('role-requirements.index');
@@ -147,6 +161,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [LearningController::class, 'index'])->name('index');
         Route::get('/pathways', [LearningController::class, 'pathwaysIndex'])->name('pathways.index');
         Route::get('/cpd', [LearningController::class, 'cpdIndex'])->name('cpd.index');
+        Route::get('/certificates', [LearningController::class, 'certificatesIndex'])->name('certificates.index');
+        Route::get('/certificates/{code}', [LearningController::class, 'showCertificate'])->name('certificates.show');
 
         // Authoring the catalogue is HR/admin only. Courses and pathways are
         // created and edited from modals on the Learning index (New Pathway also
@@ -154,6 +170,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::middleware('role:admin,hr_manager')->group(function () {
             Route::post('/courses', [LearningController::class, 'storeCourse'])->name('courses.store');
             Route::put('/courses/{id}', [LearningController::class, 'updateCourse'])->name('courses.update');
+            Route::post('/courses/{id}/toggle-status', [LearningController::class, 'toggleCourseStatus'])->name('courses.toggle-status');
             Route::post('/pathways', [LearningController::class, 'storePathway'])->name('pathways.store');
             Route::post('/cpd/{id}/verify', [LearningController::class, 'verifyCpd'])->name('cpd.verify');
 
@@ -237,6 +254,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::middleware('role:admin,hr_manager,supervisor')->group(function () {
             Route::post('/sessions', [TrainingController::class, 'storeSession'])->name('sessions.store');
+            Route::put('/sessions/{id}', [TrainingController::class, 'updateSession'])->name('sessions.update');
+            Route::post('/sessions/{id}/reschedule', [TrainingController::class, 'rescheduleSession'])->name('sessions.reschedule');
+            Route::post('/sessions/{id}/cancel', [TrainingController::class, 'cancelSession'])->name('sessions.cancel');
             Route::post('/sessions/{id}/checkin', [TrainingController::class, 'checkIn'])->name('sessions.checkin');
         });
 
@@ -266,6 +286,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::post('/candidates', [SuccessionController::class, 'storeCandidate'])->name('candidates.store');
                 Route::get('/candidates/{id}/edit', [SuccessionController::class, 'editCandidate'])->name('candidates.edit');
                 Route::put('/candidates/{id}', [SuccessionController::class, 'updateCandidate'])->name('candidates.update');
+                Route::post('/candidates/{id}/approve', [SuccessionController::class, 'approveCandidate'])->name('candidates.approve');
+                Route::post('/candidates/{id}/reject', [SuccessionController::class, 'rejectCandidate'])->name('candidates.reject');
                 Route::delete('/candidates/{id}', [SuccessionController::class, 'withdrawCandidate'])->name('candidates.withdraw');
             });
 
@@ -318,6 +340,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             Route::middleware('role:admin,hr_manager')->group(function () {
                 Route::get('/manager-setup', [EmployeeController::class, 'managerSetup'])->name('manager-setup');
+                Route::get('/import/template', [EmployeeController::class, 'downloadTemplate'])->name('import.template');
+                Route::post('/import', [EmployeeController::class, 'importCsv'])->name('import');
                 Route::get('/create', [EmployeeController::class, 'create'])->name('create');
                 Route::post('/', [EmployeeController::class, 'store'])->name('store');
                 Route::get('/{id}/edit', [EmployeeController::class, 'edit'])->name('edit');
@@ -339,23 +363,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         DB::raw('COUNT(e.employee_id) as employee_count'),
                         DB::raw("CONCAT(COALESCE(h.first_name,''),' ',COALESCE(h.last_name,'')) as head_name"))
                     ->groupBy('d.department_id', 'd.name', 'd.department_code', 'd.head_employee_id',
-                        'd.parent_dept_id', 'd.is_clinical', 'd.created_at', 'd.updated_at',
+                        'd.parent_dept_id', 'd.is_clinical', 'd.is_active', 'd.created_at', 'd.updated_at',
                         'h.first_name', 'h.last_name')
                     ->orderBy('d.name')->get();
 
-                return view('departments.index', compact('depts'));
+                $employees = DB::table('employees')->where('employment_status', 'active')->orderBy('first_name')->get();
+
+                return view('departments.index', compact('depts', 'employees'));
             })->name('index');
 
             Route::post('/', function (Request $request) {
                 $request->validate([
                     'name' => 'required|string|max:150|unique:departments,name',
                     'department_code' => 'nullable|string|max:20|unique:departments,department_code',
+                    'head_employee_id' => 'nullable|string|exists:employees,employee_id',
+                    'is_clinical' => 'nullable|boolean',
+                    'is_active' => 'nullable|boolean',
                 ]);
                 DB::table('departments')->insert([
                     'department_id' => Str::uuid(),
                     'name' => $request->name,
                     'department_code' => $request->department_code ?: null,
+                    'head_employee_id' => $request->head_employee_id ?: null,
                     'is_clinical' => $request->boolean('is_clinical'),
+                    'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
 
@@ -367,16 +398,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 abort_if(! $dept, 404);
 
                 $request->validate([
-                    'name'            => 'required|string|max:150|unique:departments,name,' . $id . ',department_id',
-                    'department_code' => 'nullable|string|max:20|unique:departments,department_code,' . $id . ',department_id',
-                    'is_clinical'     => 'nullable|boolean',
+                    'name' => 'required|string|max:150|unique:departments,name,'.$id.',department_id',
+                    'department_code' => 'nullable|string|max:20|unique:departments,department_code,'.$id.',department_id',
+                    'head_employee_id' => 'nullable|string|exists:employees,employee_id',
+                    'is_clinical' => 'nullable|boolean',
+                    'is_active' => 'nullable|boolean',
                 ]);
 
                 DB::table('departments')->where('department_id', $id)->update([
-                    'name'            => $request->name,
+                    'name' => $request->name,
                     'department_code' => $request->department_code ?: null,
-                    'is_clinical'     => $request->boolean('is_clinical'),
-                    'updated_at'      => now(),
+                    'head_employee_id' => $request->head_employee_id ?: null,
+                    'is_clinical' => $request->boolean('is_clinical'),
+                    'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+                    'updated_at' => now(),
                 ]);
 
                 return redirect()->route('departments.index')->with('success', 'Department updated.');
@@ -401,7 +436,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // No role: middleware — the assistant is available to every signed-in user.
     // Per-user isolation is enforced inside AiController (see ownedSession()),
     // since ai_chat_messages.session_id carries no FK to scope on.
-    Route::post('/ai/query', [AiController::class, 'query'])->name('ai.query');
+    Route::post('/ai/query', [AiController::class, 'query'])->middleware('throttle:30,1')->name('ai.query');
     Route::get('/ai/history', [AiController::class, 'history'])->name('ai.history');
     Route::delete('/ai/history', [AiController::class, 'clearHistory'])->name('ai.history.clear');
 
@@ -434,35 +469,50 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/log-error', function (Request $request) {
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:2048'],
-            'source'  => ['nullable', 'string', 'max:255'],
-            'lineno'  => ['nullable'],
+            'source' => ['nullable', 'string', 'max:255'],
+            'lineno' => ['nullable'],
         ]);
 
         $message = Str::limit($validated['message'], 2048);
-        $source  = Str::limit($validated['source'] ?? 'unknown', 255);
-        $lineno  = $validated['lineno'] ?? '?';
+        $source = Str::limit($validated['source'] ?? 'unknown', 255);
+        $lineno = $validated['lineno'] ?? '?';
 
         Log::error("JS ERROR: {$message} in {$source} on line {$lineno}", [
             'user_id' => auth()->id(),
-            'ip'      => $request->ip(),
+            'ip' => $request->ip(),
         ]);
 
         return response()->json(['ok' => true]);
     })->middleware('throttle:5,1')->name('log-error');
+
+    // ── Reports & Analytics (PB-18, PB-19) ───────────────────
+    Route::middleware('role:admin,hr_manager,supervisor')->prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('/performance', [ReportController::class, 'performanceReport'])->name('performance');
+        Route::get('/performance/export', [ReportController::class, 'exportPerformanceCsv'])->name('performance.export');
+        Route::get('/compliance', [ReportController::class, 'complianceReport'])->name('compliance');
+        Route::get('/compliance/export', [ReportController::class, 'exportComplianceCsv'])->name('compliance.export');
+    });
 
     // ── User Management ───────────────────────────────────────
     // Creating logins and assigning roles is the keys to the kingdom.
     // No detail page — user records are managed through index/create/edit only.
     Route::resource('users', UserController::class)->except('show')->middleware('role:admin');
     Route::post('/users/{id}/unlock', [UserController::class, 'unlockAccount'])->name('users.unlock')->middleware('role:admin');
+    Route::post('/users/{id}/toggle-active', [UserController::class, 'toggleActive'])->name('users.toggle-active')->middleware('role:admin');
     Route::post('/settings/ai-data-sharing', [UserController::class, 'updateAiSettings'])->name('settings.ai-data-sharing')->middleware('role:admin');
     Route::get('/audit/history', [UserController::class, 'auditHistory'])
         ->middleware('role:admin,hr_manager')->name('audit.history');
+    Route::get('/audit/export', [UserController::class, 'exportAuditTrail'])
+        ->middleware('role:admin,hr_manager')->name('audit.export');
 
     // ── Profile ──────────────────────────────────────────────
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/profile/totp/setup', [ProfileController::class, 'setupTotp'])->name('profile.totp.setup');
+    Route::post('/profile/totp/confirm', [ProfileController::class, 'confirmTotp'])->name('profile.totp.confirm');
+    Route::post('/profile/totp/disable', [ProfileController::class, 'disableTotp'])->name('profile.totp.disable');
 });
 
 require __DIR__.'/auth.php';

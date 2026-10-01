@@ -96,8 +96,8 @@
         </div>
 
         <p style="font-size:13px;color:var(--hims-gray);margin:0 0 16px;line-height:1.6;text-align:center">
-            A 6-character verification code has been sent to<br>
-            <strong style="color:var(--hims-dark)">{{ $maskedEmail }}</strong>
+            Enter the 6-character code sent to <strong style="color:var(--hims-dark)">{{ $maskedEmail }}</strong>,<br>
+            or generate a 6-digit code from your <strong>Authenticator App</strong> (TOTP).
         </p>
 
         <div class="case-notice">

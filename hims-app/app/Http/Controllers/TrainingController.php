@@ -72,12 +72,45 @@ class TrainingController extends Controller
         $request->validate([
             'title' => 'required|string|max:300',
             'category' => 'required|string',
-            'instructor_id' => 'required|string',
+            'instructor_id' => 'required|string|exists:employees,employee_id',
             'session_date' => 'required|date',
             'start_time' => 'required',
             'end_time' => 'required|after:start_time',
             'capacity' => 'required|integer|min:1',
+            'venue_id' => 'nullable|string|exists:training_venues,venue_id',
         ]);
+
+        // Overlap detection: Venue
+        if ($request->venue_id) {
+            $venueConflict = DB::table('training_sessions')
+                ->where('venue_id', $request->venue_id)
+                ->where('session_date', $request->session_date)
+                ->where('status', '!=', 'cancelled')
+                ->where(function ($q) use ($request) {
+                    $q->where('start_time', '<', $request->end_time)
+                        ->where('end_time', '>', $request->start_time);
+                })->first();
+
+            if ($venueConflict) {
+                return back()->withInput()->with('error', "Venue booking conflict: Venue is already booked for '{$venueConflict->title}' ({$venueConflict->start_time} - {$venueConflict->end_time}).");
+            }
+        }
+
+        // Overlap detection: Instructor
+        if ($request->instructor_id) {
+            $instConflict = DB::table('training_sessions')
+                ->where('instructor_id', $request->instructor_id)
+                ->where('session_date', $request->session_date)
+                ->where('status', '!=', 'cancelled')
+                ->where(function ($q) use ($request) {
+                    $q->where('start_time', '<', $request->end_time)
+                        ->where('end_time', '>', $request->start_time);
+                })->first();
+
+            if ($instConflict) {
+                return back()->withInput()->with('error', "Instructor schedule conflict: Instructor is already teaching '{$instConflict->title}' ({$instConflict->start_time} - {$instConflict->end_time}).");
+            }
+        }
 
         DB::table('training_sessions')->insert([
             'session_id' => Str::uuid(),
@@ -99,16 +132,123 @@ class TrainingController extends Controller
         return redirect()->route('training.index')->with('success', 'Training session scheduled successfully.');
     }
 
+    public function updateSession(Request $request, $id)
+    {
+        abort_unless(auth()->user()->can('manage-training'), 403);
+        $session = DB::table('training_sessions')->where('session_id', $id)->first();
+        abort_if(! $session, 404);
+
+        $request->validate([
+            'title' => 'required|string|max:300',
+            'category' => 'required|string',
+            'instructor_id' => 'required|string|exists:employees,employee_id',
+            'session_date' => 'required|date',
+            'start_time' => 'required',
+            'end_time' => 'required|after:start_time',
+            'capacity' => 'required|integer|min:1',
+            'venue_id' => 'nullable|string|exists:training_venues,venue_id',
+        ]);
+
+        if ($request->venue_id) {
+            $conflict = DB::table('training_sessions')
+                ->where('venue_id', $request->venue_id)
+                ->where('session_date', $request->session_date)
+                ->where('session_id', '!=', $id)
+                ->where('status', '!=', 'cancelled')
+                ->where(function ($q) use ($request) {
+                    $q->where('start_time', '<', $request->end_time)
+                        ->where('end_time', '>', $request->start_time);
+                })->first();
+
+            if ($conflict) {
+                return back()->withInput()->with('error', "Venue booking conflict: Venue is already booked for '{$conflict->title}' ({$conflict->start_time} - {$conflict->end_time}).");
+            }
+        }
+
+        DB::table('training_sessions')->where('session_id', $id)->update([
+            'title' => $request->title,
+            'category' => $request->category,
+            'instructor_id' => $request->instructor_id,
+            'venue_id' => $request->venue_id ?: null,
+            'session_date' => $request->session_date,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'capacity' => $request->capacity,
+            'cpd_hours' => $request->cpd_hours ?? 0,
+            'description' => $request->description,
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('success', 'Training session updated successfully.');
+    }
+
+    public function rescheduleSession(Request $request, $id)
+    {
+        abort_unless(auth()->user()->can('manage-training'), 403);
+        $session = DB::table('training_sessions')->where('session_id', $id)->first();
+        abort_if(! $session, 404);
+
+        $request->validate([
+            'session_date' => 'required|date',
+            'start_time' => 'required',
+            'end_time' => 'required|after:start_time',
+            'venue_id' => 'nullable|string|exists:training_venues,venue_id',
+        ]);
+
+        $venueId = $request->venue_id ?: $session->venue_id;
+
+        if ($venueId) {
+            $conflict = DB::table('training_sessions')
+                ->where('venue_id', $venueId)
+                ->where('session_date', $request->session_date)
+                ->where('session_id', '!=', $id)
+                ->where('status', '!=', 'cancelled')
+                ->where(function ($q) use ($request) {
+                    $q->where('start_time', '<', $request->end_time)
+                        ->where('end_time', '>', $request->start_time);
+                })->first();
+
+            if ($conflict) {
+                return back()->with('error', "Cannot reschedule: Venue conflict with '{$conflict->title}' ({$conflict->start_time} - {$conflict->end_time}).");
+            }
+        }
+
+        DB::table('training_sessions')->where('session_id', $id)->update([
+            'session_date' => $request->session_date,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'venue_id' => $venueId,
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('success', 'Training session rescheduled successfully.');
+    }
+
+    public function cancelSession(Request $request, $id)
+    {
+        abort_unless(auth()->user()->can('manage-training'), 403);
+        $session = DB::table('training_sessions')->where('session_id', $id)->first();
+        abort_if(! $session, 404);
+
+        DB::table('training_sessions')->where('session_id', $id)->update([
+            'status' => 'cancelled',
+            'updated_at' => now(),
+        ]);
+
+        DB::table('training_registrations')->where('session_id', $id)->where('status', 'registered')->update([
+            'status' => 'cancelled',
+        ]);
+
+        return back()->with('success', 'Training session cancelled.');
+    }
+
     public function register($sessionId)
     {
         $session = DB::table('training_sessions')->where('session_id', $sessionId)->first();
         abort_if(! $session, 404);
 
-        $registered = DB::table('training_registrations')
-            ->where('session_id', $sessionId)->count();
-
-        if ($registered >= $session->capacity) {
-            return back()->with('error', 'This session is fully booked.');
+        if ($session->status === 'cancelled') {
+            return back()->with('error', 'Cannot register for a cancelled session.');
         }
 
         $empId = auth()->user()->employee_id ?? null;
@@ -117,16 +257,35 @@ class TrainingController extends Controller
         }
 
         $exists = DB::table('training_registrations')
-            ->where('session_id', $sessionId)->where('employee_id', $empId)->exists();
+            ->where('session_id', $sessionId)->where('employee_id', $empId)->first();
 
-        if (! $exists) {
-            DB::table('training_registrations')->insert([
-                'registration_id' => Str::uuid(),
-                'session_id' => $sessionId,
-                'employee_id' => $empId,
-                'status' => 'registered',
-                'registration_date' => now(),
-            ]);
+        if ($exists) {
+            return back()->with('info', "You are already {$exists->status} for this session.");
+        }
+
+        $registeredCount = DB::table('training_registrations')
+            ->where('session_id', $sessionId)
+            ->where('status', 'registered')
+            ->count();
+
+        $isWaitlisted = $registeredCount >= $session->capacity;
+        $status = $isWaitlisted ? 'waitlisted' : 'registered';
+
+        DB::table('training_registrations')->insert([
+            'registration_id' => Str::uuid(),
+            'session_id' => $sessionId,
+            'employee_id' => $empId,
+            'status' => $status,
+            'registration_date' => now(),
+        ]);
+
+        if ($isWaitlisted) {
+            $waitlistPos = DB::table('training_registrations')
+                ->where('session_id', $sessionId)
+                ->where('status', 'waitlisted')
+                ->count();
+
+            return redirect()->route('training.index')->with('warning', "Session is at full capacity ({$session->capacity}). You have been added to the waitlist (Position #{$waitlistPos}).");
         }
 
         return redirect()->route('training.index')->with('success', 'Registered for session successfully.');
@@ -195,18 +354,18 @@ class TrainingController extends Controller
 
         $request->validate([
             'venue_name' => 'required|string|max:150',
-            'building'   => 'nullable|string|max:100',
-            'floor'      => 'nullable|string|max:20',
-            'capacity'   => 'required|integer|min:1',
-            'is_active'  => 'nullable|boolean',
+            'building' => 'nullable|string|max:100',
+            'floor' => 'nullable|string|max:20',
+            'capacity' => 'required|integer|min:1',
+            'is_active' => 'nullable|boolean',
         ]);
 
         DB::table('training_venues')->where('venue_id', $id)->update([
             'venue_name' => $request->venue_name,
-            'building'   => $request->building,
-            'floor'      => $request->floor,
-            'capacity'   => $request->capacity,
-            'is_active'  => $request->has('is_active') ? $request->boolean('is_active') : true,
+            'building' => $request->building,
+            'floor' => $request->floor,
+            'capacity' => $request->capacity,
+            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
             'updated_at' => now(),
         ]);
 

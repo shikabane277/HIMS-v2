@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PerformanceService;
 use App\Support\AuditTrail;
 use App\Support\CycleStatus;
 use App\Support\KpiWeighting;
 use App\Support\ReviewStatus;
 use Illuminate\Http\Request;
-use App\Services\PerformanceService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -840,26 +840,26 @@ class PerformanceController extends Controller
         abort_if(! $review, 404);
 
         $request->validate([
-            'goal_title'       => 'required|string|max:300',
+            'goal_title' => 'required|string|max:300',
             'goal_description' => 'nullable|string',
-            'target_date'      => 'nullable|date',
-            'progress_pct'     => 'nullable|integer|min:0|max:100',
-            'status'           => 'nullable|in:not_started,in_progress,achieved,not_achieved',
+            'target_date' => 'nullable|date',
+            'progress_pct' => 'nullable|integer|min:0|max:100',
+            'status' => 'nullable|in:not_started,in_progress,achieved,not_achieved',
         ]);
 
         $goalId = (string) Str::uuid();
 
         DB::table('review_goals')->insert([
-            'goal_id'          => $goalId,
-            'review_id'        => $reviewId,
-            'employee_id'      => $review->employee_id,
-            'goal_title'       => $request->goal_title,
+            'goal_id' => $goalId,
+            'review_id' => $reviewId,
+            'employee_id' => $review->employee_id,
+            'goal_title' => $request->goal_title,
             'goal_description' => $request->goal_description ?: $request->goal_title,
-            'target_date'      => $request->target_date ?: null,
-            'progress_pct'     => $request->progress_pct ?? 0,
-            'status'           => $request->status ?: 'not_started',
-            'created_at'       => now(),
-            'updated_at'       => now(),
+            'target_date' => $request->target_date ?: null,
+            'progress_pct' => $request->progress_pct ?? 0,
+            'status' => $request->status ?: 'not_started',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         return redirect()->back()->with('success', 'Review goal added.');
@@ -872,13 +872,13 @@ class PerformanceController extends Controller
 
         $request->validate([
             'progress_pct' => 'nullable|integer|min:0|max:100',
-            'status'       => 'required|in:not_started,in_progress,achieved,not_achieved',
+            'status' => 'required|in:not_started,in_progress,achieved,not_achieved',
         ]);
 
         DB::table('review_goals')->where('goal_id', $goalId)->update([
             'progress_pct' => $request->progress_pct ?? $goal->progress_pct,
-            'status'       => $request->status,
-            'updated_at'   => now(),
+            'status' => $request->status,
+            'updated_at' => now(),
         ]);
 
         return redirect()->back()->with('success', 'Goal updated.');
@@ -890,10 +890,10 @@ class PerformanceController extends Controller
         abort_if(! $review, 404);
 
         $request->validate([
-            'start_date'      => 'required|date',
+            'start_date' => 'required|date',
             'target_end_date' => 'required|date|after_or_equal:start_date',
-            'action_steps'    => 'required',
-            'notes'           => 'nullable|string',
+            'action_steps' => 'required',
+            'notes' => 'nullable|string',
         ]);
 
         $actionSteps = is_array($request->action_steps)
@@ -903,17 +903,17 @@ class PerformanceController extends Controller
         $pipId = (string) Str::uuid();
 
         DB::table('performance_improvement_plans')->insert([
-            'pip_id'              => $pipId,
-            'employee_id'         => $review->employee_id,
+            'pip_id' => $pipId,
+            'employee_id' => $review->employee_id,
             'triggered_by_review' => $reviewId,
-            'status'              => 'initiated',
-            'action_steps'        => json_encode($actionSteps),
-            'start_date'          => $request->start_date,
-            'target_end_date'     => $request->target_end_date,
-            'supervisor_id'       => $review->reviewer_id,
-            'notes'               => $request->notes,
-            'created_at'          => now(),
-            'updated_at'          => now(),
+            'status' => 'initiated',
+            'action_steps' => json_encode($actionSteps),
+            'start_date' => $request->start_date,
+            'target_end_date' => $request->target_end_date,
+            'supervisor_id' => $review->reviewer_id,
+            'notes' => $request->notes,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         return redirect()->back()->with('success', 'Performance Improvement Plan initiated.');
@@ -925,18 +925,124 @@ class PerformanceController extends Controller
         abort_if(! $pip, 404);
 
         $request->validate([
-            'status'          => 'required|in:initiated,active,completed,extended,failed',
+            'status' => 'required|in:initiated,active,completed,extended,failed',
             'actual_end_date' => 'nullable|date',
-            'notes'           => 'nullable|string',
+            'notes' => 'nullable|string',
         ]);
 
         DB::table('performance_improvement_plans')->where('pip_id', $pipId)->update([
-            'status'          => $request->status,
+            'status' => $request->status,
             'actual_end_date' => $request->actual_end_date ?: ($request->status === 'completed' ? now()->toDateString() : null),
-            'notes'           => $request->notes ?? $pip->notes,
-            'updated_at'      => now(),
+            'notes' => $request->notes ?? $pip->notes,
+            'updated_at' => now(),
         ]);
 
         return redirect()->back()->with('success', 'Performance Improvement Plan updated.');
+    }
+
+    public function kpiIndex(Request $request)
+    {
+        $search = $request->query('search');
+        $category = $request->query('category');
+        $status = $request->query('status');
+
+        $categories = DB::table('kpi_library')->distinct()->pluck('kpi_category')->filter()->values();
+
+        $kpis = DB::table('kpi_library')
+            ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
+                $sub->where('kpi_name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            }))
+            ->when($category, fn ($q) => $q->where('kpi_category', $category))
+            ->when($status === 'active', fn ($q) => $q->where('is_active', true))
+            ->when($status === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->orderBy('kpi_category')
+            ->orderBy('kpi_name')
+            ->paginate(25);
+
+        return view('performance.kpis.index', compact('kpis', 'categories', 'search', 'category', 'status'));
+    }
+
+    public function kpiStore(Request $request)
+    {
+        $validated = $request->validate([
+            'kpi_name' => 'required|string|max:200|unique:kpi_library,kpi_name',
+            'kpi_category' => 'required|string|max:30',
+            'description' => 'nullable|string|max:1000',
+            'target_value' => 'nullable|numeric',
+            'unit' => 'nullable|string|max:30',
+            'weight' => 'nullable|numeric|min:0.1|max:5',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $kpiId = (string) Str::uuid();
+
+        DB::table('kpi_library')->insert([
+            'kpi_id' => $kpiId,
+            'kpi_name' => $validated['kpi_name'],
+            'kpi_category' => $validated['kpi_category'],
+            'description' => $validated['description'] ?? null,
+            'target_value' => $validated['target_value'] ?? null,
+            'unit' => $validated['unit'] ?? null,
+            'weight' => $validated['weight'] ?? 1.00,
+            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrail::record('kpi_created', 'kpi_library', $kpiId, afterState: $validated);
+
+        return redirect()->route('performance.kpis.index')->with('success', 'KPI successfully added to library.');
+    }
+
+    public function kpiUpdate(Request $request, $id)
+    {
+        $kpi = DB::table('kpi_library')->where('kpi_id', $id)->first();
+        abort_if(! $kpi, 404);
+
+        $validated = $request->validate([
+            'kpi_name' => 'required|string|max:200|unique:kpi_library,kpi_name,'.$id.',kpi_id',
+            'kpi_category' => 'required|string|max:30',
+            'description' => 'nullable|string|max:1000',
+            'target_value' => 'nullable|numeric',
+            'unit' => 'nullable|string|max:30',
+            'weight' => 'nullable|numeric|min:0.1|max:5',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $after = [
+            'kpi_name' => $validated['kpi_name'],
+            'kpi_category' => $validated['kpi_category'],
+            'description' => $validated['description'] ?? null,
+            'target_value' => $validated['target_value'] ?? null,
+            'unit' => $validated['unit'] ?? null,
+            'weight' => $validated['weight'] ?? 1.00,
+            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+            'updated_at' => now(),
+        ];
+
+        DB::table('kpi_library')->where('kpi_id', $id)->update($after);
+        AuditTrail::record('kpi_updated', 'kpi_library', $id, beforeState: (array) $kpi, afterState: $after);
+
+        return redirect()->route('performance.kpis.index')->with('success', 'KPI updated successfully.');
+    }
+
+    public function kpiToggleStatus($id)
+    {
+        $kpi = DB::table('kpi_library')->where('kpi_id', $id)->first();
+        abort_if(! $kpi, 404);
+
+        $newStatus = ! (bool) ($kpi->is_active ?? true);
+        DB::table('kpi_library')->where('kpi_id', $id)->update([
+            'is_active' => $newStatus,
+            'updated_at' => now(),
+        ]);
+
+        AuditTrail::record('kpi_status_toggled', 'kpi_library', $id, afterState: [
+            'kpi_name' => $kpi->kpi_name,
+            'is_active' => $newStatus,
+        ]);
+
+        return redirect()->route('performance.kpis.index')->with('success', 'KPI '.($newStatus ? 'activated.' : 'deactivated.'));
     }
 }

@@ -18,7 +18,7 @@ class TwoFactorService
         $uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
         $lowercase = 'abcdefghijkmnpqrstuvwxyz';
         $digits = '23456789';
-        $all = $uppercase . $lowercase . $digits;
+        $all = $uppercase.$lowercase.$digits;
 
         do {
             // Guarantee at least 1 uppercase, 1 lowercase, and 1 digit
@@ -54,6 +54,7 @@ class TwoFactorService
     {
         try {
             Mail::to($user->email)->send(new TwoFactorCodeMail($code, $user->name ?? 'User'));
+
             return true;
         } catch (\Throwable $e) {
             Log::error('Two-factor authentication email delivery failed', [
@@ -90,11 +91,11 @@ class TwoFactorService
 
         $length = strlen($name);
         if ($length <= 2) {
-            $maskedName = substr($name, 0, 1) . '***';
+            $maskedName = substr($name, 0, 1).'***';
         } else {
-            $maskedName = substr($name, 0, 1) . str_repeat('*', min(4, $length - 2)) . substr($name, -1);
+            $maskedName = substr($name, 0, 1).str_repeat('*', min(4, $length - 2)).substr($name, -1);
         }
 
-        return $maskedName . '@' . $domain;
+        return $maskedName.'@'.$domain;
     }
 }

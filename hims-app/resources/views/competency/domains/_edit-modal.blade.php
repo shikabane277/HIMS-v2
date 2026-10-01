@@ -17,6 +17,13 @@
                     <label class="hims-label">Description</label>
                     <textarea name="description" id="edit_domain_description" class="hims-input" rows="3"></textarea>
                 </div>
+                <div class="mb-3">
+                    <label class="hims-label">Status</label>
+                    <select name="is_active" id="edit_domain_is_active" class="hims-input hims-select">
+                        <option value="1">Active</option>
+                        <option value="0">Deactivated / Inactive</option>
+                    </select>
+                </div>
             </div>
             <div class="hims-modal-footer">
                 <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
@@ -38,6 +45,7 @@ document.addEventListener('click', function(e) {
     form.action = btn.dataset.action;
     document.getElementById('edit_domain_name').value = btn.dataset.name;
     document.getElementById('edit_domain_description').value = btn.dataset.desc || '';
+    document.getElementById('edit_domain_is_active').value = btn.dataset.active !== undefined ? btn.dataset.active : '1';
 });
 </script>
 @endpush

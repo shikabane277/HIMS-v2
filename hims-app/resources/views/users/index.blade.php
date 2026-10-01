@@ -10,6 +10,7 @@
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Manage accounts that can log in to HIMS.</p>
     </div>
     <div class="d-flex gap-2">
+        <a href="{{ route('audit.export') }}" class="btn-hims btn-hims-outline"><i class="bi bi-download"></i> Export Audit Log</a>
         <button type="button" class="btn-hims btn-hims-outline" data-modal-open="aiDataSettingsModal"><i class="bi bi-shield-lock"></i> AI Data Settings</button>
         <a href="{{ route('users.create') }}" class="btn-hims btn-hims-primary"><i class="bi bi-person-plus-fill"></i> Add User</a>
     </div>
@@ -83,7 +84,9 @@
                         </span>
                     </td>
                     <td data-label="Status">
-                        @if($isLocked)
+                        @if(!($user->is_active ?? true))
+                            <span class="hims-badge red"><i class="bi bi-person-x-fill"></i> Deactivated</span>
+                        @elseif($isLocked)
                             <span class="hims-badge red" title="Locked until {{ $user->locked_until }}"><i class="bi bi-lock-fill"></i> Locked</span>
                         @else
                             <span class="hims-badge green">Active</span>
@@ -97,6 +100,18 @@
                             @endif
                             <a href="{{ route('users.edit', $user) }}" class="btn-hims btn-hims-ghost btn-sm"><i class="bi bi-pencil"></i> Edit</a>
                              @if($user->id !== auth()->id())
+                             <form action="{{ route('users.toggle-active', $user->id) }}" method="POST" style="display:inline">
+                                 @csrf
+                                 @if($user->is_active ?? true)
+                                     <button type="submit" class="btn-hims btn-sm" style="background:#fef3c7;color:#92400e;border:none;cursor:pointer;border-radius:8px;padding:6px 10px;font-size:12px;display:inline-flex;align-items:center;gap:4px" onclick="return confirm('Deactivate this account? User will not be able to log in.')">
+                                         <i class="bi bi-person-x"></i> Deactivate
+                                     </button>
+                                 @else
+                                     <button type="submit" class="btn-hims btn-sm" style="background:#dcfce7;color:#166534;border:none;cursor:pointer;border-radius:8px;padding:6px 10px;font-size:12px;display:inline-flex;align-items:center;gap:4px" onclick="return confirm('Reactivate this account?')">
+                                         <i class="bi bi-person-check"></i> Activate
+                                     </button>
+                                 @endif
+                             </form>
                              <a href="#" class="btn-hims btn-sm" style="background:#fee2e2;color:#dc2626;border:none;cursor:pointer;border-radius:8px;padding:6px 12px;font-size:12px;display:inline-flex;align-items:center;justify-content:center" onclick="event.preventDefault(); if(confirm('Are you sure you want to delete this user?')) { document.getElementById('delete-form-{{ $user->id }}').submit(); }">
                                  <i class="bi bi-trash"></i>
                              </a>

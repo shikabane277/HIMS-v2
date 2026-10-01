@@ -11,12 +11,40 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4" style="flex-wrap:wrap;gap:12px">
     <div>
-        <h2 style="font-size:20px;font-weight:700;margin:0">{{ $domain->domain_name }}</h2>
+        <div class="d-flex align-items-center gap-2">
+            <h2 style="font-size:20px;font-weight:700;margin:0">{{ $domain->domain_name }}</h2>
+            @if($domain->is_active ?? true)
+                <span class="hims-badge green">Active</span>
+            @else
+                <span class="hims-badge gray">Inactive</span>
+            @endif
+        </div>
         @if($domain->description)
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0;max-width:640px">{{ $domain->description }}</p>
         @endif
     </div>
-    <a href="{{ route('competency.index') }}" class="btn-hims btn-hims-ghost"><i class="bi bi-arrow-left"></i> Back to Competency</a>
+    <div class="d-flex gap-2">
+        <a href="{{ route('competency.index') }}" class="btn-hims btn-hims-ghost"><i class="bi bi-arrow-left"></i> Back to Competency</a>
+        @can('manage-competency-framework')
+        <button type="button" class="btn-hims btn-hims-outline"
+                data-modal-open="domainEditModal"
+                data-domain-edit
+                data-action="{{ route('competency.domains.update', $domain->domain_id) }}"
+                data-name="{{ $domain->domain_name }}"
+                data-desc="{{ $domain->description ?? '' }}"
+                data-active="{{ ($domain->is_active ?? true) ? '1' : '0' }}">
+            <i class="bi bi-pencil"></i> Edit Domain
+        </button>
+        <form method="POST" action="{{ route('competency.domains.toggle-status', $domain->domain_id) }}">
+            @csrf
+            @method('PATCH')
+            <button type="submit" class="btn-hims btn-hims-outline"
+                    style="background:{{ ($domain->is_active ?? true) ? '#fef3c7' : '#dcfce7' }};color:{{ ($domain->is_active ?? true) ? '#b45309' : '#15803d' }}">
+                <i class="bi bi-power"></i> {{ ($domain->is_active ?? true) ? 'Deactivate' : 'Activate' }}
+            </button>
+        </form>
+        @endcan
+    </div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -112,4 +140,8 @@
     </div>
 </div>
 @endforelse
+
+@can('manage-competency-framework')
+    @include('competency.domains._edit-modal')
+@endcan
 @endsection

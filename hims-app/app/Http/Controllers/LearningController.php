@@ -200,6 +200,26 @@ class LearningController extends Controller
         return redirect()->route('learning.index')->with('success', 'Course updated.');
     }
 
+    public function toggleCourseStatus(string $courseId)
+    {
+        abort_unless(auth()->user()->can('manage-learning'), 403);
+        $course = DB::table('courses')->where('course_id', $courseId)->first();
+        abort_if(! $course, 404);
+
+        $newStatus = ! (bool) ($course->is_active ?? true);
+        DB::table('courses')->where('course_id', $courseId)->update([
+            'is_active' => $newStatus,
+            'updated_at' => now(),
+        ]);
+
+        AuditTrail::record('course_status_toggled', 'courses', $courseId, afterState: [
+            'title' => $course->title,
+            'is_active' => $newStatus,
+        ]);
+
+        return back()->with('success', "Course \"{$course->title}\" ".($newStatus ? 'activated.' : 'deactivated.'));
+    }
+
     /**
      * One validation shape for both course writes.
      *
@@ -474,11 +494,25 @@ class LearningController extends Controller
         $hours = (float) $enrollment->cpd_hours;
 
         DB::transaction(function () use ($enrollment, $enrollmentId, $hours) {
+            $certId = (string) Str::uuid();
+            $certCode = 'CERT-'.strtoupper(Str::random(10));
+            DB::table('certificates')->insert([
+                'certificate_id' => $certId,
+                'employee_id' => $enrollment->employee_id,
+                'course_id' => $enrollment->course_id,
+                'certificate_code' => $certCode,
+                'issued_date' => now()->toDateString(),
+                'qr_verification_url' => url("/certificates/{$certCode}"),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             DB::table('course_enrollments')->where('enrollment_id', $enrollmentId)->update([
                 'status' => 'completed',
                 'completed_at' => now(),
                 'progress_pct' => 100,
                 'cpd_hours_earned' => $hours,
+                'certificate_id' => $certId,
             ]);
 
             // The CPD row is the point of the exercise: RenewalCycleService sums
@@ -617,5 +651,38 @@ class LearningController extends Controller
         );
 
         return back()->with('success', 'CPD entry verified.');
+    }
+
+    public function certificatesIndex(Request $request)
+    {
+        $query = DB::table('certificates as cert')
+            ->join('employees as e', 'cert.employee_id', '=', 'e.employee_id')
+            ->join('departments as d', 'e.department_id', '=', 'd.department_id')
+            ->join('courses as c', 'cert.course_id', '=', 'c.course_id')
+            ->select('cert.*', 'e.first_name', 'e.last_name', 'e.employee_code', 'd.name as department_name', 'c.title as course_title', 'c.cpd_hours');
+
+        $certificates = $this->scopeToVisibleEmployees($query, 'e.employee_id')
+            ->orderByDesc('cert.issued_date')
+            ->paginate(15);
+
+        return view('learning.certificates.index', compact('certificates'));
+    }
+
+    public function showCertificate(string $code)
+    {
+        $certificate = DB::table('certificates as cert')
+            ->join('employees as e', 'cert.employee_id', '=', 'e.employee_id')
+            ->join('departments as d', 'e.department_id', '=', 'd.department_id')
+            ->join('courses as c', 'cert.course_id', '=', 'c.course_id')
+            ->where(function ($q) use ($code) {
+                $q->where('cert.certificate_code', $code)
+                    ->orWhere('cert.certificate_id', $code);
+            })
+            ->select('cert.*', 'e.first_name', 'e.last_name', 'e.employee_code', 'e.position_title', 'd.name as department_name', 'c.title as course_title', 'c.cpd_hours')
+            ->first();
+
+        abort_if(! $certificate, 404, 'Certificate not found or invalid.');
+
+        return view('learning.certificates.show', compact('certificate'));
     }
 }

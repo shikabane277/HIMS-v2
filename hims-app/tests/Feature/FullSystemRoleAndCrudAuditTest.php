@@ -13,14 +13,23 @@ class FullSystemRoleAndCrudAuditTest extends TestCase
     use RefreshDatabase;
 
     private string $deptId;
+
     private string $roleId;
+
     private string $adminEmpId;
+
     private User $adminUser;
+
     private string $hrEmpId;
+
     private User $hrUser;
+
     private string $supervisorEmpId;
+
     private User $supervisorUser;
+
     private string $staffEmpId;
+
     private User $staffUser;
 
     protected function setUp(): void

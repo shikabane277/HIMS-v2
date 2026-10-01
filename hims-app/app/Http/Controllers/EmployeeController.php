@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Services\ReportingLineService;
 use App\Support\AuditTrail;
 use App\Support\CredentialStatus;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -281,9 +283,9 @@ class EmployeeController extends Controller
                 $dueDate = null;
                 $overrideDue = $ca->next_assessment_due;
                 if ($overrideDue) {
-                    $dueDate = \Carbon\Carbon::parse($overrideDue)->toDateString();
+                    $dueDate = Carbon::parse($overrideDue)->toDateString();
                 } elseif ($comp->reassessment_months && $ca->assessed_date) {
-                    $dueDate = \Carbon\Carbon::parse($ca->assessed_date)->addMonths((int) $comp->reassessment_months)->toDateString();
+                    $dueDate = Carbon::parse($ca->assessed_date)->addMonths((int) $comp->reassessment_months)->toDateString();
                 }
 
                 if ($dueDate && $dueDate <= $windowEnd) {
@@ -374,6 +376,7 @@ class EmployeeController extends Controller
 
         DB::transaction(function () use (
             $id,
+            $employee,
             $request,
             $encPhone,
             $supervisorId,
@@ -414,6 +417,25 @@ class EmployeeController extends Controller
                 'supervisor_id' => $supervisorId,
                 'updated_at' => now(),
             ]);
+
+            // Automatic user account deactivation when employee is terminated/resigned/suspended
+            if (in_array($request->employment_status, ['terminated', 'resigned', 'suspended'], true)) {
+                $affected = DB::table('users')->where('employee_id', $id)->where('is_active', true)->update([
+                    'is_active' => false,
+                    'updated_at' => now(),
+                ]);
+                if ($affected > 0) {
+                    AuditTrail::record('user_account_auto_deactivated', 'users', $id, afterState: [
+                        'reason' => 'employee_status_'.$request->employment_status,
+                        'employee_id' => $id,
+                    ]);
+                }
+            } elseif ($request->employment_status === 'active' && $employee->employment_status !== 'active') {
+                DB::table('users')->where('employee_id', $id)->where('is_active', false)->update([
+                    'is_active' => true,
+                    'updated_at' => now(),
+                ]);
+            }
         });
 
         AuditTrail::record('update_employee', 'employees', $id, beforeState: $beforeState, afterState: [
@@ -467,5 +489,160 @@ class EmployeeController extends Controller
         }
 
         return $redirect;
+    }
+
+    public function downloadTemplate()
+    {
+        abort_unless(auth()->user()->can('manage-employees'), 403);
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="employee_import_template.csv"',
+        ];
+
+        return response()->stream(function () {
+            $handle = fopen('php://output', 'w');
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($handle, ['first_name', 'last_name', 'email', 'department_code', 'role_slug', 'position_title', 'employment_status', 'hire_date']);
+            fputcsv($handle, ['Maria', 'Santos', 'maria.santos@hospital.ph', 'NUR', 'staff_nurse', 'Staff Nurse I', 'active', '2026-01-15']);
+            fputcsv($handle, ['Juan', 'Dela Cruz', 'juan.delacruz@hospital.ph', 'MED', 'doctor', 'Resident Physician', 'active', '2026-02-01']);
+            fclose($handle);
+        }, 200, $headers);
+    }
+
+    public function importCsv(Request $request)
+    {
+        abort_unless(auth()->user()->can('manage-employees'), 403);
+
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:5120',
+        ]);
+
+        $file = $request->file('csv_file');
+        $handle = fopen($file->getRealPath(), 'r');
+        if (! $handle) {
+            return back()->with('error', 'Unable to open CSV file.');
+        }
+
+        $bom = fread($handle, 3);
+        if ($bom !== chr(0xEF).chr(0xBB).chr(0xBF)) {
+            rewind($handle);
+        }
+
+        $header = fgetcsv($handle);
+        if (! $header) {
+            fclose($handle);
+
+            return back()->with('error', 'CSV file is empty.');
+        }
+
+        $header = array_map(fn ($h) => trim(strtolower($h)), $header);
+
+        $imported = 0;
+        $skipped = 0;
+
+        $departments = DB::table('departments')->get()->keyBy(fn ($d) => strtoupper($d->department_code));
+        $roles = DB::table('roles')->get()->keyBy(fn ($r) => strtolower($r->role_slug));
+
+        $lastCode = DB::table('employees')
+            ->where('employee_code', 'LIKE', 'EMP-%')
+            ->orderByDesc('employee_code')
+            ->value('employee_code');
+        $nextNum = $lastCode ? ((int) substr($lastCode, 4)) + 1 : 1;
+
+        DB::beginTransaction();
+        try {
+            while (($row = fgetcsv($handle)) !== false) {
+                if (empty(array_filter($row))) {
+                    continue;
+                }
+
+                $data = array_combine($header, array_pad($row, count($header), ''));
+                $email = trim($data['email'] ?? '');
+                $firstName = trim($data['first_name'] ?? '');
+                $lastName = trim($data['last_name'] ?? '');
+
+                if (empty($email) || empty($firstName) || empty($lastName)) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                if (DB::table('employees')->where('email', $email)->exists()) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $deptCode = strtoupper(trim($data['department_code'] ?? ''));
+                $dept = $departments->get($deptCode) ?? $departments->first();
+
+                $roleSlug = strtolower(trim($data['role_slug'] ?? ''));
+                $role = $roles->get($roleSlug) ?? $roles->first();
+
+                $empId = (string) Str::uuid();
+                $empCode = 'EMP-'.str_pad($nextNum++, 4, '0', STR_PAD_LEFT);
+                $hireDate = ! empty($data['hire_date']) ? date('Y-m-d', strtotime($data['hire_date'])) : now()->toDateString();
+                $status = in_array(trim($data['employment_status'] ?? ''), ['active', 'on_leave', 'suspended', 'resigned', 'terminated'])
+                    ? trim($data['employment_status'])
+                    : 'active';
+
+                DB::table('employees')->insert([
+                    'employee_id' => $empId,
+                    'employee_code' => $empCode,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $email,
+                    'department_id' => $dept ? $dept->department_id : DB::table('departments')->value('department_id'),
+                    'role_id' => $role ? $role->role_id : DB::table('roles')->value('role_id'),
+                    'position_title' => trim($data['position_title'] ?? 'Staff Member'),
+                    'hire_date' => $hireDate,
+                    'employment_status' => $status,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                if (! DB::table('users')->where('email', $email)->exists()) {
+                    $userRole = 'staff';
+                    if ($roleSlug === 'system_admin' || $roleSlug === 'admin') {
+                        $userRole = 'admin';
+                    } elseif (str_contains($roleSlug, 'hr')) {
+                        $userRole = 'hr_manager';
+                    } elseif (str_contains($roleSlug, 'supervisor') || str_contains($roleSlug, 'head')) {
+                        $userRole = 'supervisor';
+                    }
+
+                    DB::table('users')->insert([
+                        'name' => "{$firstName} {$lastName}",
+                        'email' => $email,
+                        'password' => Hash::make(Str::random(16)),
+                        'role' => $userRole,
+                        'employee_id' => $empId,
+                        'is_active' => $status === 'active',
+                        'must_change_password' => true,
+                        'email_verified_at' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                $imported++;
+            }
+
+            DB::commit();
+            fclose($handle);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            fclose($handle);
+
+            return back()->with('error', 'CSV Import failed: '.$e->getMessage());
+        }
+
+        $msg = "Imported {$imported} employees successfully.";
+        if ($skipped > 0) {
+            $msg .= " ({$skipped} duplicate or invalid rows skipped)";
+        }
+
+        return redirect()->route('employees.index')->with('success', $msg);
     }
 }

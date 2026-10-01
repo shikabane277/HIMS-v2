@@ -11,6 +11,7 @@ use App\Services\Ai\AiTypoCorrector;
 use App\Support\FuzzyMatch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -234,8 +235,9 @@ class AiController extends Controller
             ->where('session_id', $session->id)
             ->max('seq');
 
+        $msgId = (string) Str::uuid();
         DB::table('ai_chat_messages')->insert([
-            'id' => Str::uuid(),
+            'id' => $msgId,
             'user_id' => $userId,
             'session_id' => $session->id,
             'role' => 'user',
@@ -243,6 +245,16 @@ class AiController extends Controller
             'seq' => ++$seq,
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+
+        Log::info('AI Assistant Prompt Audit [RA 10173]', [
+            'user_id' => $userId,
+            'session_id' => $session->id,
+            'prompt_length' => strlen($prompt),
+            'prompt_preview' => Str::limit($prompt, 80),
+            'ip' => $request->ip(),
+            'compliance' => 'RA 10173 Audited',
+            'timestamp' => now()->toIso8601String(),
         ]);
 
         // The hard RBAC gate. Deliberately ahead of ask(): a refusal must not

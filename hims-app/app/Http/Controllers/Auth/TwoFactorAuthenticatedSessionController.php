@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\TwoFactorService;
+use App\Support\TotpService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -57,8 +58,8 @@ class TwoFactorAuthenticatedSessionController extends Controller
             return redirect()->route('login');
         }
 
-        $throttleKey = '2fa|' . $user->id . '|' . $request->ip();
-        $userThrottleKey = '2fa|' . $user->id;
+        $throttleKey = '2fa|'.$user->id.'|'.$request->ip();
+        $userThrottleKey = '2fa|'.$user->id;
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5) || RateLimiter::tooManyAttempts($userThrottleKey, 10)) {
             $seconds = max(RateLimiter::availableIn($throttleKey), RateLimiter::availableIn($userThrottleKey));
@@ -68,20 +69,24 @@ class TwoFactorAuthenticatedSessionController extends Controller
             ]);
         }
 
-        if (! $user->two_factor_expires_at || now()->gt($user->two_factor_expires_at)) {
-            throw ValidationException::withMessages([
-                'code' => 'The verification code has expired. Please click "Resend Code" to receive a new one.',
-            ]);
-        }
-
         $inputCode = trim((string) $request->input('code'));
 
-        if (! $user->two_factor_code || ! hash_equals($user->two_factor_code, hash('sha256', $inputCode))) {
+        $totpService = app(TotpService::class);
+        $isTotpValid = ! empty($user->totp_secret) && $totpService->verify($user->totp_secret, $inputCode);
+        $isEmailValid = ! empty($user->two_factor_code) && $user->two_factor_expires_at && now()->lte($user->two_factor_expires_at) && hash_equals($user->two_factor_code, hash('sha256', $inputCode));
+
+        if (! $isTotpValid && ! $isEmailValid) {
             RateLimiter::hit($throttleKey, 600);
             RateLimiter::hit($userThrottleKey, 600);
 
+            if ($user->two_factor_expires_at && now()->gt($user->two_factor_expires_at) && empty($user->totp_secret)) {
+                throw ValidationException::withMessages([
+                    'code' => 'The verification code has expired. Please click "Resend Code" to receive a new one.',
+                ]);
+            }
+
             throw ValidationException::withMessages([
-                'code' => 'The verification code is incorrect. Case matters: uppercase and lowercase characters must match exactly.',
+                'code' => 'The verification code is incorrect or expired. Enter the 6-character code from your email or the 6-digit code from your authenticator app.',
             ]);
         }
 
@@ -118,7 +123,7 @@ class TwoFactorAuthenticatedSessionController extends Controller
             return redirect()->route('login');
         }
 
-        $resendThrottleKey = '2fa-resend|' . $user->id;
+        $resendThrottleKey = '2fa-resend|'.$user->id;
         if (RateLimiter::tooManyAttempts($resendThrottleKey, 1)) {
             $seconds = RateLimiter::availableIn($resendThrottleKey);
 

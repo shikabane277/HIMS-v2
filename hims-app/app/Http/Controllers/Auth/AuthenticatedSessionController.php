@@ -8,6 +8,7 @@ use App\Services\TwoFactorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
@@ -50,7 +51,7 @@ class AuthenticatedSessionController extends Controller
                     "Email delivery is temporarily unavailable. Your verification code is: {$code}"
                 );
             }
-            \Illuminate\Support\Facades\Log::critical('2FA email delivery failed — code displayed on screen as fallback', [
+            Log::critical('2FA email delivery failed — code displayed on screen as fallback', [
                 'user_id' => $user->id,
             ]);
         }

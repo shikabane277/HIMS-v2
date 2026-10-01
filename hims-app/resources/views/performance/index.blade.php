@@ -11,11 +11,16 @@
         <h2 style="font-size:20px;font-weight:700;margin:0">Review Cycles</h2>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Manage employee evaluation cycles and appraisal forms.</p>
     </div>
-    @can('manage-review-cycles')
-        <button type="button" class="btn-hims btn-hims-primary" data-modal-open="cycleCreateModal">
-            <i class="bi bi-plus-circle"></i> New Cycle
-        </button>
-    @endcan
+    <div class="d-flex gap-2">
+        @can('manage-review-cycles')
+            <a href="{{ route('performance.kpis.index') }}" class="btn-hims btn-hims-outline">
+                <i class="bi bi-card-checklist"></i> KPI Library
+            </a>
+            <button type="button" class="btn-hims btn-hims-primary" data-modal-open="cycleCreateModal">
+                <i class="bi bi-plus-circle"></i> New Cycle
+            </button>
+        @endcan
+    </div>
 </div>
 
 <div class="row g-3 mb-4">

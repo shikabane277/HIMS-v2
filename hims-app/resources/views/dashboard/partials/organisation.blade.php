@@ -133,6 +133,18 @@
                 </table>
             </div>
         </div>
+</div>
+
+{{-- Performance Trends Chart --}}
+<div class="hims-card mb-4 animate-in">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5><i class="bi bi-graph-up text-primary-hims"></i> Evaluation Score Trends</h5>
+        <span class="text-muted" style="font-size:12.5px"><i class="bi bi-clock-history"></i> Hospital-wide Review Trajectory</span>
+    </div>
+    <div class="card-body" style="padding:16px 20px">
+        <div style="height:200px;position:relative">
+            <canvas id="dashboardTrendChart"></canvas>
+        </div>
     </div>
 </div>
 

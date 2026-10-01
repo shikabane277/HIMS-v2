@@ -13,12 +13,19 @@ class NewCrudsAndRbacTest extends TestCase
     use RefreshDatabase;
 
     private string $deptId;
+
     private string $roleId;
+
     private string $adminEmpId;
+
     private User $adminUser;
+
     private string $supervisorEmpId;
+
     private User $supervisorUser;
+
     private string $staffEmpId;
+
     private User $staffUser;
 
     protected function setUp(): void

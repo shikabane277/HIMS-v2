@@ -57,9 +57,14 @@
                     {!! $dept->is_clinical ? '<i class="bi bi-hospital text-primary-hims"></i>' : '<i class="bi bi-folder2" style="color:#6b7280"></i>' !!}
                     {{ $dept->name }}
                 </h5>
-                <span class="hims-badge {{ $dept->is_clinical ? 'blue' : 'gray' }}">
-                    {{ $dept->is_clinical ? 'Clinical' : 'Administrative' }}
-                </span>
+                <div class="d-flex gap-1 align-items-center">
+                    <span class="hims-badge {{ $dept->is_clinical ? 'blue' : 'gray' }}">
+                        {{ $dept->is_clinical ? 'Clinical' : 'Administrative' }}
+                    </span>
+                    <span class="hims-badge {{ ($dept->is_active ?? true) ? 'green' : 'gray' }}">
+                        {{ ($dept->is_active ?? true) ? 'Active' : 'Inactive' }}
+                    </span>
+                </div>
             </div>
             <div class="card-body" style="padding:16px 20px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -71,6 +76,10 @@
                         <div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Staff Count</div>
                         <div style="font-size:22px;font-weight:800;color:var(--hims-text-dark)">{{ $dept->employee_count ?? 0 }}</div>
                     </div>
+                </div>
+
+                <div style="font-size:12px;color:#4b5563;margin-bottom:12px">
+                    <i class="bi bi-person-badge"></i> Head: <strong>{{ $dept->head_name ?: 'None Assigned' }}</strong>
                 </div>
 
                 @if($dept->employee_count > 0)
@@ -96,7 +105,9 @@
                             data-action="{{ route('departments.update', $dept->department_id) }}"
                             data-name="{{ $dept->name }}"
                             data-code="{{ $dept->department_code ?? '' }}"
-                            data-clinical="{{ $dept->is_clinical ? '1' : '0' }}">
+                            data-clinical="{{ $dept->is_clinical ? '1' : '0' }}"
+                            data-head="{{ $dept->head_employee_id ?? '' }}"
+                            data-active="{{ ($dept->is_active ?? true) ? '1' : '0' }}">
                         <i class="bi bi-pencil"></i>
                     </button>
                     @if(($dept->employee_count ?? 0) === 0)
@@ -154,6 +165,20 @@
                         <option value="0">Administrative</option>
                     </select>
                 </div>
+                <div class="mb-3">
+                    <label class="hims-label">Department Head</label>
+                    <select name="head_employee_id" class="hims-input hims-select">
+                        <option value="">-- No Head Assigned --</option>
+                        @foreach($employees ?? [] as $emp)
+                            <option value="{{ $emp->employee_id }}">{{ $emp->first_name }} {{ $emp->last_name }} ({{ $emp->employee_code }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="d-flex align-items-center gap-2" style="cursor:pointer;font-size:13px;font-weight:600">
+                        <input type="checkbox" name="is_active" value="1" checked> Active Department
+                    </label>
+                </div>
             </div>
             <div class="hims-modal-footer">
                 <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
@@ -189,6 +214,20 @@
                         <option value="0">Administrative</option>
                     </select>
                 </div>
+                <div class="mb-3">
+                    <label class="hims-label">Department Head</label>
+                    <select name="head_employee_id" id="edit_dept_head" class="hims-input hims-select">
+                        <option value="">-- No Head Assigned --</option>
+                        @foreach($employees ?? [] as $emp)
+                            <option value="{{ $emp->employee_id }}">{{ $emp->first_name }} {{ $emp->last_name }} ({{ $emp->employee_code }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="d-flex align-items-center gap-2" style="cursor:pointer;font-size:13px;font-weight:600">
+                        <input type="checkbox" name="is_active" id="edit_dept_active" value="1"> Active Department
+                    </label>
+                </div>
             </div>
             <div class="hims-modal-footer">
                 <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
@@ -211,6 +250,8 @@ document.addEventListener('click', function(e) {
     document.getElementById('edit_dept_name').value = btn.dataset.name;
     document.getElementById('edit_dept_code').value = btn.dataset.code;
     document.getElementById('edit_dept_clinical').value = btn.dataset.clinical;
+    document.getElementById('edit_dept_head').value = btn.dataset.head || '';
+    document.getElementById('edit_dept_active').checked = btn.dataset.active === '1';
 });
 </script>
 @endpush

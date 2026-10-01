@@ -17,6 +17,9 @@
     </div>
     @can('manage-employees')
     <div class="d-flex gap-2">
+        <button type="button" class="btn-hims btn-hims-outline" data-modal-open="importEmployeeModal">
+            <i class="bi bi-file-earmark-arrow-up"></i> Import CSV
+        </button>
         <a href="{{ route('employees.manager-setup') }}" class="btn-hims btn-hims-outline">
             <i class="bi bi-person-check-fill"></i> Manager Setup
         </a>
@@ -172,4 +175,43 @@
     @endif
 </div>
 
+@can('manage-employees')
+<div class="hims-modal-backdrop" id="importEmployeeModal" role="dialog" aria-modal="true">
+    <div class="hims-modal">
+        <div class="hims-modal-header">
+            <h5><i class="bi bi-file-earmark-arrow-up"></i> Import Employees from CSV</h5>
+            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
+        </div>
+        <form method="POST" action="{{ route('employees.import') }}" enctype="multipart/form-data">
+            @csrf
+            <div class="hims-modal-body">
+                <p style="font-size:13px;color:#6b7280;margin-bottom:14px">
+                    Upload a CSV file to batch-import staff records. New user logins with temporary passwords will automatically be generated.
+                </p>
+                <div class="mb-3">
+                    <label class="hims-label" for="employee_csv">Select CSV File *</label>
+                    <input type="file" name="csv_file" id="employee_csv" class="hims-input" accept=".csv,text/csv" required>
+                </div>
+                <div class="p-3" style="background:#f8fafc;border-radius:6px;font-size:12.5px;color:#4b5563">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong>Expected Columns:</strong>
+                        <a href="{{ route('employees.import.template') }}" class="btn-hims btn-hims-ghost btn-sm" style="padding:2px 8px;font-size:12px">
+                            <i class="bi bi-download"></i> Download Template
+                        </a>
+                    </div>
+                    <code style="display:block;font-size:11px;color:#2563eb;word-break:break-all">
+                        first_name, last_name, email, department_code, role_slug, position_title, employment_status, hire_date
+                    </code>
+                </div>
+            </div>
+            <div class="hims-modal-footer">
+                <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
+                <button type="submit" class="btn-hims btn-hims-primary"><i class="bi bi-upload"></i> Upload & Import</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endcan
+
+@include('partials.modal-js')
 @endsection

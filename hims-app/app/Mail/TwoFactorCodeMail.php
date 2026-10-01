@@ -20,7 +20,7 @@ class TwoFactorCodeMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your HIMS Verification Code: ' . $this->code,
+            subject: 'Your HIMS Verification Code: '.$this->code,
         );
     }
 

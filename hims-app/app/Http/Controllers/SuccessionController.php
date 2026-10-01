@@ -436,6 +436,46 @@ class SuccessionController extends Controller
         return redirect()->route('succession.index')->with('success', 'Candidate withdrawn from the pipeline.');
     }
 
+    public function approveCandidate($id)
+    {
+        abort_unless($this->canSeeConfidentialSuccessionData(), 403, 'Only HR Managers and Administrators can approve succession nominations.');
+
+        $before = $this->successionCandidate($id);
+
+        $after = [
+            'status' => 'approved',
+            'reviewed_at' => now(),
+            'approved_at' => now(),
+        ];
+
+        DB::table('succession_candidates')->where('candidate_id', $id)->update($after);
+
+        AuditTrail::record('succession_candidate_approved', 'succession_candidates', $id,
+            beforeState: (array) $before, afterState: $after);
+
+        return redirect()->route('succession.candidates.show', $id)->with('success', 'Candidate nomination approved successfully.');
+    }
+
+    public function rejectCandidate($id)
+    {
+        abort_unless($this->canSeeConfidentialSuccessionData(), 403, 'Only HR Managers and Administrators can reject succession nominations.');
+
+        $before = $this->successionCandidate($id);
+
+        $after = [
+            'status' => 'rejected',
+            'reviewed_at' => now(),
+            'approved_at' => null,
+        ];
+
+        DB::table('succession_candidates')->where('candidate_id', $id)->update($after);
+
+        AuditTrail::record('succession_candidate_rejected', 'succession_candidates', $id,
+            beforeState: (array) $before, afterState: $after);
+
+        return redirect()->route('succession.candidates.show', $id)->with('success', 'Candidate nomination rejected.');
+    }
+
     /** Add a development milestone to a candidate's leadership path. */
     public function storeMilestone(Request $request, $id)
     {

@@ -94,7 +94,7 @@
                 <div style="display:grid;gap:12px;font-size:13px">
                     <div>
                         <div class="hims-label" style="margin-bottom:2px">Status</div>
-                        <span class="hims-badge {{ $candidate->status === 'approved' ? 'green' : 'gray' }}">
+                        <span class="hims-badge {{ $candidate->status === 'approved' ? 'green' : ($candidate->status === 'rejected' ? 'red' : 'yellow') }}">
                             {{ ucfirst(str_replace('_',' ', (string) $candidate->status)) }}
                         </span>
                     </div>
@@ -122,6 +122,38 @@
                             <span style="color:#9ca3af">No rationale recorded</span>
                         @endif
                     </div>
+                    @can('manage-succession')
+                    <div style="border-top:1px solid var(--hims-border);padding-top:12px;margin-top:4px">
+                        <div class="hims-label" style="margin-bottom:8px">Succession Approval Workflow</div>
+                        <div class="d-flex gap-2" style="flex-wrap:wrap">
+                            @if($candidate->status !== 'approved')
+                            <form method="POST" action="{{ route('succession.candidates.approve', $candidate->candidate_id) }}" onsubmit="return confirm('Approve nomination for {{ addslashes($candidate->employee_name) }}?')">
+                                @csrf
+                                <button type="submit" class="btn-hims btn-hims-primary btn-sm" style="background:#16a34a;border-color:#16a34a">
+                                    <i class="bi bi-check-circle-fill"></i> Approve Nomination
+                                </button>
+                            </form>
+                            @endif
+
+                            @if($candidate->status !== 'rejected')
+                            <form method="POST" action="{{ route('succession.candidates.reject', $candidate->candidate_id) }}" onsubmit="return confirm('Reject nomination for {{ addslashes($candidate->employee_name) }}?')">
+                                @csrf
+                                <button type="submit" class="btn-hims btn-sm" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 12px;cursor:pointer">
+                                    <i class="bi bi-x-circle"></i> Reject
+                                </button>
+                            </form>
+                            @endif
+
+                            <form method="POST" action="{{ route('succession.candidates.withdraw', $candidate->candidate_id) }}" onsubmit="return confirm('Withdraw candidate from pipeline?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn-hims btn-hims-ghost btn-sm" style="color:#6b7280">
+                                    Withdraw
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    @endcan
                 </div>
             </div>
         </div>

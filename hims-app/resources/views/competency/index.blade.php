@@ -118,14 +118,26 @@
     </div>
     <div class="card-body" style="padding:0">
         <table class="hims-table">
-            <thead><tr><th>Domain</th><th>Categories</th><th>Competencies</th><th>JCI Reference</th><th>Actions</th></tr></thead>
+        <table class="hims-table">
+            <thead><tr><th>Domain</th><th>Categories</th><th>Competencies</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
                 @forelse($domains ?? [] as $domain)
                 <tr>
-                    <td data-label="Domain"><strong>{{ $domain->domain_name }}</strong></td>
+                    <td data-label="Domain">
+                        <strong>{{ $domain->domain_name }}</strong>
+                        @if(!empty($domain->description))
+                            <div style="font-size:12px;color:#6b7280;margin-top:2px">{{ Str::limit($domain->description, 60) }}</div>
+                        @endif
+                    </td>
                     <td data-label="Categories">{{ $domain->categories_count ?? 0 }}</td>
                     <td data-label="Competencies">{{ $domain->competencies_count ?? 0 }}</td>
-                    <td data-label="JCI Reference"><span class="hims-badge blue">{{ $domain->jci_codes ?? 'SQE' }}</span></td>
+                    <td data-label="Status">
+                        @if($domain->is_active ?? true)
+                            <span class="hims-badge green">Active</span>
+                        @else
+                            <span class="hims-badge gray">Inactive</span>
+                        @endif
+                    </td>
                     <td data-label="Actions">
                         <div class="d-flex gap-2">
                             <a href="{{ route('competency.domains.show', $domain->domain_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
@@ -135,9 +147,18 @@
                                     data-domain-edit
                                     data-action="{{ route('competency.domains.update', $domain->domain_id) }}"
                                     data-name="{{ $domain->domain_name }}"
-                                    data-desc="{{ $domain->description ?? '' }}">
+                                    data-desc="{{ $domain->description ?? '' }}"
+                                    data-active="{{ ($domain->is_active ?? true) ? '1' : '0' }}">
                                 Edit
                             </button>
+                            <form method="POST" action="{{ route('competency.domains.toggle-status', $domain->domain_id) }}">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit" class="btn-hims btn-sm"
+                                        style="background:{{ ($domain->is_active ?? true) ? '#fef3c7' : '#dcfce7' }};color:{{ ($domain->is_active ?? true) ? '#b45309' : '#15803d' }};border:none;border-radius:8px;padding:6px 10px;cursor:pointer">
+                                    {{ ($domain->is_active ?? true) ? 'Deactivate' : 'Activate' }}
+                                </button>
+                            </form>
                             <form method="POST" action="{{ route('competency.domains.destroy', $domain->domain_id) }}"
                                   onsubmit="return confirm('Delete competency domain {{ addslashes($domain->domain_name) }}?')">
                                 @csrf

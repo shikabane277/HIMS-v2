@@ -76,6 +76,11 @@
             <span class="nav-icon"><i class="bi bi-trophy"></i></span> Succession
         </a>
         @endcan
+        @if(auth()->user() && auth()->user()->role !== 'staff')
+        <a href="{{ route('reports.index') }}" class="sidebar-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">
+            <span class="nav-icon"><i class="bi bi-file-earmark-bar-graph"></i></span> Reports & Analytics
+        </a>
+        @endif
 
         @canany(['view-employees','manage-departments','manage-users'])
         <div class="sidebar-section-label">Admin</div>
