@@ -11,14 +11,57 @@ use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::orderBy('name')->paginate(25);
+        $query = User::query();
+
+        if ($search = trim((string) $request->input('search'))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($role = $request->input('role')) {
+            $query->where('role', $role);
+        }
+
+        $sort = $request->input('sort', 'latest');
+        if ($sort === 'name') {
+            $query->orderBy('name');
+        } else {
+            $query->orderByDesc('created_at')->orderByDesc('id');
+        }
+
+        $users = $query->paginate(25)->withQueryString();
         $total = User::count();
 
         $aiSettings = DB::table('system_settings')->pluck('value', 'key')->all();
 
-        return view('users.index', compact('users', 'total', 'aiSettings'));
+        $employees = DB::table('employees')
+            ->whereNotIn('employee_id', function ($q) {
+                $q->select('employee_id')->from('users')->whereNotNull('employee_id');
+            })
+            ->orderBy('first_name')
+            ->get();
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'total' => $total,
+                'stats' => [
+                    'total' => $total,
+                    'admins' => User::where('role', 'admin')->count(),
+                    'managers' => User::whereIn('role', ['hr_manager', 'supervisor'])->count(),
+                    'locked' => User::whereNotNull('locked_until')->where('locked_until', '>', now())->count(),
+                ],
+                'users' => $users->items(),
+                'html' => view('users._table_rows', compact('users'))->render(),
+                'pagination_html' => $users->hasPages() ? (string) $users->links() : '',
+            ]);
+        }
+
+        return view('users.index', compact('users', 'total', 'aiSettings', 'employees'));
     }
 
     public function create()
@@ -35,28 +78,95 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $email = strtolower(trim((string) $request->email));
+        $request->merge(['email' => $email]);
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            'email' => 'required|string|email|max:255|unique:users,email',
             'password' => ['required', 'confirmed', Password::min(8)],
             'role' => 'required|in:admin,hr_manager,supervisor,staff',
             'employee_id' => 'nullable|string|exists:employees,employee_id|unique:users,employee_id',
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role,
-            'employee_id' => $request->employee_id ?: null,
-            'email_verified_at' => now(),
-        ]);
+        if ($validator->fails()) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => $validator->errors()->first(),
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            $validator->validate();
+        }
+
+        try {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'role' => $request->role,
+                'employee_id' => $request->employee_id ?: null,
+                'email_verified_at' => now(),
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            $msg = $e->getMessage();
+            $code = $e->getCode();
+            $driverCode = $e->errorInfo[1] ?? null;
+
+            if ($code == 23000 || $driverCode == 1062) {
+                if (str_contains($msg, 'users_email_unique') || str_contains($msg, 'email')) {
+                    if ($request->wantsJson() || $request->ajax()) {
+                        return response()->json([
+                            'message' => 'A user with this email address already exists.',
+                            'errors' => ['email' => ['A user with this email address already exists.']],
+                        ], 422);
+                    }
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'email' => 'A user with this email address already exists.',
+                    ]);
+                }
+                if (str_contains($msg, 'users_employee_id_unique') || str_contains($msg, 'employee_id')) {
+                    if ($request->wantsJson() || $request->ajax()) {
+                        return response()->json([
+                            'message' => 'This employee already has an associated user account.',
+                            'errors' => ['employee_id' => ['This employee already has an associated user account.']],
+                        ], 422);
+                    }
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'employee_id' => 'This employee already has an associated user account.',
+                    ]);
+                }
+            }
+
+            throw $e;
+        }
 
         AuditTrail::record('create_user', 'users', (string) $user->id, afterState: [
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->role,
         ]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "User \"{$user->name}\" created successfully.",
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'is_active' => (bool) ($user->is_active ?? true),
+                    'employee_id' => $user->employee_id,
+                ],
+                'stats' => [
+                    'total' => User::count(),
+                    'admins' => User::where('role', 'admin')->count(),
+                    'managers' => User::whereIn('role', ['hr_manager', 'supervisor'])->count(),
+                    'locked' => User::whereNotNull('locked_until')->where('locked_until', '>', now())->count(),
+                ],
+            ]);
+        }
 
         return redirect()->route('users.index')->with('success', "User \"{$request->name}\" created successfully.");
     }
@@ -77,9 +187,12 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        $email = strtolower(trim((string) $request->email));
+        $request->merge(['email' => $email]);
+
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => "required|email|unique:users,email,{$user->id}",
+            'email' => "required|string|email|max:255|unique:users,email,{$user->id}",
             'role' => 'required|in:admin,hr_manager,supervisor,staff',
             'employee_id' => "nullable|string|exists:employees,employee_id|unique:users,employee_id,{$user->id}",
         ]);
@@ -91,16 +204,37 @@ class UserController extends Controller
 
         $beforeState = $user->toArray();
 
-        $user->update([
-            'name' => $request->name,
-            'email' => $request->email,
-            'role' => $request->role,
-            'employee_id' => $request->employee_id ?: null,
-        ]);
+        try {
+            $user->update([
+                'name' => $request->name,
+                'email' => $request->email,
+                'role' => $request->role,
+                'employee_id' => $request->employee_id ?: null,
+            ]);
 
-        if ($request->filled('password')) {
-            $request->validate(['password' => ['confirmed', Password::min(8)]]);
-            $user->update(['password' => Hash::make($request->password)]);
+            if ($request->filled('password')) {
+                $request->validate(['password' => ['confirmed', Password::min(8)]]);
+                $user->update(['password' => Hash::make($request->password)]);
+            }
+        } catch (\Illuminate\Database\QueryException $e) {
+            $msg = $e->getMessage();
+            $code = $e->getCode();
+            $driverCode = $e->errorInfo[1] ?? null;
+
+            if ($code == 23000 || $driverCode == 1062) {
+                if (str_contains($msg, 'users_email_unique') || str_contains($msg, 'email')) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'email' => 'A user with this email address already exists.',
+                    ]);
+                }
+                if (str_contains($msg, 'users_employee_id_unique') || str_contains($msg, 'employee_id')) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'employee_id' => 'This employee already has an associated user account.',
+                    ]);
+                }
+            }
+
+            throw $e;
         }
 
         AuditTrail::record('update_user', 'users', (string) $user->id, beforeState: $beforeState, afterState: [

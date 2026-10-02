@@ -979,6 +979,10 @@
                     : null;
                 appendMsg(data.response ?? 'No response.', 'ai', variant);
 
+                if (data.action_status === 'ok') {
+                    window.dispatchEvent(new CustomEvent('hims:data-mutated', { detail: data }));
+                }
+
                 if (data.session_id) {
                     const isNew = data.session_id !== sessionId;
                     sessionId = data.session_id;
@@ -1006,6 +1010,27 @@
         // does not steal the caret from the page's own first field.
         if (localStorage.getItem(OPEN_KEY)) openRail(true);
     });
+</script>
+<script>
+    document.addEventListener('submit', function (e) {
+        const form = e.target;
+        if (!form || form.tagName !== 'FORM') return;
+        if (form.method && form.method.toUpperCase() === 'GET') return;
+        if (form.dataset.submitting === 'true') {
+            e.preventDefault();
+            return false;
+        }
+        if (form.checkValidity && !form.checkValidity()) {
+            return;
+        }
+        form.dataset.submitting = 'true';
+        const submitBtn = form.querySelector('button[type="submit"]:not([data-no-disable]), input[type="submit"]:not([data-no-disable])');
+        if (submitBtn) {
+            setTimeout(() => {
+                submitBtn.disabled = true;
+            }, 0);
+        }
+    }, true);
 </script>
 <script src="{{ asset('js/hims-select.js') }}?v={{ file_exists(public_path('js/hims-select.js')) ? filemtime(public_path('js/hims-select.js')) : 1 }}"></script>
 @stack('scripts')

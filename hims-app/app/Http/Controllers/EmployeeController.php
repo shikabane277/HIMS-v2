@@ -67,10 +67,13 @@ class EmployeeController extends Controller
 
     public function store(Request $request)
     {
+        $email = strtolower(trim((string) $request->email));
+        $request->merge(['email' => $email]);
+
         $request->validate([
             'first_name' => 'required|string|max:100',
             'last_name' => 'required|string|max:100',
-            'email' => 'required|email|unique:employees',
+            'email' => 'required|string|email|max:255|unique:employees,email',
             'department_id' => 'required|string|exists:departments,department_id',
             'role_id' => 'required|string|exists:roles,role_id',
             'position_title' => 'nullable|string|max:200',
@@ -81,37 +84,70 @@ class EmployeeController extends Controller
             'phone' => 'nullable|string|max:100',
         ]);
 
-        $empCode = 'EMP-'.strtoupper(Str::random(6));
+        do {
+            $empCode = 'EMP-'.strtoupper(Str::random(6));
+        } while (DB::table('employees')->where('employee_code', $empCode)->exists());
+
         $encPhone = $request->phone ? Crypt::encryptString($request->phone) : null;
         $empId = (string) Str::uuid();
         $supervisorId = $request->supervisor_id ?: null;
         $isPeopleManager = $request->boolean('is_people_manager');
 
-        DB::transaction(function () use ($empId, $empCode, $request, $encPhone, $supervisorId, $isPeopleManager) {
-            $graph = $this->reportingLines->reportingGraph(true);
-            $assignmentError = $this->reportingLines->assignmentError($empId, $supervisorId, true, $graph);
+        try {
+            DB::transaction(function () use ($empId, $empCode, $request, $encPhone, $supervisorId, $isPeopleManager) {
+                if (DB::table('employees')->where('email', $request->email)->exists()) {
+                    throw ValidationException::withMessages([
+                        'email' => 'An employee with this email address already exists.',
+                    ]);
+                }
 
-            if ($assignmentError) {
-                throw ValidationException::withMessages(['supervisor_id' => $assignmentError]);
+                $graph = $this->reportingLines->reportingGraph(true);
+                $assignmentError = $this->reportingLines->assignmentError($empId, $supervisorId, true, $graph);
+
+                if ($assignmentError) {
+                    throw ValidationException::withMessages(['supervisor_id' => $assignmentError]);
+                }
+
+                DB::table('employees')->insert([
+                    'employee_id' => $empId,
+                    'employee_code' => $empCode,
+                    'first_name' => $request->first_name,
+                    'last_name' => $request->last_name,
+                    'email' => $request->email,
+                    'phone' => $encPhone,
+                    'department_id' => $request->department_id,
+                    'role_id' => $request->role_id,
+                    'position_title' => $request->position_title,
+                    'hire_date' => $request->hire_date,
+                    'employment_status' => $request->employment_status,
+                    'is_people_manager' => $isPeopleManager,
+                    'supervisor_id' => $supervisorId,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            $msg = $e->getMessage();
+            $code = $e->getCode();
+            $driverCode = $e->errorInfo[1] ?? null;
+
+            if ($code == 23000 || $driverCode == 1062) {
+                if (str_contains($msg, 'employees_email_unique') || str_contains($msg, 'email')) {
+                    throw ValidationException::withMessages([
+                        'email' => 'An employee with this email address already exists.',
+                    ]);
+                }
+                if (str_contains($msg, 'employees_employee_code_unique') || str_contains($msg, 'employee_code')) {
+                    throw ValidationException::withMessages([
+                        'first_name' => 'Could not generate a unique employee code. Please try saving again.',
+                    ]);
+                }
+                throw ValidationException::withMessages([
+                    'email' => 'An employee with this record already exists in the system.',
+                ]);
             }
 
-            DB::table('employees')->insert([
-                'employee_id' => $empId,
-                'employee_code' => $empCode,
-                'first_name' => $request->first_name,
-                'last_name' => $request->last_name,
-                'email' => $request->email,
-                'phone' => $encPhone,
-                'department_id' => $request->department_id,
-                'role_id' => $request->role_id,
-                'position_title' => $request->position_title,
-                'hire_date' => $request->hire_date,
-                'employment_status' => $request->employment_status,
-                'is_people_manager' => $isPeopleManager,
-                'supervisor_id' => $supervisorId,
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-        });
+            throw $e;
+        }
 
         AuditTrail::record('create_employee', 'employees', $empId, afterState: [
             'first_name' => $request->first_name,
@@ -352,10 +388,13 @@ class EmployeeController extends Controller
         abort_if(! $employee, 404);
         $this->authorizeEmployeeAccess($id);
 
+        $email = strtolower(trim((string) $request->email));
+        $request->merge(['email' => $email]);
+
         $request->validate([
             'first_name' => 'required|string|max:100',
             'last_name' => 'required|string|max:100',
-            'email' => 'required|email|max:255|unique:employees,email,'.$id.',employee_id',
+            'email' => 'required|string|email|max:255|unique:employees,email,'.$id.',employee_id',
             'department_id' => 'required|string|exists:departments,department_id',
             'role_id' => 'required|string|exists:roles,role_id',
             'position_title' => 'nullable|string|max:200',
@@ -374,69 +413,94 @@ class EmployeeController extends Controller
 
         $beforeState = (array) $employee;
 
-        DB::transaction(function () use (
-            $id,
-            $employee,
-            $request,
-            $encPhone,
-            $supervisorId,
-            $isPeopleManager,
-            $supervisorChanged
-        ) {
-            $graph = $this->reportingLines->reportingGraph(true);
-            $directReportCount = collect($graph)->filter(fn ($managerId) => $managerId === $id)->count();
-
-            if (! $isPeopleManager && $directReportCount > 0) {
-                throw ValidationException::withMessages([
-                    'is_people_manager' => "Reassign this manager's {$directReportCount} direct report(s) before removing People Manager status.",
-                ]);
-            }
-
-            $assignmentError = $this->reportingLines->assignmentError(
+        try {
+            DB::transaction(function () use (
                 $id,
+                $employee,
+                $request,
+                $encPhone,
                 $supervisorId,
-                $supervisorChanged,
-                $graph
-            );
-
-            if ($assignmentError) {
-                throw ValidationException::withMessages(['supervisor_id' => $assignmentError]);
-            }
-
-            DB::table('employees')->where('employee_id', $id)->update([
-                'first_name' => $request->first_name,
-                'last_name' => $request->last_name,
-                'email' => $request->email,
-                'phone' => $encPhone,
-                'department_id' => $request->department_id,
-                'role_id' => $request->role_id,
-                'position_title' => $request->position_title,
-                'hire_date' => $request->hire_date,
-                'employment_status' => $request->employment_status,
-                'is_people_manager' => $isPeopleManager,
-                'supervisor_id' => $supervisorId,
-                'updated_at' => now(),
-            ]);
-
-            // Automatic user account deactivation when employee is terminated/resigned/suspended
-            if (in_array($request->employment_status, ['terminated', 'resigned', 'suspended'], true)) {
-                $affected = DB::table('users')->where('employee_id', $id)->where('is_active', true)->update([
-                    'is_active' => false,
-                    'updated_at' => now(),
-                ]);
-                if ($affected > 0) {
-                    AuditTrail::record('user_account_auto_deactivated', 'users', $id, afterState: [
-                        'reason' => 'employee_status_'.$request->employment_status,
-                        'employee_id' => $id,
+                $isPeopleManager,
+                $supervisorChanged
+            ) {
+                if (DB::table('employees')->where('email', $request->email)->where('employee_id', '!=', $id)->exists()) {
+                    throw ValidationException::withMessages([
+                        'email' => 'An employee with this email address already exists.',
                     ]);
                 }
-            } elseif ($request->employment_status === 'active' && $employee->employment_status !== 'active') {
-                DB::table('users')->where('employee_id', $id)->where('is_active', false)->update([
-                    'is_active' => true,
+
+                $graph = $this->reportingLines->reportingGraph(true);
+                $directReportCount = collect($graph)->filter(fn ($managerId) => $managerId === $id)->count();
+
+                if (! $isPeopleManager && $directReportCount > 0) {
+                    throw ValidationException::withMessages([
+                        'is_people_manager' => "Reassign this manager's {$directReportCount} direct report(s) before removing People Manager status.",
+                    ]);
+                }
+
+                $assignmentError = $this->reportingLines->assignmentError(
+                    $id,
+                    $supervisorId,
+                    $supervisorChanged,
+                    $graph
+                );
+
+                if ($assignmentError) {
+                    throw ValidationException::withMessages(['supervisor_id' => $assignmentError]);
+                }
+
+                DB::table('employees')->where('employee_id', $id)->update([
+                    'first_name' => $request->first_name,
+                    'last_name' => $request->last_name,
+                    'email' => $request->email,
+                    'phone' => $encPhone,
+                    'department_id' => $request->department_id,
+                    'role_id' => $request->role_id,
+                    'position_title' => $request->position_title,
+                    'hire_date' => $request->hire_date,
+                    'employment_status' => $request->employment_status,
+                    'is_people_manager' => $isPeopleManager,
+                    'supervisor_id' => $supervisorId,
                     'updated_at' => now(),
                 ]);
+
+                // Automatic user account deactivation when employee is terminated/resigned/suspended
+                if (in_array($request->employment_status, ['terminated', 'resigned', 'suspended'], true)) {
+                    $affected = DB::table('users')->where('employee_id', $id)->where('is_active', true)->update([
+                        'is_active' => false,
+                        'updated_at' => now(),
+                    ]);
+                    if ($affected > 0) {
+                        AuditTrail::record('user_account_auto_deactivated', 'users', $id, afterState: [
+                            'reason' => 'employee_status_'.$request->employment_status,
+                            'employee_id' => $id,
+                        ]);
+                    }
+                } elseif ($request->employment_status === 'active' && $employee->employment_status !== 'active') {
+                    DB::table('users')->where('employee_id', $id)->where('is_active', false)->update([
+                        'is_active' => true,
+                        'updated_at' => now(),
+                    ]);
+                }
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            $msg = $e->getMessage();
+            $code = $e->getCode();
+            $driverCode = $e->errorInfo[1] ?? null;
+
+            if ($code == 23000 || $driverCode == 1062) {
+                if (str_contains($msg, 'employees_email_unique') || str_contains($msg, 'email')) {
+                    throw ValidationException::withMessages([
+                        'email' => 'An employee with this email address already exists.',
+                    ]);
+                }
+                throw ValidationException::withMessages([
+                    'email' => 'An employee with this record already exists in the system.',
+                ]);
             }
-        });
+
+            throw $e;
+        }
 
         AuditTrail::record('update_employee', 'employees', $id, beforeState: $beforeState, afterState: [
             'first_name' => $request->first_name,
@@ -558,7 +622,7 @@ class EmployeeController extends Controller
                 }
 
                 $data = array_combine($header, array_pad($row, count($header), ''));
-                $email = trim($data['email'] ?? '');
+                $email = strtolower(trim($data['email'] ?? ''));
                 $firstName = trim($data['first_name'] ?? '');
                 $lastName = trim($data['last_name'] ?? '');
 

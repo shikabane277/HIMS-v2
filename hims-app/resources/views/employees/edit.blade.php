@@ -34,25 +34,34 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('employees.update', $employee->employee_id) }}">
+                <form method="POST" action="{{ route('employees.update', $employee->employee_id) }}" id="editEmployeeForm">
                     @csrf
                     @method('PUT')
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="hims-label">First Name *</label>
-                            <input type="text" name="first_name" class="hims-input" required maxlength="100"
+                            <input type="text" name="first_name" class="hims-input @error('first_name') is-invalid @enderror" required maxlength="100"
                                    value="{{ old('first_name', $employee->first_name) }}">
+                            @error('first_name')
+                                <div style="font-size:12px;color:#ef4444;margin-top:4px"><i class="bi bi-exclamation-circle"></i> {{ $message }}</div>
+                            @enderror
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Last Name *</label>
-                            <input type="text" name="last_name" class="hims-input" required maxlength="100"
+                            <input type="text" name="last_name" class="hims-input @error('last_name') is-invalid @enderror" required maxlength="100"
                                    value="{{ old('last_name', $employee->last_name) }}">
+                            @error('last_name')
+                                <div style="font-size:12px;color:#ef4444;margin-top:4px"><i class="bi bi-exclamation-circle"></i> {{ $message }}</div>
+                            @enderror
                         </div>
 
                         <div class="col-md-6">
                             <label class="hims-label">Email Address *</label>
-                            <input type="email" name="email" class="hims-input" required maxlength="255"
+                            <input type="email" name="email" class="hims-input @error('email') is-invalid @enderror" required maxlength="255"
                                    value="{{ old('email', $employee->email) }}">
+                            @error('email')
+                                <div style="font-size:12px;color:#ef4444;margin-top:4px"><i class="bi bi-exclamation-circle"></i> {{ $message }}</div>
+                            @enderror
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Phone</label>
@@ -168,7 +177,7 @@
 
                         <div class="col-12 mt-3 d-flex gap-2 justify-content-end">
                             <a href="{{ route('employees.show', $employee->employee_id) }}" class="btn-hims btn-hims-outline">Cancel</a>
-                            <button type="submit" class="btn-hims btn-hims-primary">
+                            <button type="submit" class="btn-hims btn-hims-primary" id="saveEditEmployeeBtn">
                                 <i class="bi bi-check-circle"></i> Save Changes
                             </button>
                         </div>
@@ -186,17 +195,30 @@
         const select = document.querySelector('select[name="supervisor_id"]');
         const setupWarning = document.getElementById('managerSetupWarning');
         const noManagerWarning = document.getElementById('noManagerWarning');
-        if (!select || !setupWarning || !noManagerWarning) return;
+        if (select && setupWarning && noManagerWarning) {
+            const sync = () => {
+                const option = select.options[select.selectedIndex];
+                const hasManager = Boolean(select.value);
+                noManagerWarning.style.display = hasManager ? 'none' : 'flex';
+                setupWarning.style.display = hasManager && option?.dataset.setupComplete === '0' ? 'flex' : 'none';
+            };
 
-        const sync = () => {
-            const option = select.options[select.selectedIndex];
-            const hasManager = Boolean(select.value);
-            noManagerWarning.style.display = hasManager ? 'none' : 'flex';
-            setupWarning.style.display = hasManager && option?.dataset.setupComplete === '0' ? 'flex' : 'none';
-        };
+            select.addEventListener('change', sync);
+            sync();
+        }
 
-        select.addEventListener('change', sync);
-        sync();
+        const form = document.getElementById('editEmployeeForm');
+        const btn = document.getElementById('saveEditEmployeeBtn');
+        if (form && btn) {
+            form.addEventListener('submit', (e) => {
+                if (btn.disabled) {
+                    e.preventDefault();
+                    return false;
+                }
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="width:0.9rem;height:0.9rem;border-width:2px;"></span> Saving...';
+            });
+        }
     })();
 </script>
 @endpush

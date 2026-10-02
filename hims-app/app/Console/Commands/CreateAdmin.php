@@ -35,8 +35,8 @@ class CreateAdmin extends Command
      */
     public function handle(): int
     {
-        $email = $this->option('email') ?? $this->ask('Admin email address');
-        $name = $this->option('name') ?? $this->ask('Admin display name', 'HIMS Administrator');
+        $email = strtolower(trim((string) ($this->option('email') ?? $this->ask('Admin email address'))));
+        $name = trim((string) ($this->option('name') ?? $this->ask('Admin display name', 'HIMS Administrator')));
 
         $password = $this->option('password')
             ?? $this->secret('Admin password (min 10 characters with upper, lower, number, symbol)');
@@ -45,9 +45,12 @@ class CreateAdmin extends Command
         $validator = Validator::make(
             compact('email', 'name', 'password'),
             [
-                'email' => ['required', 'email', 'unique:users,email'],
+                'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email', 'unique:employees,email'],
                 'name' => ['required', 'string', 'max:255'],
                 'password' => ['required', 'string', Password::defaults()],
+            ],
+            [
+                'email.unique' => 'An account or employee record with email ":input" already exists.',
             ]
         );
 
@@ -125,40 +128,45 @@ class CreateAdmin extends Command
         $employeeCode = 'EMP-'.str_pad($nextNum, 4, '0', STR_PAD_LEFT);
 
         // ── Create employee + user in a transaction ────────────────
-        DB::transaction(function () use ($email, $name, $password, $adminDeptId, $adminRoleId, $employeeCode) {
-            $employeeId = (string) Str::uuid();
+        try {
+            DB::transaction(function () use ($email, $name, $password, $adminDeptId, $adminRoleId, $employeeCode) {
+                $employeeId = (string) Str::uuid();
 
-            $nameParts = explode(' ', $name, 2);
-            $firstName = $nameParts[0];
-            $lastName = $nameParts[1] ?? 'Administrator';
+                $nameParts = explode(' ', $name, 2);
+                $firstName = $nameParts[0];
+                $lastName = $nameParts[1] ?? 'Administrator';
 
-            DB::table('employees')->insert([
-                'employee_id' => $employeeId,
-                'employee_code' => $employeeCode,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'email' => $email,
-                'department_id' => $adminDeptId,
-                'role_id' => $adminRoleId,
-                'position_title' => 'System Administrator',
-                'hire_date' => now()->toDateString(),
-                'employment_status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+                DB::table('employees')->insert([
+                    'employee_id' => $employeeId,
+                    'employee_code' => $employeeCode,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $email,
+                    'department_id' => $adminDeptId,
+                    'role_id' => $adminRoleId,
+                    'position_title' => 'System Administrator',
+                    'hire_date' => now()->toDateString(),
+                    'employment_status' => 'active',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-            DB::table('users')->insert([
-                'name' => $name,
-                'email' => $email,
-                'password' => Hash::make($password),
-                'role' => 'admin',
-                'employee_id' => $employeeId,
-                'email_verified_at' => now(),
-                'must_change_password' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        });
+                DB::table('users')->insert([
+                    'name' => $name,
+                    'email' => $email,
+                    'password' => Hash::make($password),
+                    'role' => 'admin',
+                    'employee_id' => $employeeId,
+                    'email_verified_at' => now(),
+                    'must_change_password' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            $this->error('Failed to create administrator: an employee or user with this email/code already exists.');
+            return self::FAILURE;
+        }
 
         $this->info('✅ Admin account created successfully.');
         $this->line("   Email: {$email}");

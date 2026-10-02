@@ -24,20 +24,29 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('employees.store') }}">
+                <form method="POST" action="{{ route('employees.store') }}" id="createEmployeeForm">
                     @csrf
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="hims-label">First Name *</label>
-                            <input type="text" name="first_name" class="hims-input" value="{{ old('first_name') }}" required placeholder="e.g. Maria">
+                            <input type="text" name="first_name" class="hims-input @error('first_name') is-invalid @enderror" value="{{ old('first_name') }}" required placeholder="e.g. Maria">
+                            @error('first_name')
+                                <div style="font-size:12px;color:#ef4444;margin-top:4px"><i class="bi bi-exclamation-circle"></i> {{ $message }}</div>
+                            @enderror
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Last Name *</label>
-                            <input type="text" name="last_name" class="hims-input" value="{{ old('last_name') }}" required placeholder="e.g. Santos">
+                            <input type="text" name="last_name" class="hims-input @error('last_name') is-invalid @enderror" value="{{ old('last_name') }}" required placeholder="e.g. Santos">
+                            @error('last_name')
+                                <div style="font-size:12px;color:#ef4444;margin-top:4px"><i class="bi bi-exclamation-circle"></i> {{ $message }}</div>
+                            @enderror
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Email Address *</label>
-                            <input type="email" name="email" class="hims-input" value="{{ old('email') }}" required placeholder="e.g. m.santos@hospital.ph">
+                            <input type="email" name="email" class="hims-input @error('email') is-invalid @enderror" value="{{ old('email') }}" required placeholder="e.g. m.santos@hospital.ph">
+                            @error('email')
+                                <div style="font-size:12px;color:#ef4444;margin-top:4px"><i class="bi bi-exclamation-circle"></i> {{ $message }}</div>
+                            @enderror
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Position Title</label>
@@ -106,7 +115,7 @@
                         </div>
                         <div class="col-12 mt-3 d-flex gap-2 justify-content-end">
                             <a href="{{ route('employees.index') }}" class="btn-hims btn-hims-outline">Cancel</a>
-                            <button type="submit" class="btn-hims btn-hims-primary">
+                            <button type="submit" class="btn-hims btn-hims-primary" id="saveEmployeeBtn">
                                 <i class="bi bi-check-circle"></i> Save Employee
                             </button>
                         </div>
@@ -123,10 +132,24 @@
     (() => {
         const select = document.querySelector('select[name="supervisor_id"]');
         const warning = document.getElementById('managerWarning');
-        if (!select || !warning) return;
-        const sync = () => { warning.style.display = select.value ? 'none' : 'flex'; };
-        select.addEventListener('change', sync);
-        sync();
+        if (select && warning) {
+            const sync = () => { warning.style.display = select.value ? 'none' : 'flex'; };
+            select.addEventListener('change', sync);
+            sync();
+        }
+
+        const form = document.getElementById('createEmployeeForm');
+        const btn = document.getElementById('saveEmployeeBtn');
+        if (form && btn) {
+            form.addEventListener('submit', (e) => {
+                if (btn.disabled) {
+                    e.preventDefault();
+                    return false;
+                }
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="width:0.9rem;height:0.9rem;border-width:2px;"></span> Saving...';
+            });
+        }
     })();
 </script>
 @endpush
