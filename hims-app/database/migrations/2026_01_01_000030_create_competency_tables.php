@@ -68,28 +68,32 @@ return new class extends Migration
 
         // MySQL trigger to auto-compute gap.
         // Guarded: this is MySQL-specific procedural SQL (DECLARE/SET), which is a
-        // syntax error on the sqlite :memory: connection phpunit.xml runs tests on.
+        // syntax error on sqlite :memory: and unsupported on TiDB Serverless.
         if (DB::getDriverName() === 'mysql') {
-            DB::unprepared('
-                CREATE TRIGGER trg_compute_gap_insert
-                BEFORE INSERT ON competency_assessments
-                FOR EACH ROW
-                BEGIN
-                    DECLARE req_prof INT;
-                    SELECT required_proficiency INTO req_prof FROM competencies WHERE competency_id = NEW.competency_id;
-                    SET NEW.gap = NEW.current_proficiency - req_prof;
-                END
-            ');
-            DB::unprepared('
-                CREATE TRIGGER trg_compute_gap_update
-                BEFORE UPDATE ON competency_assessments
-                FOR EACH ROW
-                BEGIN
-                    DECLARE req_prof INT;
-                    SELECT required_proficiency INTO req_prof FROM competencies WHERE competency_id = NEW.competency_id;
-                    SET NEW.gap = NEW.current_proficiency - req_prof;
-                END
-            ');
+            try {
+                DB::unprepared('
+                    CREATE TRIGGER trg_compute_gap_insert
+                    BEFORE INSERT ON competency_assessments
+                    FOR EACH ROW
+                    BEGIN
+                        DECLARE req_prof INT;
+                        SELECT required_proficiency INTO req_prof FROM competencies WHERE competency_id = NEW.competency_id;
+                        SET NEW.gap = NEW.current_proficiency - req_prof;
+                    END
+                ');
+                DB::unprepared('
+                    CREATE TRIGGER trg_compute_gap_update
+                    BEFORE UPDATE ON competency_assessments
+                    FOR EACH ROW
+                    BEGIN
+                        DECLARE req_prof INT;
+                        SELECT required_proficiency INTO req_prof FROM competencies WHERE competency_id = NEW.competency_id;
+                        SET NEW.gap = NEW.current_proficiency - req_prof;
+                    END
+                ');
+            } catch (\Throwable $e) {
+                // Engines like TiDB Serverless do not support procedural triggers; gap is maintained in application logic.
+            }
         }
 
         Schema::create('employee_credentials', function (Blueprint $table) {
@@ -124,8 +128,12 @@ return new class extends Migration
     public function down(): void
     {
         if (DB::getDriverName() === 'mysql') {
-            DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_update');
-            DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_insert');
+            try {
+                DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_update');
+                DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_insert');
+            } catch (\Throwable $e) {
+                // Ignore if triggers not supported
+            }
         }
         Schema::dropIfExists('credential_alert_log');
         Schema::dropIfExists('employee_credentials');
