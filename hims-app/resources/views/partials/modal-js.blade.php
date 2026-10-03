@@ -25,6 +25,7 @@ window.himsModal = (function () {
     function open(target) {
         const backdrop = el(target);
         if (!backdrop) return;
+        backdrop.style.display = 'flex';
         backdrop.classList.add('open');
         // Next frame, so the browser has a painted start state to animate from.
         requestAnimationFrame(() => backdrop.classList.add('shown'));
@@ -38,7 +39,10 @@ window.himsModal = (function () {
         if (!backdrop) return;
         backdrop.classList.remove('shown');
         document.body.style.overflow = '';
-        setTimeout(() => backdrop.classList.remove('open'), 200);
+        setTimeout(() => {
+            backdrop.classList.remove('open');
+            backdrop.style.display = 'none';
+        }, 200);
         if (lastTrigger) { lastTrigger.focus(); lastTrigger = null; }
     }
 

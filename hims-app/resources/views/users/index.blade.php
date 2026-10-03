@@ -51,7 +51,6 @@
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Manage login accounts that can access HIMS. New accounts appear immediately.</p>
     </div>
     <div class="d-flex gap-2">
-        <button type="button" class="btn-hims btn-hims-outline" data-modal-open="aiDataSettingsModal"><i class="bi bi-shield-lock"></i> AI Data Settings</button>
         <button type="button" class="btn-hims btn-hims-primary" data-modal-open="userCreateModal"><i class="bi bi-person-plus-fill"></i> Add User</button>
     </div>
 </div>
@@ -150,7 +149,7 @@
 
 @push('modals')
 {{-- Create User Modal --}}
-<div class="hims-modal-backdrop" id="userCreateModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="userCreateModalTitle">
+<div class="hims-modal-backdrop" id="userCreateModal" role="dialog" aria-modal="true" aria-labelledby="userCreateModalTitle">
     <div class="hims-modal" style="max-width:580px">
         <div class="hims-modal-header">
             <h4 id="userCreateModalTitle"><i class="bi bi-person-plus-fill"></i> Add System User</h4>
@@ -210,50 +209,6 @@
                 <button type="submit" class="btn-hims btn-hims-primary" id="btnSubmitCreateUser">
                     <i class="bi bi-check-circle"></i> Create User
                 </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{{-- AI Data Settings Modal --}}
-<div class="hims-modal-backdrop" id="aiDataSettingsModal" style="display:none">
-    <div class="hims-modal" style="max-width:520px">
-        <div class="hims-modal-header">
-            <h4><i class="bi bi-shield-lock"></i> AI Data-Sharing Settings</h4>
-            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
-        </div>
-        <form method="POST" action="{{ route('settings.ai-data-sharing') }}">
-            @csrf
-            <div class="hims-modal-body">
-                <div class="mb-3">
-                    <label class="form-check-label d-flex align-items-center gap-2" style="font-weight:600">
-                        <input type="checkbox" name="ai_include_comments" value="1" @checked(($aiSettings['ai_include_comments'] ?? '1') === '1')>
-                        Include supervisors' written comments in AI gap-analysis
-                    </label>
-                    <p style="font-size:12px;color:#6b7280;margin:4px 0 0 24px">Allows the AI prompt to receive verbatim review feedback text.</p>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-check-label d-flex align-items-center gap-2" style="font-weight:600">
-                        <input type="checkbox" name="ai_redact_names" value="1" @checked(($aiSettings['ai_redact_names'] ?? '1') === '1')>
-                        Redact employee & patient names before sending to AI
-                    </label>
-                    <p style="font-size:12px;color:#6b7280;margin:4px 0 0 24px">Automatically replaces names and PII in review feedback with placeholders.</p>
-                </div>
-
-                <div class="p-3" style="background:#f8fafc;border-radius:8px;border:1px solid var(--hims-border)">
-                    <div style="font-size:12px;color:#6b7280">Active AI Provider</div>
-                    <div style="font-size:14px;font-weight:600;color:var(--hims-primary)">
-                        {{ ucfirst(config('services.ai.driver', 'gemini')) }}
-                        @if(config('services.ai.driver') === 'compatible')
-                            ({{ config('services.ai.compatible_label', 'Groq') }})
-                        @endif
-                    </div>
-                </div>
-            </div>
-            <div class="hims-modal-footer">
-                <button type="button" class="btn-hims btn-hims-ghost" data-modal-dismiss>Cancel</button>
-                <button type="submit" class="btn-hims btn-hims-primary">Save Settings</button>
             </div>
         </form>
     </div>
@@ -333,10 +288,15 @@
                     body: formData
                 });
 
-                const data = await res.json();
+                let data = null;
+                try {
+                    data = await res.json();
+                } catch (_) {
+                    data = null;
+                }
 
                 if (!res.ok) {
-                    const msg = data.message || Object.values(data.errors || {})[0]?.[0] || 'Unable to create user.';
+                    const msg = data?.message || Object.values(data?.errors || {})[0]?.[0] || (res.status === 419 ? 'Session expired. Please refresh the page.' : `Unable to create user (Status ${res.status}).`);
                     errorBox.textContent = msg;
                     errorBox.style.display = 'block';
                     submitBtn.disabled = false;
@@ -352,7 +312,7 @@
 
                 // Show success banner
                 if (liveAlert && liveAlertMsg) {
-                    liveAlertMsg.textContent = data.message || 'User created successfully.';
+                    liveAlertMsg.textContent = data?.message || 'User created successfully.';
                     liveAlert.style.display = 'flex';
                     setTimeout(() => { liveAlert.style.display = 'none'; }, 5000);
                 }
@@ -361,7 +321,7 @@
                 await refreshUsersTable(true);
 
             } catch (err) {
-                errorBox.textContent = 'A connection error occurred. Please try again.';
+                errorBox.textContent = err?.message || 'A connection error occurred. Please try again.';
                 errorBox.style.display = 'block';
             } finally {
                 submitBtn.disabled = false;

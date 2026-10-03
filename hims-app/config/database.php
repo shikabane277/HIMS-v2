@@ -61,6 +61,10 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA') ?: (function () {
+                    $host = env('DB_HOST', '127.0.0.1');
+                    if ($host === '127.0.0.1' || $host === 'localhost') {
+                        return null;
+                    }
                     foreach ([
                         '/etc/pki/tls/certs/ca-bundle.crt',
                         '/etc/ssl/certs/ca-certificates.crt',

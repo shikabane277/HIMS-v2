@@ -39,8 +39,6 @@ class UserController extends Controller
         $users = $query->paginate(25)->withQueryString();
         $total = User::count();
 
-        $aiSettings = DB::table('system_settings')->pluck('value', 'key')->all();
-
         $employees = DB::table('employees')
             ->whereNotIn('employee_id', function ($q) {
                 $q->select('employee_id')->from('users')->whereNotNull('employee_id');
@@ -64,7 +62,7 @@ class UserController extends Controller
             ]);
         }
 
-        return view('users.index', compact('users', 'total', 'aiSettings', 'employees'));
+        return view('users.index', compact('users', 'total', 'employees'));
     }
 
     public function create()
@@ -82,7 +80,11 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $email = strtolower(trim((string) $request->email));
-        $request->merge(['email' => $email]);
+        $employeeId = $request->filled('employee_id') ? trim((string) $request->employee_id) : null;
+        $request->merge([
+            'email' => $email,
+            'employee_id' => $employeeId,
+        ]);
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
@@ -108,8 +110,14 @@ class UserController extends Controller
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
-                'employee_id' => $request->employee_id ?: null,
+                'employee_id' => $employeeId,
                 'email_verified_at' => now(),
+            ]);
+
+            AuditTrail::record('create_user', 'users', (string) $user->id, afterState: [
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
             ]);
         } catch (QueryException $e) {
             $msg = $e->getMessage();
@@ -141,14 +149,22 @@ class UserController extends Controller
                 }
             }
 
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => 'Database error while creating user: ' . $e->getMessage(),
+                ], 500);
+            }
+
+            throw $e;
+        } catch (\Throwable $e) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => 'Failed to create user: ' . $e->getMessage(),
+                ], 500);
+            }
+
             throw $e;
         }
-
-        AuditTrail::record('create_user', 'users', (string) $user->id, afterState: [
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->role,
-        ]);
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
