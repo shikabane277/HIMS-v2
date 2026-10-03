@@ -1,0 +1,8 @@
+{
+  "name": "hims-v2",
+  "private": true,
+  "scripts": {
+    "build": "cd hims-app && npm install && npm run build && node -e \"const fs=require('fs'); fs.cpSync('public', '../dist', {recursive: true});\"",
+    "dev": "cd hims-app && npm run dev"
+  }
+}

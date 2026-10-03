@@ -1,0 +1,2532 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ═══════════════════════════════════════════════
+   HIMS Design System — Green & White Theme
+═══════════════════════════════════════════════ */
+:root {
+    --hims-primary:       #16a34a;
+    --hims-primary-dark:  #15803d;
+    --hims-primary-light: #22c55e;
+    --hims-primary-xlight:#dcfce7;
+    --hims-primary-pale:  #f0fdf4;
+    --hims-white:         #ffffff;
+    --hims-surface:       #f8fffe;
+    --hims-border:        #bbf7d0;
+    --hims-text:          #14532d;
+    --hims-text-muted:    #4ade80;
+    --hims-text-dark:     #052e16;
+    --hims-gray:          #6b7280;
+    --hims-gray-light:    #f3f4f6;
+    --hims-danger:        #dc2626;
+    --hims-warning:       #d97706;
+    --hims-info:          #0891b2;
+    --hims-sidebar-w:     260px;
+    --hims-topbar-h:      64px;
+    /* AI assistant rail. --hims-ai-w is the docked width, overwritten inline
+       by the resize handle; --hims-ai-offset is how much room the page
+       actually gives up, which is 0 whenever the rail is closed or is
+       overlaying rather than pushing. Both are set from JS. */
+    --hims-ai-w:          340px;
+    --hims-ai-offset:     0px;
+    --hims-radius:        12px;
+    --hims-radius-sm:     8px;
+    --hims-shadow:        0 1px 3px rgba(22,163,74,.08), 0 4px 16px rgba(22,163,74,.06);
+    --hims-shadow-md:     0 4px 24px rgba(22,163,74,.12), 0 1px 4px rgba(0,0,0,.04);
+    --hims-shadow-lg:     0 8px 40px rgba(22,163,74,.18), 0 2px 8px rgba(0,0,0,.06);
+    --hims-transition:    all .22s cubic-bezier(.4,0,.2,1);
+    --hims-spring:        cubic-bezier(.34,1.56,.64,1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--hims-surface);
+    color: var(--hims-text-dark);
+    margin: 0;
+    min-height: 100vh;
+}
+
+/* ═══════════════ SIDEBAR ═══════════════ */
+.hims-sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    width: var(--hims-sidebar-w);
+    height: 100vh;
+    background: linear-gradient(180deg, #052e16 0%, #14532d 40%, #15803d 100%);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    overflow-y: auto;
+    transition: var(--hims-transition);
+}
+
+.hims-sidebar::-webkit-scrollbar { width: 4px; }
+.hims-sidebar::-webkit-scrollbar-track { background: transparent; }
+.hims-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 4px; }
+
+.sidebar-brand {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+}
+.sidebar-brand .brand-icon {
+    width: 40px; height: 40px;
+    background: var(--hims-primary-light);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+.sidebar-brand .brand-text { color: #fff; }
+.sidebar-brand .brand-text .brand-name { font-size: 15px; font-weight: 700; display: block; line-height: 1.2; }
+.sidebar-brand .brand-text .brand-sub  { font-size: 10px; opacity: .65; font-weight: 400; }
+
+.sidebar-section-label {
+    padding: 16px 20px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    color: rgba(255,255,255,.4);
+    text-transform: uppercase;
+}
+
+.sidebar-nav { padding: 8px 12px; flex: 1; }
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: var(--hims-radius-sm);
+    color: rgba(255,255,255,.75);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: var(--hims-transition);
+    margin-bottom: 2px;
+    position: relative;
+}
+.sidebar-link:hover {
+    background: rgba(255,255,255,.1);
+    color: #fff;
+    transform: translateX(3px);
+}
+.sidebar-link.active {
+    background: rgba(255,255,255,.15);
+    color: #fff;
+    font-weight: 600;
+}
+.sidebar-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 3px; height: 60%;
+    background: var(--hims-primary-light);
+    border-radius: 0 3px 3px 0;
+    animation: slideInLeft .2s ease;
+}
+.sidebar-link .nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; transition: transform .2s var(--hims-spring); }
+.sidebar-link:hover .nav-icon { transform: scale(1.15); }
+.sidebar-link .nav-badge {
+    margin-left: auto;
+    background: var(--hims-danger);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 20px;
+    min-width: 18px;
+    text-align: center;
+}
+
+.sidebar-footer {
+    padding: 16px 12px;
+    border-top: 1px solid rgba(255,255,255,.1);
+}
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--hims-radius-sm);
+    transition: var(--hims-transition);
+    cursor: pointer;
+    text-decoration: none;
+}
+.sidebar-user:hover { background: rgba(255,255,255,.08); }
+.sidebar-user .user-avatar {
+    width: 36px; height: 36px;
+    background: var(--hims-primary-light);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700;
+    color: #fff; flex-shrink: 0;
+}
+.sidebar-user .user-info .user-name  { font-size: 13px; font-weight: 600; color: #fff; display: block; }
+.sidebar-user .user-info .user-role  { font-size: 11px; color: rgba(255,255,255,.5); }
+
+/* ═══════════════ TOPBAR ═══════════════ */
+.hims-topbar {
+    position: fixed;
+    top: 0;
+    left: var(--hims-sidebar-w);
+    right: var(--hims-ai-offset);
+    height: var(--hims-topbar-h);
+    background: var(--hims-white);
+    border-bottom: 1px solid var(--hims-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    z-index: 99;
+    box-shadow: 0 1px 0 var(--hims-border);
+    transition: right .18s cubic-bezier(.4,0,.2,1);
+}
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.hims-menu-toggle {
+    display: none;
+    width: 40px; height: 40px;
+    border: none;
+    background: var(--hims-primary-pale);
+    border-radius: 10px;
+    color: var(--hims-primary);
+    font-size: 20px;
+    cursor: pointer;
+    align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: var(--hims-transition);
+}
+.hims-menu-toggle:hover { background: var(--hims-primary-xlight); }
+.hims-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5,46,22,.5);
+    z-index: 99;
+    opacity: 0;
+    transition: opacity .3s ease;
+}
+.hims-sidebar-backdrop.open { opacity: 1; }
+.topbar-left .page-title { font-size: 17px; font-weight: 700; color: var(--hims-text-dark); margin: 0; }
+.topbar-left .page-breadcrumb { font-size: 12px; color: var(--hims-gray); margin: 0; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.topbar-btn {
+    width: 38px; height: 38px;
+    border: none;
+    background: var(--hims-primary-pale);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--hims-primary);
+    font-size: 16px;
+    transition: var(--hims-transition);
+    position: relative;
+}
+.topbar-btn:hover { background: var(--hims-primary-xlight); transform: scale(1.08); }
+.topbar-btn .notif-count {
+    position: absolute;
+    top: -4px; right: -5px;
+    min-width: 19px; height: 19px;
+    padding: 0 5px;
+    background: var(--hims-danger);
+    color: #fff;
+    border-radius: 999px;
+    border: 2px solid #fff;
+    font-size: 9px;
+    line-height: 15px;
+    font-weight: 800;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(220,38,38,.35);
+}
+
+/* ── Topbar dropdowns (notifications + help) ── */
+.topbar-menu-wrap { position: relative; }
+.topbar-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    background: #fff;
+    border: 1px solid var(--hims-border);
+    border-radius: 14px;
+    box-shadow: 0 16px 42px -6px rgba(0,0,0,.15), 0 6px 18px -2px rgba(0,0,0,.08);
+    z-index: 1100;
+    opacity: 0;
+    transform: translateY(-10px) scale(.94);
+    transform-origin: top right;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .22s var(--hims-spring), visibility .2s;
+    visibility: hidden;
+    overflow: hidden;
+}
+.topbar-dropdown.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    visibility: visible;
+    animation: dropdownPopIn .28s var(--hims-spring) forwards;
+}
+
+/* Staggered entrance for dropdown items */
+.topbar-dropdown.open .notif-item,
+.topbar-dropdown.open .help-faq,
+.topbar-dropdown.open .global-search-box {
+    animation: dropdownItemPop .24s cubic-bezier(.16,1,.3,1) both;
+}
+.topbar-dropdown.open .notif-item:nth-child(1),
+.topbar-dropdown.open .help-faq:nth-child(1) { animation-delay: .02s; }
+.topbar-dropdown.open .notif-item:nth-child(2),
+.topbar-dropdown.open .help-faq:nth-child(2) { animation-delay: .05s; }
+.topbar-dropdown.open .notif-item:nth-child(3),
+.topbar-dropdown.open .help-faq:nth-child(3) { animation-delay: .08s; }
+.topbar-dropdown.open .notif-item:nth-child(4),
+.topbar-dropdown.open .help-faq:nth-child(4) { animation-delay: .11s; }
+.topbar-dropdown.open .notif-item:nth-child(5),
+.topbar-dropdown.open .help-faq:nth-child(5) { animation-delay: .14s; }
+
+/* Generic dropdown menus */
+.dropdown-menu,
+.dropdown-content,
+.hims-dropdown-menu {
+    border: 1px solid var(--hims-border);
+    border-radius: 12px;
+    box-shadow: 0 16px 42px -6px rgba(0,0,0,.14), 0 6px 18px -2px rgba(0,0,0,.08);
+    transform-origin: top right;
+    transition: opacity .18s ease, transform .22s var(--hims-spring);
+}
+.dropdown-menu.show,
+.dropdown-menu.open,
+.dropdown-content.open,
+.hims-dropdown-menu.open {
+    display: block;
+    animation: dropdownPopIn .28s var(--hims-spring) forwards;
+}
+
+.topbar-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -6px; right: 14px;
+    width: 12px; height: 12px;
+    background: #fff;
+    border-left: 1px solid var(--hims-border);
+    border-top: 1px solid var(--hims-border);
+    transform: rotate(45deg);
+}
+.topbar-dropdown-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    font-weight: 700; font-size: 13px;
+    color: var(--hims-text-dark);
+    border-bottom: 1px solid var(--hims-primary-pale);
+}
+.topbar-dropdown-action {
+    border: none; background: none;
+    color: var(--hims-primary);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; padding: 2px 4px; border-radius: 6px;
+}
+.topbar-dropdown-action:hover { background: var(--hims-primary-pale); }
+.topbar-dropdown-body { max-height: 340px; overflow-y: auto; padding: 6px; }
+.topbar-dropdown-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 28px 16px; color: var(--hims-text-muted); font-size: 13px;
+}
+.topbar-dropdown-empty i { font-size: 24px; color: var(--hims-primary-light); }
+
+/* Facebook-style notification feed: recent activity stays in the panel after
+   being read, while unread rows carry a tinted background and a small marker. */
+.notif-dropdown { width: 390px; border-color: #e5e7eb; border-radius: 16px; }
+.notif-dropdown-header { padding: 15px 16px 12px; border-bottom-color: #eef2f7; }
+.notif-heading { font-size: 18px; line-height: 1.2; font-weight: 800; color: #111827; }
+.notif-heading-count { margin-top: 2px; font-size: 11px; font-weight: 500; color: #6b7280; }
+.notif-list { max-height: min(560px, calc(100vh - 110px)); padding: 6px 8px 10px; }
+.notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    position: relative;
+    padding: 10px 30px 10px 8px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: inherit;
+    transition: background .14s ease;
+}
+.notif-item:hover { background: #f3f4f6; }
+.notif-item.unread { background: #eff6ff; }
+.notif-item.unread:hover { background: #e0edff; }
+.notif-item-icon {
+    width: 44px; height: 44px;
+    flex: 0 0 44px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    color: #fff;
+    background: #64748b;
+    font-size: 18px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.16);
+}
+.notif-item-icon.celebration { background: #7c3aed; }
+.notif-item-icon.success { background: #16a34a; }
+.notif-item-icon.warning { background: #d97706; }
+.notif-item-icon.danger { background: #dc2626; }
+.notif-item-icon.info { background: #0284c7; }
+.notif-item-content { min-width: 0; display: block; flex: 1; }
+.notif-item-title {
+    display: block;
+    color: #111827;
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: 650;
+}
+.notif-item.read .notif-item-title { font-weight: 550; }
+.notif-item-message {
+    display: -webkit-box;
+    margin-top: 2px;
+    color: #4b5563;
+    font-size: 12px;
+    line-height: 1.35;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+.notif-item-time { display: block; margin-top: 4px; color: #1877f2; font-size: 11px; font-weight: 650; }
+.notif-item.read .notif-item-time { color: #6b7280; font-weight: 500; }
+.notif-unread-marker {
+    position: absolute;
+    top: 50%; right: 10px;
+    width: 9px; height: 9px;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background: #1877f2;
+}
+
+/* Permission-aware global search panel. */
+.search-dropdown { width: 520px; border-color: #e5e7eb; }
+.global-search-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    background: #f9fafb;
+    color: #6b7280;
+}
+.global-search-box:focus-within {
+    border-color: #1877f2;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(24,119,242,.12);
+}
+.global-search-box input {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #111827;
+    font: inherit;
+    font-size: 14px;
+}
+.global-search-box input::-webkit-search-cancel-button { cursor: pointer; }
+.global-search-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 100px;
+    padding: 20px 24px;
+    color: #6b7280;
+    font-size: 12.5px;
+    line-height: 1.5;
+    text-align: center;
+}
+.global-search-status.empty { color: #4b5563; }
+.global-search-results { max-height: min(590px, calc(100vh - 120px)); overflow-y: auto; padding: 0 8px 10px; }
+.global-search-group {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 9px 10px 5px;
+    background: rgba(255,255,255,.96);
+    color: #6b7280;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.global-search-result {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    color: inherit;
+    text-decoration: none;
+    transition: background .12s ease;
+}
+.global-search-result:hover,
+.global-search-result.active { background: #eff6ff; }
+.global-search-icon {
+    width: 36px; height: 36px;
+    flex: 0 0 36px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 9px;
+    background: #e8f0fe;
+    color: #1877f2;
+    font-size: 15px;
+}
+.global-search-copy { min-width: 0; display: block; flex: 1; }
+.global-search-title {
+    display: block;
+    overflow: hidden;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.global-search-subtitle {
+    display: block;
+    overflow: hidden;
+    margin-top: 2px;
+    color: #6b7280;
+    font-size: 11.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.global-search-arrow { flex: 0 0 auto; color: #9ca3af; font-size: 12px; }
+.global-search-spinner {
+    width: 16px; height: 16px;
+    border: 2px solid #dbeafe;
+    border-top-color: #1877f2;
+    border-radius: 50%;
+    animation: searchSpin .7s linear infinite;
+}
+@keyframes searchSpin { to { transform: rotate(360deg); } }
+.help-faq {
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+.help-faq + .help-faq { border-top: 1px solid var(--hims-primary-pale); }
+.help-faq summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--hims-text-dark);
+    list-style: none;
+    padding: 4px 0;
+}
+.help-faq summary::-webkit-details-marker { display: none; }
+.help-faq summary::before { content: '▸ '; color: var(--hims-primary); }
+.help-faq[open] summary::before { content: '▾ '; }
+.help-faq p {
+    margin: 6px 0 4px;
+    color: var(--hims-text);
+    line-height: 1.55;
+    font-size: 12.5px;
+}
+.help-faq code {
+    background: var(--hims-primary-pale);
+    color: var(--hims-primary-dark);
+    padding: 1px 5px; border-radius: 4px; font-size: 12px;
+}
+
+/* ═══════════════ MAIN CONTENT ═══════════════ */
+.hims-main {
+    margin-left: var(--hims-sidebar-w);
+    margin-top: var(--hims-topbar-h);
+    margin-right: var(--hims-ai-offset);
+    padding: 28px;
+    min-height: calc(100vh - var(--hims-topbar-h));
+    max-width: calc(100vw - var(--hims-sidebar-w));
+    overflow-x: hidden;
+    transition: margin-right .18s cubic-bezier(.4,0,.2,1);
+}
+body.ai-rail-docked .hims-main {
+    max-width: calc(100vw - var(--hims-sidebar-w) - var(--hims-ai-offset));
+}
+/* Suppress both transitions mid-drag: animating the reflow on every
+   pointermove makes the resize lag behind the cursor. */
+body.ai-resizing .hims-main,
+body.ai-resizing .hims-topbar,
+body.ai-resizing #ai-rail { transition: none; }
+body.ai-resizing { cursor: col-resize; user-select: none; }
+
+/* ═══════════════ STAT CARDS ═══════════════ */
+.stat-card {
+    background: var(--hims-white);
+    border-radius: var(--hims-radius);
+    border: 1px solid var(--hims-border);
+    padding: 22px 24px;
+    transition: var(--hims-transition);
+    box-shadow: var(--hims-shadow);
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+.stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 80px; height: 80px;
+    background: var(--hims-primary-pale);
+    border-radius: 0 0 0 80px;
+    transition: var(--hims-transition);
+}
+.stat-card:hover { box-shadow: var(--hims-shadow-md); transform: translateY(-3px); }
+.stat-card:hover::after { width: 100px; height: 100px; }
+.stat-card .stat-icon {
+    width: 48px; height: 48px;
+    background: var(--hims-primary-pale);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    color: var(--hims-primary);
+    margin-bottom: 14px;
+    z-index: 1; position: relative;
+    transition: transform .25s var(--hims-spring), background .2s ease;
+}
+.stat-card:hover .stat-icon { transform: scale(1.1); background: var(--hims-primary-xlight); }
+.stat-card .stat-value { font-size: 30px; font-weight: 800; color: var(--hims-text-dark); line-height: 1; }
+.stat-card .stat-label { font-size: 13px; color: var(--hims-gray); margin-top: 4px; font-weight: 500; }
+.stat-card .stat-change { font-size: 12px; margin-top: 8px; }
+.stat-card .stat-change.up   { color: var(--hims-primary); }
+.stat-card .stat-change.down { color: var(--hims-danger); }
+
+/* ═══════════════ CARDS / PANELS ═══════════════ */
+.hims-card {
+    background: var(--hims-white);
+    border-radius: var(--hims-radius);
+    border: 1px solid var(--hims-border);
+    box-shadow: var(--hims-shadow);
+    max-width: 100%;
+    overflow: hidden;
+}
+.hims-card:has(.hims-select-wrapper),
+.hims-card:has(select),
+.hims-card.overflow-visible {
+    overflow: visible;
+}
+.hims-card .card-header {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--hims-border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--hims-primary-pale);
+}
+.hims-card .card-header h5 {
+    margin: 0; font-size: 15px; font-weight: 700;
+    color: var(--hims-primary-dark);
+    display: flex; align-items: center; gap: 8px;
+}
+.hims-card .card-body {
+    padding: 20px 22px;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.hims-card .card-body::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar {
+    height: 5px;
+}
+.hims-card .card-body::-webkit-scrollbar-track,
+.table-responsive::-webkit-scrollbar-track {
+    background: transparent;
+}
+.hims-card .card-body::-webkit-scrollbar-thumb,
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.hims-card .card-body::-webkit-scrollbar-thumb:hover,
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ═══════════════ TABLES ═══════════════ */
+.hims-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.hims-table th {
+    background: var(--hims-primary-pale);
+    color: var(--hims-primary-dark);
+    font-size: 12px; font-weight: 600;
+    /* A header labels the column under it, so it has to start where that column
+       starts. Browsers default `th` to `text-align: center` and `td` to left;
+       Bootstrap's reboot papers over it with `th { text-align: inherit }`, and
+       HIMS loads no Bootstrap CSS — only the icon font — so every header in the
+       app sat centred above left-aligned data. Declared here rather than left to
+       the user agent. A column whose data is not left (see .text-center /
+       .text-end below) must carry the same class on its th. */
+    text-align: left;
+    text-transform: uppercase; letter-spacing: .05em;
+    padding: 12px 16px;
+    border-bottom: 2px solid var(--hims-border);
+    white-space: nowrap;
+}
+.hims-table td {
+    padding: 13px 16px;
+    font-size: 13.5px;
+    color: var(--hims-text-dark);
+    border-bottom: 1px solid var(--hims-primary-pale);
+    transition: var(--hims-transition);
+}
+.hims-table tr:hover td { background: var(--hims-primary-pale); }
+.hims-table tr:last-child td { border-bottom: none; }
+
+/* A key/value table, not a grid of records: two columns, no `thead`, one row per
+   field. `employees/show`, `performance/show`, `training/sessions/show` and
+   `training/venues/index` each build a profile card out of one. They are
+   deliberately *not* `.hims-table` — they have no header row to drop and no
+   columns to stack, so none of the responsive rules at the end of this file
+   apply to them, including the `overflow-wrap: anywhere` that keeps an address
+   inside a cell.
+
+   Which is what this rule is for. A `td` will not shrink below the min-content
+   width of its contents, and an email has no space to break at: on
+   `employees/show` a 55-character address demanded 367px inside a card body
+   279px wide, and `.hims-card { overflow: hidden }` clipped the rest — so the
+   address a phone user wanted to copy ended mid-domain, at every width where the
+   card is narrower than the string. `anywhere` rather than `break-word` because
+   only `anywhere` also reduces the min-content contribution, which is the half
+   that lets the table itself stop being too wide. */
+.hims-kv td { overflow-wrap: anywhere; }
+
+/* ═══════════════ BADGES / PILLS ═══════════════ */
+.hims-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11.5px; font-weight: 600;
+    white-space: nowrap;
+}
+.hims-badge.green   { background: var(--hims-primary-xlight); color: var(--hims-primary-dark); }
+.hims-badge.red     { background: #fee2e2; color: #991b1b; }
+.hims-badge.yellow  { background: #fef3c7; color: #92400e; }
+.hims-badge.blue    { background: #e0f2fe; color: #0c4a6e; }
+.hims-badge.gray    { background: #f3f4f6; color: #374151; }
+.hims-badge.purple  { background: #ede9fe; color: #4c1d95; }
+
+/* ═══════════════ BUTTONS ═══════════════ */
+.btn-hims {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px;
+    border-radius: var(--hims-radius-sm);
+    font-size: 13.5px; font-weight: 600;
+    border: none; cursor: pointer;
+    transition: var(--hims-transition);
+    white-space: nowrap;
+    text-decoration: none;
+}
+.btn-hims-primary {
+    background: var(--hims-primary);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(22,163,74,.3);
+}
+.btn-hims-primary:hover {
+    background: var(--hims-primary-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(22,163,74,.4);
+    color: #fff;
+}
+.btn-hims-outline {
+    background: transparent;
+    color: var(--hims-primary);
+    border: 1.5px solid var(--hims-primary);
+}
+.btn-hims-outline:hover { background: var(--hims-primary-pale); color: var(--hims-primary-dark); }
+.btn-hims-ghost {
+    background: var(--hims-primary-pale);
+    color: var(--hims-primary-dark);
+}
+.btn-hims-ghost:hover { background: var(--hims-primary-xlight); }
+.btn-hims-danger { background: var(--hims-danger); color: #fff; }
+.btn-hims-danger:hover { background: #b91c1c; color: #fff; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+
+/* ═══════════════ FORMS ═══════════════ */
+.hims-label {
+    display: block; margin-bottom: 5px;
+    font-size: 12.5px; font-weight: 600;
+    color: var(--hims-primary-dark);
+}
+.hims-input {
+    width: 100%;
+    padding: 9px 13px;
+    border: 1.5px solid var(--hims-border);
+    border-radius: var(--hims-radius-sm);
+    font-size: 13.5px; font-family: inherit;
+    color: var(--hims-text-dark);
+    background: var(--hims-white);
+    transition: var(--hims-transition);
+    outline: none;
+}
+.hims-input:focus {
+    border-color: var(--hims-primary);
+    box-shadow: 0 0 0 3px rgba(22,163,74,.15);
+}
+.hims-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+    padding-right: 36px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2316a34a' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-color: var(--hims-white);
+    transition: border-color var(--hims-transition) ease, box-shadow var(--hims-transition) ease, transform .15s ease;
+}
+.hims-select:hover {
+    border-color: var(--hims-primary-light);
+}
+.hims-select:focus {
+    border-color: var(--hims-primary);
+    box-shadow: 0 0 0 3px rgba(22,163,74,.15);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+/* ═══════════════ CUSTOM ANIMATED SELECT ═══════════════ */
+.hims-select-wrapper {
+    position: relative;
+    width: 100%;
+    display: block;
+    box-sizing: border-box;
+}
+
+.hims-select-wrapper.open {
+    z-index: 99999 !important;
+}
+
+.hims-card:has(.hims-select-wrapper.open) {
+    z-index: 99998 !important;
+    position: relative !important;
+    overflow: visible !important;
+}
+
+.hims-select-trigger {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 14px;
+    border: 1.5px solid var(--hims-border);
+    border-radius: var(--hims-radius-sm);
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--hims-text-dark);
+    background: var(--hims-white);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color var(--hims-transition) ease, box-shadow var(--hims-transition) ease, transform .15s ease, background-color .15s ease;
+    box-sizing: border-box;
+}
+
+.hims-select-trigger:hover {
+    border-color: var(--hims-primary-light);
+    background-color: #fafdfb;
+}
+
+.hims-select-trigger:focus-visible,
+.hims-select-wrapper.open .hims-select-trigger {
+    border-color: var(--hims-primary);
+    box-shadow: 0 0 0 3px rgba(22,163,74,.15);
+    outline: none;
+}
+
+.hims-select-trigger.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #f9fafb;
+}
+
+.hims-select-trigger-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+.hims-select-trigger-text.placeholder {
+    color: #9ca3af;
+}
+
+.hims-select-arrow {
+    color: var(--hims-primary);
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .25s var(--hims-spring);
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+
+.hims-select-wrapper.open .hims-select-arrow {
+    transform: rotate(180deg);
+}
+
+.hims-select-menu {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    width: 100%;
+    min-width: 160px;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1px solid var(--hims-border);
+    border-radius: 12px;
+    box-shadow: 0 16px 42px -6px rgba(0, 0, 0, 0.16), 0 4px 14px -2px rgba(0, 0, 0, 0.08);
+    z-index: 99999 !important;
+    max-height: 240px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+    transform-origin: top center;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity .18s ease, transform .22s var(--hims-spring), visibility .18s;
+}
+
+.hims-select-wrapper.open .hims-select-menu {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    visibility: visible;
+    animation: dropdownPopIn .24s var(--hims-spring) forwards;
+}
+
+.hims-select-menu.opens-up {
+    top: auto;
+    bottom: calc(100% + 5px);
+    transform-origin: bottom center;
+}
+
+.hims-select-wrapper.open .hims-select-menu.opens-up {
+    animation: dropdownPopInUp .24s var(--hims-spring) forwards;
+}
+
+@keyframes dropdownPopIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.96);
+    }
+    70% {
+        opacity: 1;
+        transform: translateY(2px) scale(1.008);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes dropdownPopInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
+    }
+    70% {
+        opacity: 1;
+        transform: translateY(-2px) scale(1.008);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes dropdownItemPop {
+    0% {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hims-select-wrapper.open .hims-select-option {
+    animation: dropdownItemPop .2s cubic-bezier(.16,1,.3,1) both;
+}
+
+.hims-select-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--hims-text-dark);
+    cursor: pointer;
+    transition: background .14s ease, transform .15s var(--hims-spring), color .14s ease;
+    user-select: none;
+}
+
+.hims-select-option:hover,
+.hims-select-option.focused {
+    background: var(--hims-primary-pale);
+    color: var(--hims-primary-dark);
+    transform: translateX(3px);
+}
+
+.hims-select-option.selected {
+    background: var(--hims-primary-xlight);
+    color: var(--hims-primary-dark);
+    font-weight: 600;
+}
+
+.hims-select-option .option-check {
+    color: var(--hims-primary);
+    font-size: 13px;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: opacity .15s ease, transform .2s var(--hims-spring);
+}
+
+.hims-select-option.selected .option-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.hims-select-option.is-placeholder {
+    color: #9ca3af;
+}
+
+.hims-select-option.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Staggered entrance for select menu options */
+.hims-select-wrapper.open .hims-select-option {
+    animation: dropdownItemPop .2s cubic-bezier(.16,1,.3,1) both;
+}
+.hims-select-wrapper.open .hims-select-option:nth-child(1) { animation-delay: .02s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(2) { animation-delay: .04s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(3) { animation-delay: .06s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(4) { animation-delay: .08s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(5) { animation-delay: .10s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(6) { animation-delay: .12s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(7) { animation-delay: .14s; }
+.hims-select-wrapper.open .hims-select-option:nth-child(8) { animation-delay: .16s; }
+
+/* ═══════════════ PROGRESS BARS ═══════════════ */
+.hims-progress { height: 8px; background: var(--hims-primary-xlight); border-radius: 20px; overflow: hidden; }
+.hims-progress-bar { height: 100%; background: linear-gradient(90deg, var(--hims-primary) 0%, var(--hims-primary-light) 100%); border-radius: 20px; transition: width .6s ease; }
+
+/* ═══════════════ RATING STARS ═══════════════ */
+.star-rating { color: #f59e0b; font-size: 14px; }
+.star-rating .empty { color: #d1d5db; }
+
+/* ═══════════════ STATUS INDICATORS ═══════════════ */
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.status-dot.active   { background: var(--hims-primary); }
+.status-dot.warning  { background: var(--hims-warning); }
+.status-dot.danger   { background: var(--hims-danger); }
+.status-dot.inactive { background: #d1d5db; }
+
+/* ═══════════════ 9-BOX GRID ═══════════════ */
+.nine-box-grid { display: grid; grid-template-columns: repeat(3,1fr); grid-template-rows: repeat(3,1fr); gap: 6px; }
+.nine-box-cell {
+    padding: 12px; border-radius: 8px; text-align: center;
+    font-size: 11px; font-weight: 600; min-height: 80px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    transition: var(--hims-transition); cursor: pointer;
+}
+.nine-box-cell:hover { transform: scale(1.04); box-shadow: var(--hims-shadow-md); }
+.nine-box-cell.star     { background: #16a34a; color: #fff; }
+.nine-box-cell.high     { background: #22c55e; color: #fff; }
+.nine-box-cell.solid    { background: #4ade80; color: #14532d; }
+.nine-box-cell.potential{ background: #86efac; color: #14532d; }
+.nine-box-cell.core     { background: #bbf7d0; color: #14532d; }
+.nine-box-cell.avg      { background: #f0fdf4; color: #374151; border: 1px solid #bbf7d0; }
+.nine-box-cell.diamond  { background: #fef3c7; color: #92400e; }
+.nine-box-cell.inconsist{ background: #fee2e2; color: #991b1b; }
+.nine-box-cell.under    { background: #fca5a5; color: #7f1d1d; }
+.nine-box-count { font-size: 22px; font-weight: 800; }
+
+/* ═══════════════ RECOGNITION WALL ═══════════════ */
+.recognition-post {
+    background: var(--hims-white);
+    border: 1px solid var(--hims-border);
+    border-radius: var(--hims-radius);
+    padding: 18px 20px;
+    transition: var(--hims-transition);
+    box-shadow: var(--hims-shadow);
+}
+.recognition-post:hover { box-shadow: var(--hims-shadow-md); transform: translateY(-1px); }
+.recognition-visibility {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    max-width: 320px;
+}
+.recognition-visibility label {
+    justify-content: center;
+    min-height: 38px;
+}
+.recognition-visibility label:has(input:checked) {
+    background: var(--hims-primary-pale);
+    border-color: var(--hims-primary);
+    color: var(--hims-primary-dark);
+}
+.recognition-badge-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px;
+    background: var(--hims-primary-xlight);
+    border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+    color: var(--hims-primary-dark);
+}
+
+/* ═══════════════ AUTH PAGES ═══════════════ */
+.auth-wrapper {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #052e16 0%, #14532d 50%, #15803d 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+.auth-wrapper::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+.auth-card {
+    background: rgba(255,255,255,.97);
+    border-radius: 20px;
+    padding: 48px 44px;
+    width: 100%; max-width: 440px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    position: relative; z-index: 1;
+}
+.auth-logo { text-align: center; margin-bottom: 32px; }
+.auth-logo .logo-icon {
+    width: 64px; height: 64px;
+    background: linear-gradient(135deg, var(--hims-primary) 0%, var(--hims-primary-dark) 100%);
+    border-radius: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 30px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 24px rgba(22,163,74,.35);
+}
+.auth-logo h1 { font-size: 22px; font-weight: 800; color: var(--hims-text-dark); margin: 0 0 4px; }
+.auth-logo p  { font-size: 13px; color: var(--hims-gray); margin: 0; }
+
+/* ═══════════════ ALERTS ═══════════════ */
+/* An alert is prose, so it lays out as prose. It used to be display:flex —
+   which made every child its own flex item, so a <strong> mid-sentence became
+   its own column ("mark it | finished | when you are done") and a nested <ul>
+   or <div> sat beside the text instead of under it. Every alert in the app
+   opens with an <i> icon, so an inline icon with a right margin reproduces the
+   icon-left look without blockifying the sentence around it. */
+.hims-alert {
+    padding: 12px 16px; border-radius: var(--hims-radius-sm);
+    font-size: 13.5px; line-height: 1.55;
+    margin-bottom: 16px;
+}
+.hims-alert > i:first-child { margin-right: 9px; }
+.hims-alert.success { background: var(--hims-primary-xlight); color: var(--hims-primary-dark); border-left: 4px solid var(--hims-primary); }
+.hims-alert.error   { background: #fee2e2; color: #991b1b; border-left: 4px solid var(--hims-danger); }
+.hims-alert.warning { background: #fef3c7; color: #92400e; border-left: 4px solid var(--hims-warning); }
+.hims-alert.info    { background: #e0f2fe; color: #0c4a6e; border-left: 4px solid var(--hims-info); }
+
+/* ═══════════════ SKILLS MATRIX ═══════════════ */
+.gap-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 28px;
+    border-radius: 6px;
+    font-size: 12px; font-weight: 700;
+}
+.gap-chip.positive { background: var(--hims-primary-xlight); color: var(--hims-primary-dark); }
+.gap-chip.zero     { background: #f3f4f6; color: #6b7280; }
+.gap-chip.negative { background: #fee2e2; color: #991b1b; }
+
+/* ═══════════════ CALENDAR ═══════════════ */
+.calendar-event {
+    padding: 4px 8px; border-radius: 5px;
+    font-size: 11.5px; font-weight: 600;
+    background: var(--hims-primary-xlight);
+    color: var(--hims-primary-dark);
+    cursor: pointer; transition: var(--hims-transition);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.calendar-event:hover { background: var(--hims-primary); color: #fff; }
+
+/* ═══════════════ RESPONSIVE GRID & UTILITIES ═══════════════ */
+/* Bootstrap-compatible grid system for the Blade views */
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -12px;
+    margin-left: -12px;
+}
+.col-1, .col-2, .col-3, .col-4, .col-5, .col-6,
+.col-7, .col-8, .col-9, .col-10, .col-11, .col-12,
+.col-sm-1, .col-sm-2, .col-sm-3, .col-sm-4, .col-sm-5, .col-sm-6,
+.col-sm-7, .col-sm-8, .col-sm-9, .col-sm-10, .col-sm-11, .col-sm-12,
+.col-md-1, .col-md-2, .col-md-3, .col-md-4, .col-md-5, .col-md-6,
+.col-md-7, .col-md-8, .col-md-9, .col-md-10, .col-md-11, .col-md-12,
+.col-lg-1, .col-lg-2, .col-lg-3, .col-lg-4, .col-lg-5, .col-lg-6,
+.col-lg-7, .col-lg-8, .col-lg-9, .col-lg-10, .col-lg-11, .col-lg-12,
+.col-xl-1, .col-xl-2, .col-xl-3, .col-xl-4, .col-xl-5, .col-xl-6,
+.col-xl-7, .col-xl-8, .col-xl-9, .col-xl-10, .col-xl-11, .col-xl-12 {
+    position: relative;
+    width: 100%;
+    padding-right: 12px;
+    padding-left: 12px;
+    min-width: 0;
+}
+.col-12 { flex: 0 0 100%; max-width: 100%; }
+.col-11 { flex: 0 0 91.666667%; max-width: 91.666667%; }
+.col-10 { flex: 0 0 83.333333%; max-width: 83.333333%; }
+.col-9  { flex: 0 0 75%; max-width: 75%; }
+.col-8  { flex: 0 0 66.666667%; max-width: 66.666667%; }
+.col-7  { flex: 0 0 58.333333%; max-width: 58.333333%; }
+.col-6  { flex: 0 0 50%; max-width: 50%; }
+.col-5  { flex: 0 0 41.666667%; max-width: 41.666667%; }
+.col-4  { flex: 0 0 33.333333%; max-width: 33.333333%; }
+.col-3  { flex: 0 0 25%; max-width: 25%; }
+.col-2  { flex: 0 0 16.666667%; max-width: 16.666667%; }
+.col-1  { flex: 0 0 8.333333%; max-width: 8.333333%; }
+
+/* Gutters */
+.g-0 { margin-right: 0; margin-left: 0; }
+.g-0 > * { padding-right: 0; padding-left: 0; }
+.g-2 { margin-right: -8px; margin-left: -8px; }
+.g-2 > * { padding-right: 8px; padding-left: 8px; }
+.g-3 { margin-right: -12px; margin-left: -12px; }
+.g-3 > * { padding-right: 12px; padding-left: 12px; }
+.g-4 { margin-right: -16px; margin-left: -16px; }
+.g-4 > * { padding-right: 16px; padding-left: 16px; }
+
+/* Flex utilities */
+.d-flex { display: flex !important; }
+.d-none { display: none !important; }
+.d-block { display: block !important; }
+.flex-column { flex-direction: column !important; }
+.flex-row { flex-direction: row !important; }
+.flex-wrap { flex-wrap: wrap !important; }
+.align-items-center { align-items: center !important; }
+.align-items-start { align-items: flex-start !important; }
+.align-items-end { align-items: flex-end !important; }
+.justify-content-center { justify-content: center !important; }
+.justify-content-between { justify-content: space-between !important; }
+.justify-content-end { justify-content: flex-end !important; }
+.justify-content-start { justify-content: flex-start !important; }
+
+/* Spacing utilities */
+.gap-2 { gap: 8px !important; }
+.gap-3 { gap: 12px !important; }
+.gap-4 { gap: 16px !important; }
+.mb-0 { margin-bottom: 0 !important; }
+.mb-1 { margin-bottom: 4px !important; }
+.mb-2 { margin-bottom: 8px !important; }
+.mb-3 { margin-bottom: 12px !important; }
+.mb-4 { margin-bottom: 16px !important; }
+.mb-6 { margin-bottom: 24px !important; }
+.mt-1 { margin-top: 4px !important; }
+.mt-2 { margin-top: 8px !important; }
+.mt-3 { margin-top: 12px !important; }
+.mt-4 { margin-top: 16px !important; }
+.mt-6 { margin-top: 24px !important; }
+.me-2 { margin-right: 8px !important; }
+.ms-1 { margin-left: 4px !important; }
+.ms-3 { margin-left: 12px !important; }
+.ms-4 { margin-left: 16px !important; }
+.ms-6 { margin-left: 24px !important; }
+
+/* Text utilities */
+.text-center { text-align: center !important; }
+.text-end { text-align: right !important; }
+.text-start { text-align: left !important; }
+
+/* Width utilities */
+.w-100 { width: 100% !important; }
+
+/* Table responsive */
+.table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Breakpoint: sm (576px+) */
+@media (min-width: 576px) {
+    .col-sm-12 { flex: 0 0 100%; max-width: 100%; }
+    .col-sm-11 { flex: 0 0 91.666667%; max-width: 91.666667%; }
+    .col-sm-10 { flex: 0 0 83.333333%; max-width: 83.333333%; }
+    .col-sm-9  { flex: 0 0 75%; max-width: 75%; }
+    .col-sm-8  { flex: 0 0 66.666667%; max-width: 66.666667%; }
+    .col-sm-7  { flex: 0 0 58.333333%; max-width: 58.333333%; }
+    .col-sm-6  { flex: 0 0 50%; max-width: 50%; }
+    .col-sm-5  { flex: 0 0 41.666667%; max-width: 41.666667%; }
+    .col-sm-4  { flex: 0 0 33.333333%; max-width: 33.333333%; }
+    .col-sm-3  { flex: 0 0 25%; max-width: 25%; }
+    .col-sm-2  { flex: 0 0 16.666667%; max-width: 16.666667%; }
+    .col-sm-1  { flex: 0 0 8.333333%; max-width: 8.333333%; }
+}
+
+/* Breakpoint: md (768px+) */
+@media (min-width: 768px) {
+    .col-md-12 { flex: 0 0 100%; max-width: 100%; }
+    .col-md-11 { flex: 0 0 91.666667%; max-width: 91.666667%; }
+    .col-md-10 { flex: 0 0 83.333333%; max-width: 83.333333%; }
+    .col-md-9  { flex: 0 0 75%; max-width: 75%; }
+    .col-md-8  { flex: 0 0 66.666667%; max-width: 66.666667%; }
+    .col-md-7  { flex: 0 0 58.333333%; max-width: 58.333333%; }
+    .col-md-6  { flex: 0 0 50%; max-width: 50%; }
+    .col-md-5  { flex: 0 0 41.666667%; max-width: 41.666667%; }
+    .col-md-4  { flex: 0 0 33.333333%; max-width: 33.333333%; }
+    .col-md-3  { flex: 0 0 25%; max-width: 25%; }
+    .col-md-2  { flex: 0 0 16.666667%; max-width: 16.666667%; }
+    .col-md-1  { flex: 0 0 8.333333%; max-width: 8.333333%; }
+}
+
+/* Breakpoint: lg (992px+) */
+@media (min-width: 992px) {
+    .col-lg-12 { flex: 0 0 100%; max-width: 100%; }
+    .col-lg-11 { flex: 0 0 91.666667%; max-width: 91.666667%; }
+    .col-lg-10 { flex: 0 0 83.333333%; max-width: 83.333333%; }
+    .col-lg-9  { flex: 0 0 75%; max-width: 75%; }
+    .col-lg-8  { flex: 0 0 66.666667%; max-width: 66.666667%; }
+    .col-lg-7  { flex: 0 0 58.333333%; max-width: 58.333333%; }
+    .col-lg-6  { flex: 0 0 50%; max-width: 50%; }
+    .col-lg-5  { flex: 0 0 41.666667%; max-width: 41.666667%; }
+    .col-lg-4  { flex: 0 0 33.333333%; max-width: 33.333333%; }
+    .col-lg-3  { flex: 0 0 25%; max-width: 25%; }
+    .col-lg-2  { flex: 0 0 16.666667%; max-width: 16.666667%; }
+    .col-lg-1  { flex: 0 0 8.333333%; max-width: 8.333333%; }
+}
+
+/* Breakpoint: xl (1200px+) */
+@media (min-width: 1200px) {
+    .col-xl-12 { flex: 0 0 100%; max-width: 100%; }
+    .col-xl-11 { flex: 0 0 91.666667%; max-width: 91.666667%; }
+    .col-xl-10 { flex: 0 0 83.333333%; max-width: 83.333333%; }
+    .col-xl-9  { flex: 0 0 75%; max-width: 75%; }
+    .col-xl-8  { flex: 0 0 66.666667%; max-width: 66.666667%; }
+    .col-xl-7  { flex: 0 0 58.333333%; max-width: 58.333333%; }
+    .col-xl-6  { flex: 0 0 50%; max-width: 50%; }
+    .col-xl-5  { flex: 0 0 41.666667%; max-width: 41.666667%; }
+    .col-xl-4  { flex: 0 0 33.333333%; max-width: 33.333333%; }
+    .col-xl-3  { flex: 0 0 25%; max-width: 25%; }
+    .col-xl-2  { flex: 0 0 16.666667%; max-width: 16.666667%; }
+    .col-xl-1  { flex: 0 0 8.333333%; max-width: 8.333333%; }
+}
+
+/* ═══════════════ AI ASSISTANT RAIL ═══════════════ */
+/* A docked secondary sidebar in the VSCode sense: it owns a column of the
+   viewport and the page reflows around it (see --hims-ai-offset on .hims-main
+   and .hims-topbar), rather than floating on top of the content the way the
+   old chat bubble did.
+
+   z-index 98 puts it under the topbar (99) and the topbar dropdowns (1100),
+   so the notification and help menus still open over it instead of being
+   clipped behind it. */
+#ai-rail {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--hims-ai-w);
+    /* 100% of the initial containing block, not 100vw: `vw` includes the width
+       of a classic scrollbar, so on a narrow desktop window the rail became
+       wider than the space it could be seen in and its left edge — where every
+       line of the conversation starts — sat off screen. Fixed positioning means
+       it can never add a scrollbar of its own, so the overflow was silent. */
+    max-width: 100%;
+    background: var(--hims-white);
+    border-left: 1px solid var(--hims-border);
+    display: flex;
+    flex-direction: column;
+    z-index: 98;
+    /* Kept out of the layout entirely when closed: visibility (not just the
+       transform) stops it trapping focus, and a transform alone would leave a
+       horizontal scrollbar on the body. */
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: transform .25s cubic-bezier(.4,0,.2,1), visibility 0s .25s;
+}
+#ai-rail.open {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform .25s var(--hims-spring), visibility 0s 0s;
+    box-shadow: -8px 0 32px rgba(5,46,22,.08);
+}
+
+/* ── Drag handle on the left edge ── */
+#ai-rail-resizer {
+    position: absolute;
+    top: 0; bottom: 0; left: -3px;
+    width: 7px;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 2;
+}
+#ai-rail-resizer:hover,
+#ai-rail-resizer:focus-visible { background: var(--hims-primary-light); outline: none; }
+
+/* ── Header ── */
+#ai-rail-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: var(--hims-topbar-h);
+    flex-shrink: 0;
+    padding: 0 8px 0 16px;
+    border-bottom: 1px solid var(--hims-border);
+    background: var(--hims-primary-pale);
+}
+#ai-rail-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--hims-primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* Titles are the user's first question, so they can be any length. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ai-rail-icon {
+    width: 30px; height: 30px;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: var(--hims-primary-dark);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: var(--hims-transition);
+}
+.ai-rail-icon:hover  { background: var(--hims-primary-xlight); }
+.ai-rail-icon.active { background: var(--hims-primary); color: #fff; }
+
+/* ── Conversation list ── */
+#ai-sessions {
+    flex-shrink: 0;
+    max-height: 40%;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--hims-border);
+    background: #fbfefc;
+}
+#ai-sessions[hidden] { display: none; }
+.ai-sessions-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--hims-gray);
+}
+.ai-sessions-clear {
+    border: none;
+    background: none;
+    color: var(--hims-danger);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+.ai-sessions-clear:hover { background: #fee2e2; }
+.ai-sessions-empty { padding: 4px 14px 14px; font-size: 12px; color: var(--hims-gray); }
+
+.ai-session {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 8px 2px 14px;
+}
+.ai-session:hover        { background: var(--hims-primary-pale); }
+.ai-session.active       { background: var(--hims-primary-xlight); }
+.ai-session-name {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    border: none;
+    background: none;
+    padding: 7px 0;
+    font: inherit;
+    font-size: 13px;
+    color: var(--hims-text-dark);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ai-session.active .ai-session-name { font-weight: 600; color: var(--hims-primary-dark); }
+.ai-session-act {
+    width: 24px; height: 24px;
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    color: var(--hims-gray);
+    font-size: 12px;
+    cursor: pointer;
+    /* Hidden until hover so the list stays readable, but always present for
+       keyboard users, who reach them by tab. */
+    opacity: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity .12s, background .12s, color .12s;
+}
+.ai-session:hover .ai-session-act,
+.ai-session-act:focus-visible { opacity: 1; }
+.ai-session-act:hover { background: var(--hims-primary-xlight); color: var(--hims-primary-dark); }
+
+/* ── Transcript ── */
+#ai-messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    background: #f8fdf9;
+}
+.ai-msg {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    max-width: 92%;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+.ai-msg.user {
+    align-self: flex-end;
+    background: var(--hims-primary-xlight);
+    color: var(--hims-text);
+    border: 1px solid var(--hims-border);
+}
+.ai-msg.ai {
+    align-self: flex-start;
+    background: var(--hims-white);
+    color: #374151;
+    border: 1px solid #e5e7eb;
+}
+.ai-msg.thinking {
+    align-self: flex-start;
+    background: var(--hims-white);
+    color: var(--hims-gray);
+    font-style: italic;
+    border: 1px solid #e5e7eb;
+}
+/* An action the assistant actually carried out reads differently from an
+   answer about one, so it borrows the banner palette above. .pending is the
+   destructive offer still waiting on "confirm". */
+.ai-msg.ai.did-ok      { background: var(--hims-primary-xlight); color: var(--hims-primary-dark); border-color: var(--hims-primary); }
+.ai-msg.ai.did-error   { background: #fee2e2; color: #991b1b; border-color: var(--hims-danger); }
+.ai-msg.ai.did-pending { background: #fef3c7; color: #92400e; border-color: var(--hims-warning); }
+
+/* ── Composer ── */
+#ai-input-row {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 12px 14px;
+    background: var(--hims-white);
+    border-top: 1px solid var(--hims-border);
+}
+#ai-input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.45;
+    resize: none;
+    max-height: 120px;
+    transition: border-color .15s;
+}
+#ai-input:focus { outline: none; border-color: var(--hims-primary); }
+#ai-send-btn {
+    width: 36px; height: 36px;
+    flex-shrink: 0;
+    align-self: flex-end;
+    border: none;
+    border-radius: 8px;
+    background: var(--hims-primary);
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+}
+#ai-send-btn:hover    { background: var(--hims-primary-dark); }
+#ai-send-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+
+/* Marks the topbar button while the rail is docked, the way VSCode keeps its
+   sidebar toggles lit. */
+.topbar-btn#ai-toggle.active { background: var(--hims-primary); color: #fff; }
+
+/* ── Overlay mode ──
+   Below this width there is not enough room to give a 280px+ column away and
+   still show a table, so the rail stops pushing and floats over the page with
+   a backdrop instead. JS keeps --hims-ai-offset at 0 here; the media query is
+   what styles the backdrop and widens the rail on phones. */
+#ai-rail-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5,46,22,.45);
+    z-index: 97;
+}
+@media (max-width: 1099px) {
+    #ai-rail-backdrop.open { display: block; }
+    #ai-rail-backdrop { top: var(--hims-topbar-h); }
+    #ai-rail {
+        top: var(--hims-topbar-h);
+        z-index: 100;
+        box-shadow: -8px 0 40px rgba(0,0,0,.18);
+    }
+    #ai-rail-resizer { display: none; }
+}
+@media (max-width: 480px) {
+    /* Full width, but measured the same way as the max-width above — 100vw is
+       15px too wide the moment a classic scrollbar is present. */
+    #ai-rail { width: 100%; }
+}
+
+/* Docking the rail narrows the main column enough that a wide table would be
+   clipped by .hims-card's overflow:hidden. Let the card scroll horizontally
+   for as long as the rail is taking up space. */
+body.ai-rail-docked .hims-card .card-body { overflow-x: auto; }
+
+/* ═══════════════════════════════════════════════
+   MOBILE RESPONSIVE
+
+   One rule governs this section: below 768px every value on a page must be
+   reachable by scrolling *down*. Nothing may ask for a sideways swipe.
+
+   That is a legibility rule, not a taste one. A horizontally scrolled region
+   gives the reader no signal that anything exists to its right — the gap
+   analysis table clipped after its third column looks exactly like a table
+   that has three columns, and the two that decide whether a row needs acting
+   on (Below Requirement, Suggested Response) are the ones that disappear. The
+   rules that used to live here made that the default rather than the accident:
+   `.hims-table { min-width: 520px }` guaranteed every table in the app was
+   wider than the phone reading it, and the `overflow-x: auto` beside it turned
+   the guarantee into a scrollbar.
+
+   So below 768px a table stops being a grid and becomes a list of records. The
+   header row is dropped and each cell prints its own label from `data-label`,
+   which is the only reason a cell can survive being lifted out of its column.
+   `Unit\ResponsiveTableContractTest` pins that: a `td` with no `data-label`
+   renders as a bare value under no heading, on phones only — which is exactly
+   where nobody is looking when they change a table.
+═══════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+    .hims-main { padding: 20px; }
+    .hims-topbar { padding: 0 20px; }
+}
+
+@media (max-width: 768px) {
+    /* ── Shell ── */
+    .hims-sidebar {
+        transform: translateX(-100%);
+        box-shadow: none;
+    }
+    .hims-sidebar.open {
+        transform: translateX(0);
+        box-shadow: 0 0 40px rgba(0,0,0,.35);
+        z-index: 101;
+    }
+    .hims-sidebar-backdrop.open { display: block; }
+    .hims-menu-toggle { display: flex; }
+    .hims-main    { margin-left: 0; padding: 16px; }
+    .topbar-left .page-breadcrumb { display: none; }
+
+    /* The bar carries a menu toggle, four 38px icon buttons and the page title,
+       and below 768px they do not fit on one line: the toggle, the buttons,
+       their gaps and the bar's own padding claim a fixed 260px, so on a 360px
+       screen the title is offered 85px for text measuring 250.
+
+       Letting the title shrink into that (`min-width: 0`) and clamping it at two
+       lines is what stopped it pushing the icon buttons off the side of the
+       screen — a flex item will not shrink below its own min-content width until
+       told it may, so the title block used to hold `.topbar-left` open at the
+       width of its longest word. But a clamp only converts a horizontal overflow
+       into a vertical one. Measured after that change, "AI-Driven Competency
+       Gap Analysis" still needed three lines at 372px and six at 320px against a
+       two-line clamp, so the title was cut mid-phrase on both common phone
+       widths — and the bar had 14px of slack left inside its 64px, which is not
+       the 18px a third line costs. Every title longer than about 22 characters
+       was affected at 320px, which is most of the module names.
+
+       So the title gets a row to itself. `display: contents` on `.topbar-left`
+       drops that element's box and promotes the toggle and the title block to
+       children of the bar, which is what lets the toggle stay up beside the icon
+       buttons while the title wraps below them — no markup change, and the
+       shell's JS reaches `#menu-toggle` by id, so nothing there cares which
+       parent it has. Across the full bar width every title in the app measures
+       one line from 320px up, so the bar grows by 20px rather than by a whole
+       second row, and the two-line clamp stays as the backstop for a 280px
+       screen where one row is still not enough.
+
+       `--hims-topbar-h` is overridden rather than `height` being set directly:
+       `.hims-main` clears the bar with a matching `margin-top` and subtracts it
+       again from `min-height`, the AI rail and its backdrop take their `top` from
+       it, the rail header matches its height, and the pinned dropdowns below hang
+       off it. One value keeps six rules that must agree in step; a literal height
+       here would leave the other five measuring a 64px bar.
+
+       Tap targets are deliberately not shrunk to pay for any of this: 38px is
+       already under the 44px guidance and a hospital phone is used one-handed in
+       a hurry. */
+    :root { --hims-topbar-h: 84px; }
+    .hims-topbar {
+        left: 0;
+        flex-wrap: wrap;
+        align-content: center;
+        row-gap: 2px;
+        padding: 6px 12px;
+    }
+    .topbar-left { display: contents; }
+    .hims-menu-toggle { order: 1; flex-shrink: 0; }
+    .topbar-right { order: 2; margin-left: auto; gap: 6px; flex-shrink: 0; }
+    .topbar-left > div { order: 3; flex: 1 1 100%; min-width: 0; }
+    .topbar-left .page-title {
+        font-size: 14.5px;
+        line-height: 1.25;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow: hidden;
+        overflow-wrap: break-word;
+    }
+
+    /* ── Topbar dropdowns ──
+       Pinned to the viewport instead of to their trigger. A 320px panel hung
+       off `right: 0` of a button that is itself only ~110px from the right edge
+       starts at a negative x on a phone, and the half that lands off screen is
+       the half holding the *start* of every line of text — so the panel reads
+       as gibberish rather than as something cut off.
+
+       Written against `.topbar-dropdown` rather than against the panels one at
+       a time, because doing it one at a time is what broke it: `.notif-dropdown`
+       and `.search-dropdown` were listed here and `#help-dropdown` carries
+       neither class, which left the help menu as the one panel still clipped. */
+    .topbar-dropdown {
+        position: fixed;
+        top: var(--hims-topbar-h);
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-width: none;
+        transform-origin: top center;
+    }
+    /* The caret would now point at a trigger the panel is no longer beside. */
+    .topbar-dropdown::before { display: none; }
+
+    /* ── Cards and stats ── */
+    .stat-card { padding: 16px 18px; }
+    .stat-card .stat-value { font-size: 24px; }
+    .stat-card .stat-label { font-size: 12px; }
+
+    /* 61 card bodies carry an inline `style="padding:0"` so a table can run
+       full-bleed to the card's edges. That is right for a grid and wrong for a
+       stack of record cards, which need a gutter to read as separate objects —
+       and an inline declaration can only be beaten by `!important`. Normalising
+       every card body to one mobile gutter is the point, not a side effect — it
+       also flattens the 32-60px an empty-state body or two declares inline,
+       which on a phone is air the sentence does not need. */
+    .hims-card .card-body { padding: 14px !important; }
+
+    /* A card header has to be wrapped by name. It is already a flex row with
+       `justify-content: space-between`, but it gets that from its own rule in the
+       CARDS section and *not* from the `.d-flex.justify-content-between` utility
+       pair below, so that rule cannot reach it — and four headers put a filter
+       `<select>` carrying an inline pixel width beside their title (performance,
+       training and competency index, plus succession index). Unwrapped at 360px
+       the title is squeezed to two lines and the 190px select down to 140, and
+       the row still fits, so nothing overflows to give it away. `employees/index`
+       carries `flex-wrap:wrap` inline, which is the other half of why this looked
+       like it was already handled. */
+    .hims-card .card-header { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
+
+    /* A page header row with a title on the left and an action on the right has
+       no room for both. Only the `justify-content-between` rows are wrapped;
+       leaving bare `.d-flex` alone keeps avatar-plus-name and icon-plus-label
+       pairs on one line where they belong. */
+    .d-flex.justify-content-between { flex-wrap: wrap; }
+    .hims-table td .d-flex { flex-wrap: wrap; }
+
+    /* Wrapping the header row is only half the job, and stopping there is what
+       shipped `/learning` with its primary action off the side of the screen.
+       The actions in such a header are a *nested* `.d-flex.gap-2`, so the rule
+       above moves that group onto its own line and then leaves it unwrapped at
+       its natural width: three buttons measured 481px inside a 357px viewport,
+       putting "New Course" past the right edge with a scrollbar as the only way
+       to reach it — and `/learning/accounts` fared worse, clipping its
+       "Proxy-tracked" filter with no scroll offered at all. So the gap-carrying
+       rows wrap too. Naming the gap utilities is what keeps this off
+       avatar-plus-name pairs, which carry no gap class and stay on one line.
+       Wrapping never moves a group that already fits, so this changes nothing
+       but the rows that overflow. */
+    .d-flex.gap-1, .d-flex.gap-2,
+    .d-flex.gap-3, .d-flex.gap-4 { flex-wrap: wrap; }
+
+    /* Filter controls carry inline pixel widths sized for a desktop filter row
+       (220px on the employee search, 190px on the competency matrix select).
+       Two of those side by side are wider than a phone, so the row overflowed
+       the card. Again inline, so again `!important`. */
+    .hims-input, .hims-select { width: 100% !important; max-width: 100% !important; }
+
+    /* Tabs wrap to a second row instead of scrolling below this width, but the
+       declarations that do it are not here — they are at the foot of the TABS
+       section, 250 lines down. `.hims-tabs` and `.hims-tab` are defined *after*
+       this block at the same specificity (0,1,0), and a media query adds none of
+       its own, so the tie is settled by source order and the base rule wins.
+       Written here, three of the five declarations were dead on arrival: only
+       `flex-wrap` survived, and only because the base rule happens not to
+       declare it. Anything else this section wants from a component defined
+       below it has the same problem. */
+
+    /* ── Badges ──
+       A badge is usually a status word, and `white-space: nowrap` is right for
+       those: "Expiring Soon" reads badly broken in two. But some badges hold a
+       *name* — `employees/index` and `employees/show` both put the department in
+       one — and a stacked cell gives its value a 130px track at 320px wide. The
+       badge is the grid item, so it is stretched to that track and its text has
+       nowhere to go, and `.hims-table tr` below clips instead of scrolling: at
+       320px "Quality & Patient Safety" and "Information Technology" — two of the
+       seven seeded departments, not edge cases — lost their last word with no
+       scrollbar to reveal it. The `overflow-wrap: anywhere` on the cell could not
+       help, because a break is only taken where wrapping is allowed at all.
+
+       Relaxing it here costs nothing: `normal` permits a wrap, it does not force
+       one, so every badge that already fits on one line still does. A two-line
+       pill is legible; half a department name is not. */
+    .hims-badge { white-space: normal; overflow-wrap: anywhere; }
+
+    /* ── Tables become records ──
+       Every part of the table is re-flowed to a block, the header row is
+       dropped, and each cell prints its own `data-label`. */
+    .hims-table,
+    .hims-table tbody,
+    .hims-table tr,
+    .hims-table td { display: block; width: auto; }
+
+    /* Hidden rather than removed from the markup: the desktop rule set still
+       needs it, and it is still what describes the table to a screen reader at
+       every width above this one. */
+    .hims-table thead { display: none; }
+
+    .hims-table tr {
+        border: 1px solid var(--hims-border);
+        border-radius: var(--hims-radius-sm);
+        background: var(--hims-white);
+        margin-bottom: 10px;
+        overflow: hidden;
+    }
+    .hims-table tr:last-child { margin-bottom: 0; }
+
+    .hims-table td {
+        display: grid;
+        /* Label column sized off the longest realistic header, not a straight
+           percentage, so the values line up down the card without a two-word
+           heading forcing the value onto its own line. */
+        grid-template-columns: minmax(84px, 34%) minmax(0, 1fr);
+        gap: 4px 12px;
+        align-items: baseline;
+        padding: 8px 12px;
+        border: 0;
+        font-size: 13px;
+        /* Emails, credential numbers and licence codes have no space to break
+           at, and one of them is all it takes to push the card past the
+           viewport — which is the defect this whole section exists to remove. */
+        overflow-wrap: anywhere;
+    }
+    .hims-table td + td { border-top: 1px solid var(--hims-primary-pale); }
+
+    /* One `td` in the app carries an inline `max-width` sized for a desktop
+       column — `competency/gap-analysis/employee`'s Notes cell, at 260px. Left
+       standing it holds that cell 29px narrower than the ones above and below it
+       in the same card, and because the label track is a percentage of the *cell*
+       rather than of the card the label column shrinks with it: one row starts
+       its value 10px left of its neighbours, which is the misalignment the
+       `minmax()` above exists to prevent. Inline, so `!important`. */
+    .hims-table td { max-width: none !important; }
+
+    .hims-table td::before {
+        content: attr(data-label);
+        font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: .05em;
+        color: var(--hims-primary-dark);
+    }
+
+    /* Tint the whole record on hover, not the one cell under the pointer: in a
+       stacked card the row is the object, and a single tinted cell reads as a
+       rendering fault. */
+    .hims-table tr:hover td { background: transparent; }
+    .hims-table tr:hover { background: var(--hims-primary-pale); }
+
+    /* A stacked card has exactly one value column, so a column-alignment class
+       has nothing left to align against — and `.text-center` on a value now
+       sitting beside its label reads as a mistake. More specific than the
+       utilities in the Text section, which are `!important`. `colspan` cells
+       are exempt: they belong to no column, so their own centring still means
+       what it says. */
+    .hims-table td.text-center:not([colspan]),
+    .hims-table td.text-end:not([colspan]),
+    .hims-table td.text-start:not([colspan]) { text-align: left !important; }
+
+    /* An empty-state row spans the table, so it stays one block with no label
+       in front of its sentence. */
+    .hims-table td[colspan] { display: block; }
+    .hims-table td[colspan]::before { content: none; }
+}
+
+@media (max-width: 480px) {
+    .hims-main { padding: 12px; }
+    .stat-card { padding: 18px 18px; }
+    .stat-card .stat-value { font-size: 26px; }
+    /* The label column gives way first — at 360px a fixed 84px minimum leaves
+       too little for the value beside it. */
+    .hims-table td { grid-template-columns: minmax(72px, 38%) minmax(0, 1fr); padding: 7px 10px; }
+}
+
+/* ═══════════════ ANIMATIONS ═══════════════ */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.animate-in { animation: fadeInUp .35s cubic-bezier(.4,0,.2,1) forwards; }
+
+@keyframes popIn {
+    from { opacity: 0; transform: scale(.92); }
+    to   { opacity: 1; transform: scale(1); }
+}
+.pop-in { animation: popIn .25s var(--hims-spring) forwards; }
+
+@keyframes dropdownPopIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.94);
+    }
+    70% {
+        opacity: 1;
+        transform: translateY(2px) scale(1.008);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes dropdownItemPop {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from { transform: translateY(-50%) scaleY(0); opacity: 0; }
+    to   { transform: translateY(-50%) scaleY(1); opacity: 1; }
+}
+
+@keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+.skeleton {
+    background: linear-gradient(90deg, var(--hims-primary-pale) 25%, var(--hims-primary-xlight) 50%, var(--hims-primary-pale) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+}
+
+/* Staggered stat-card entrance — each card pops in with a slight delay.
+   The animation-delay is set inline on the .stat-card elements that already
+   carry one; this just widens the base animation to include the pop. */
+.stat-card {
+    animation: popIn .35s var(--hims-spring) both;
+}
+
+/* ═══════════════════════════════════════════════
+   MODAL
+   Used by the review-cycle editor. z-index clears the topbar (99) and its
+   dropdowns (1100) so a modal is never half-covered by the shell. Hidden by
+   default; JS adds .open to display it, then .shown on the next frame so the
+   fade and slide actually animate rather than snapping.
+
+   The backdrop is deliberately transparent — it exists only as a full-viewport
+   click target for dismissal, not as a scrim. Without a dim behind it the panel
+   has to carry its own separation, which is what the heavier shadow and the
+   solid border below are for.
+═══════════════════════════════════════════════ */
+.hims-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5,46,22,.35);
+    z-index: 1200;
+    opacity: 0;
+    transition: opacity .25s ease;
+    padding: 20px;
+    overflow-y: auto;
+}
+.hims-modal-backdrop.open  { display: flex; align-items: flex-start; justify-content: center; }
+.hims-modal-backdrop.shown { opacity: 1; }
+
+.hims-modal {
+    background: var(--hims-white);
+    border: 1px solid var(--hims-primary);
+    border-radius: var(--hims-radius);
+    box-shadow: 0 18px 50px rgba(5, 46, 22, .28);
+    width: 100%;
+    max-width: 620px;
+    margin: auto;
+    transform: translateY(-16px) scale(.96);
+    transition: transform .3s var(--hims-spring);
+}
+.hims-modal-backdrop.shown .hims-modal { transform: translateY(0) scale(1); }
+
+.hims-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--hims-border);
+}
+.hims-modal-header h5 {
+    margin: 0;
+    font-size: 15px; font-weight: 700;
+    color: var(--hims-text-dark);
+    display: flex; align-items: center; gap: 8px;
+}
+.hims-modal-close {
+    background: none; border: none;
+    font-size: 20px; line-height: 1;
+    color: var(--hims-gray);
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: var(--hims-radius-sm);
+    transition: var(--hims-transition);
+}
+.hims-modal-close:hover { background: var(--hims-gray-light); color: var(--hims-text-dark); }
+
+.hims-modal-body { padding: 20px; }
+.hims-modal-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--hims-border);
+}
+
+@media (max-width: 576px) {
+    .hims-modal-backdrop { padding: 12px; }
+    .hims-modal-footer   { flex-direction: column-reverse; }
+    .hims-modal-footer .btn-hims { width: 100%; justify-content: center; }
+}
+
+/* ═══════════════════════════════════════════════
+   CHECKLIST
+   Stands in for <select multiple>, which hides "you may pick more than one"
+   behind Ctrl/Cmd-click and gives no hit target taller than a line of text.
+   Scrolls internally so a hundred competencies cannot stretch a modal.
+═══════════════════════════════════════════════ */
+.hims-checklist {
+    border: 1px solid var(--hims-border);
+    border-radius: var(--hims-radius-sm);
+    background: var(--hims-white);
+    max-height: 196px;
+    overflow-y: auto;
+    padding: 4px;
+}
+.hims-checklist label {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin: 0;
+    padding: 7px 9px;
+    border-radius: var(--hims-radius-sm);
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--hims-text-dark);
+    cursor: pointer;
+    transition: var(--hims-transition);
+}
+.hims-checklist label:hover { background: var(--hims-primary-pale); }
+.hims-checklist input[type="checkbox"] {
+    width: 15px; height: 15px;
+    margin-top: 1px;
+    flex-shrink: 0;
+    accent-color: var(--hims-primary);
+    cursor: pointer;
+}
+.hims-checklist .checklist-meta { color: var(--hims-gray); font-size: 11.5px; }
+.hims-checklist-empty { padding: 10px 9px; font-size: 12px; color: var(--hims-gray); }
+.hims-checklist-filter { margin-bottom: 6px; }
+
+/* A <button> that has to read as the inline link it replaced — used where an
+   empty-state sentence opens a modal instead of navigating to a create page. */
+.hims-link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════
+   TABS
+   Sub-navigation inside a module whose halves answer different questions —
+   Learning's individual-facing pages versus its institutional ones. Each tab is
+   a real <a>, so it bookmarks, refreshes and back-buttons like any other page;
+   nothing here switches panels client-side.
+   The strip scrolls horizontally rather than wrapping, because a wrapped second
+   row of tabs reads as a second navigation bar.
+═══════════════════════════════════════════════ */
+.hims-tabs {
+    display: flex;
+    gap: 4px;
+    align-items: stretch;
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--hims-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+.hims-tabs::-webkit-scrollbar {
+    height: 4px;
+}
+.hims-tabs::-webkit-scrollbar-track {
+    background: transparent;
+}
+.hims-tabs::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.hims-tabs::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+.hims-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    padding: 10px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--hims-gray);
+    text-decoration: none;
+    white-space: nowrap;
+    border: 0;
+    /* Sits on the strip's own border so the active tab can paint over it. */
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    border-radius: var(--hims-radius-sm) var(--hims-radius-sm) 0 0;
+    transition: var(--hims-transition);
+}
+.hims-tab:hover {
+    color: var(--hims-primary);
+    background: var(--hims-primary-pale);
+}
+.hims-tab.active {
+    color: var(--hims-primary);
+    border-bottom-color: var(--hims-primary);
+    background: var(--hims-white);
+}
+.hims-tab i { font-size: 14px; }
+
+.select-option-icon {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 14px;
+    color: var(--hims-primary);
+    vertical-align: middle;
+}
+
+/* ═══════════════════════════════════════════════
+   MOBILE TABS DROPDOWN
+   On mobile screens, 8 tabs wrap into 3 cramped rows.
+   .hims-tabs-mobile provides a clean dropdown selector.
+═══════════════════════════════════════════════ */
+.hims-tabs-mobile {
+    display: none;
+    margin-bottom: 18px;
+}
+.hims-tabs-mobile-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--hims-white);
+    border: 1px solid var(--hims-border);
+    border-radius: var(--hims-radius-md);
+    padding: 6px 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.hims-tabs-mobile-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--hims-gray);
+    margin: 0;
+    white-space: nowrap;
+}
+.hims-tabs-mobile-label i {
+    color: var(--hims-primary);
+    font-size: 14px;
+}
+.hims-tabs-mobile-select-wrap {
+    flex: 1;
+    min-width: 0;
+}
+.hims-tabs-mobile-select-wrap .hims-select-wrapper {
+    width: 100% !important;
+}
+.hims-tabs-mobile-select-wrap .hims-select-trigger {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    padding: 7px 12px;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════
+   LEARNING HEADER & DESCRIPTION (Mobile & Desktop)
+═══════════════════════════════════════════════ */
+.learning-header-container {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    margin-bottom: 20px;
+}
+.learning-header-content {
+    flex: 1 1 420px;
+    min-width: min(100%, 280px);
+}
+.learning-header-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--hims-dark);
+}
+.learning-header-desc {
+    color: #6b7280;
+    font-size: 13px;
+    margin: 4px 0 0;
+    line-height: 1.5;
+}
+.learning-desc-toggle {
+    display: none;
+    background: none;
+    border: none;
+    padding: 0 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--hims-primary);
+    cursor: pointer;
+    vertical-align: baseline;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.learning-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+/* ── When AI Rail is docked or open, available horizontal space narrows significantly ── */
+body.ai-rail-docked .learning-header-container,
+body:has(#ai-rail.open) .learning-header-container {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 12px;
+}
+body.ai-rail-docked .learning-header-content,
+body:has(#ai-rail.open) .learning-header-content {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+}
+body.ai-rail-docked .learning-header-actions,
+body:has(#ai-rail.open) .learning-header-actions {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+body.ai-rail-docked .d-flex.justify-content-between.align-items-center,
+body:has(#ai-rail.open) .d-flex.justify-content-between.align-items-center {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+@media (max-width: 991.98px) {
+    .d-flex.justify-content-between.align-items-center {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+}
+.d-flex.justify-content-between.align-items-center > div:first-child {
+    min-width: 0;
+}
+
+@media (max-width: 1440px) {
+    /* Switch desktop tabs to clean section dropdown when docked */
+    body.ai-rail-docked .hims-tabs-desktop,
+    body:has(#ai-rail.open) .hims-tabs-desktop {
+        display: none !important;
+    }
+    body.ai-rail-docked .hims-tabs-mobile,
+    body:has(#ai-rail.open) .hims-tabs-mobile {
+        display: block !important;
+    }
+
+    /* Stack large 2-column splits (e.g. col-lg-8 / col-lg-4, col-xl-8 / col-xl-4, col-lg-7 / col-lg-5, col-lg-6 / col-lg-6) */
+    body.ai-rail-docked .col-lg-12,
+    body.ai-rail-docked .col-lg-11,
+    body.ai-rail-docked .col-lg-10,
+    body.ai-rail-docked .col-lg-9,
+    body.ai-rail-docked .col-lg-8,
+    body.ai-rail-docked .col-lg-7,
+    body.ai-rail-docked .col-lg-6,
+    body.ai-rail-docked .col-lg-5,
+    body.ai-rail-docked .col-lg-4,
+    body.ai-rail-docked .col-xl-12,
+    body.ai-rail-docked .col-xl-11,
+    body.ai-rail-docked .col-xl-10,
+    body.ai-rail-docked .col-xl-9,
+    body.ai-rail-docked .col-xl-8,
+    body.ai-rail-docked .col-xl-7,
+    body.ai-rail-docked .col-xl-6,
+    body.ai-rail-docked .col-xl-5,
+    body.ai-rail-docked .col-xl-4,
+    body:has(#ai-rail.open) .col-lg-12,
+    body:has(#ai-rail.open) .col-lg-11,
+    body:has(#ai-rail.open) .col-lg-10,
+    body:has(#ai-rail.open) .col-lg-9,
+    body:has(#ai-rail.open) .col-lg-8,
+    body:has(#ai-rail.open) .col-lg-7,
+    body:has(#ai-rail.open) .col-lg-6,
+    body:has(#ai-rail.open) .col-lg-5,
+    body:has(#ai-rail.open) .col-lg-4,
+    body:has(#ai-rail.open) .col-xl-12,
+    body:has(#ai-rail.open) .col-xl-11,
+    body:has(#ai-rail.open) .col-xl-10,
+    body:has(#ai-rail.open) .col-xl-9,
+    body:has(#ai-rail.open) .col-xl-8,
+    body:has(#ai-rail.open) .col-xl-7,
+    body:has(#ai-rail.open) .col-xl-6,
+    body:has(#ai-rail.open) .col-xl-5,
+    body:has(#ai-rail.open) .col-xl-4 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Stat cards: 4 per row becomes 2x2 grid */
+    body.ai-rail-docked .col-sm-3,
+    body.ai-rail-docked .col-md-3,
+    body.ai-rail-docked .col-lg-3,
+    body.ai-rail-docked .col-xl-3,
+    body:has(#ai-rail.open) .col-sm-3,
+    body:has(#ai-rail.open) .col-md-3,
+    body:has(#ai-rail.open) .col-lg-3,
+    body:has(#ai-rail.open) .col-xl-3 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+    }
+
+    /* 3-column stats / summaries: reflow gracefully */
+    body.ai-rail-docked .col-md-4,
+    body.ai-rail-docked .col-lg-4,
+    body.ai-rail-docked .col-xl-4,
+    body:has(#ai-rail.open) .col-md-4,
+    body:has(#ai-rail.open) .col-lg-4,
+    body:has(#ai-rail.open) .col-xl-4 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+    }
+}
+
+@media (max-width: 1100px) {
+    /* Below 1100px (content area <= 860px), stack columns cleanly even when rail is closed */
+    .col-lg-12,
+    .col-lg-11,
+    .col-lg-10,
+    .col-lg-9,
+    .col-lg-8,
+    .col-lg-7,
+    .col-lg-6,
+    .col-lg-5,
+    .col-lg-4,
+    .col-xl-12,
+    .col-xl-11,
+    .col-xl-10,
+    .col-xl-9,
+    .col-xl-8,
+    .col-xl-7,
+    .col-xl-6,
+    .col-xl-5,
+    .col-xl-4 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    .col-sm-3,
+    .col-md-3,
+    .col-lg-3,
+    .col-xl-3 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+    }
+
+    /* Below 1100px with rail docked (content area <= 500px), stack all stats full width */
+    body.ai-rail-docked .col-sm-3,
+    body.ai-rail-docked .col-md-3,
+    body.ai-rail-docked .col-lg-3,
+    body.ai-rail-docked .col-xl-3,
+    body.ai-rail-docked .col-md-4,
+    body.ai-rail-docked .col-lg-4,
+    body.ai-rail-docked .col-xl-4,
+    body.ai-rail-docked .col-sm-4,
+    body.ai-rail-docked .col-md-6,
+    body.ai-rail-docked .col-sm-6,
+    body:has(#ai-rail.open) .col-sm-3,
+    body:has(#ai-rail.open) .col-md-3,
+    body:has(#ai-rail.open) .col-lg-3,
+    body:has(#ai-rail.open) .col-xl-3,
+    body:has(#ai-rail.open) .col-md-4,
+    body:has(#ai-rail.open) .col-lg-4,
+    body:has(#ai-rail.open) .col-xl-4,
+    body:has(#ai-rail.open) .col-sm-4,
+    body:has(#ai-rail.open) .col-md-6,
+    body:has(#ai-rail.open) .col-sm-6 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .hims-tabs-desktop {
+        display: none !important;
+    }
+    .hims-tabs-mobile {
+        display: block !important;
+    }
+    .hims-tabs:not(.hims-tabs-desktop) {
+        flex-wrap: wrap;
+        /* `overflow-x: auto` has nothing left to scroll once the strip wraps,
+           and the `overflow-y: hidden` beside it clips the 1px the tabs hang
+           below the strip on purpose. */
+        overflow: visible;
+        gap: 2px 4px;
+    }
+    /* The -1px that lets an active tab paint over the strip's border also pulls
+       the row below it up by 1px once there is a row below it. */
+    .hims-tab { margin-bottom: 0; }
+
+    .learning-header-container {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .learning-header-content {
+        flex: 0 0 auto;
+        width: 100%;
+        min-width: 0;
+    }
+    .learning-header-title {
+        font-size: 16.5px;
+        line-height: 1.3;
+    }
+    .learning-header-desc {
+        font-size: 12px;
+        margin-top: 3px;
+        line-height: 1.45;
+    }
+    .learning-header-desc .desc-extra {
+        display: none;
+    }
+    .learning-header-desc .desc-extra.expanded {
+        display: inline;
+        animation: dropdownPopIn 0.2s ease forwards;
+    }
+    .learning-desc-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+    }
+    .learning-header-actions {
+        margin-left: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+    }
+    .learning-header-actions .btn-hims {
+        padding: 7px 12px;
+        font-size: 12px;
+        flex: 1 1 calc(50% - 6px);
+        justify-content: center;
+    }
+    .learning-header-actions .btn-hims-primary {
+        flex: 1 1 100%;
+    }
+}
+
+@media (max-width: 576px) {
+    /* Icons alone would be a guessing game, so the label stays and the padding
+       gives way instead. */
+    .hims-tab { padding: 9px 11px; font-size: 12.5px; }
+}
+
+@media (max-width: 480px) {
+    .learning-header-actions .btn-hims {
+        padding: 6px 10px;
+        font-size: 11.5px;
+    }
+}
+
+/* Utility overrides */
+.text-primary-hims { color: var(--hims-primary) !important; }
+.bg-primary-hims   { background: var(--hims-primary) !important; }
+.border-hims       { border-color: var(--hims-border) !important; }
