@@ -327,49 +327,7 @@ final class AiActionRegistry
             'params' => [],
         ],
 
-        // ── Employees / Departments / Users ─────────────────────
-        'employee.create' => [
-            'route' => 'employees.store',
-            'label' => 'Add an employee to the system',
-            'table' => 'employees',
-            'pk' => 'employee_id',
-            'resolve' => ['department_id' => 'department'],
-            'params' => [
-                'first_name' => 'first name',
-                'last_name' => 'last name',
-                'email' => 'email address, must be unique',
-                'department_id' => 'department, by name',
-                'role_id' => 'role id (ask if unsure)',
-                'hire_date' => 'YYYY-MM-DD',
-            ],
-        ],
-        'employee.update' => [
-            'route' => 'employees.update',
-            'label' => 'Edit an employee record',
-            'table' => 'employees',
-            'pk' => 'employee_id',
-            'uri' => ['id'],
-            'resolve' => ['department_id' => 'department', 'supervisor_id' => 'employee'],
-            'params' => [
-                'first_name' => 'first name',
-                'last_name' => 'last name',
-                'email' => 'email, must be unique',
-                'department_id' => 'department, by name',
-                'role_id' => 'role id',
-                'hire_date' => 'YYYY-MM-DD',
-                'employment_status' => 'active | probationary | on_leave | suspended | terminated | resigned',
-                'supervisor_id' => 'optional supervisor, by name',
-            ],
-        ],
-        'employee.delete' => [
-            'route' => 'employees.destroy',
-            'label' => 'Delete an employee record',
-            'table' => 'employees',
-            'pk' => 'employee_id',
-            'uri' => ['id'],
-            'destructive' => true,
-            'params' => [],
-        ],
+        // ── Departments / Users (Employee CRUD removed: synced from HR1 & HR2) ──
         'department.create' => [
             'route' => 'departments.store',
             'label' => 'Create a department',

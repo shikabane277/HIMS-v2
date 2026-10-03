@@ -578,61 +578,85 @@ class AiActionTest extends TestCase
     public function test_a_one_field_update_keeps_every_other_field(): void
     {
         $admin = $this->linkedUser('admin', 'admin@hospital.test');
-        $target = DB::table('employees')->where('email', 'admin@hospital.test')->first();
+        $employee = DB::table('employees')->where('email', 'admin@hospital.test')->first();
+
+        $cycleId = (string) Str::uuid();
+        DB::table('review_cycles')->insert([
+            'cycle_id' => $cycleId,
+            'cycle_name' => 'Original Cycle',
+            'cycle_type' => 'annual',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'status' => 'planned',
+            'created_by' => $employee->employee_id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $this->planningProvider([
-            'action' => 'employee.update',
+            'action' => 'performance.cycle.update',
             'params' => [
-                'id' => $target->employee_id,
-                'employment_status' => 'probationary',
+                'id' => $cycleId,
+                'status' => 'active',
             ],
             'missing' => [],
-            'summary' => 'Put Test Person on probation.',
+            'summary' => 'Activate the review cycle.',
         ]);
 
         $this->actingAs($admin)
-            ->postJson('/ai/query', ['query' => 'set Test Person on probation'])
+            ->postJson('/ai/query', ['query' => 'activate the review cycle'])
             ->assertOk()
             ->assertJsonPath('action_status', 'ok');
 
-        $after = DB::table('employees')->where('employee_id', $target->employee_id)->first();
+        $after = DB::table('review_cycles')->where('cycle_id', $cycleId)->first();
 
-        $this->assertSame('probationary', $after->employment_status);
+        $this->assertSame('active', $after->status);
 
         // The fields the instruction never mentioned are untouched, not blanked.
-        $this->assertSame($target->first_name, $after->first_name);
-        $this->assertSame($target->last_name, $after->last_name);
-        $this->assertSame($target->email, $after->email);
-        $this->assertSame($target->department_id, $after->department_id);
-        $this->assertSame($target->role_id, $after->role_id);
-        $this->assertSame($target->hire_date, $after->hire_date);
+        $this->assertSame('Original Cycle', $after->cycle_name);
+        $this->assertSame('annual', $after->cycle_type);
+        $this->assertSame('2026-01-01', $after->start_date);
+        $this->assertSame('2026-12-31', $after->end_date);
     }
 
     /** Pre-filling must not let the model reach a column the registry hides. */
     public function test_prefill_does_not_widen_the_whitelist(): void
     {
         $admin = $this->linkedUser('admin', 'admin@hospital.test');
-        $target = DB::table('employees')->where('email', 'admin@hospital.test')->first();
+        $employee = DB::table('employees')->where('email', 'admin@hospital.test')->first();
+
+        $cycleId = (string) Str::uuid();
+        DB::table('review_cycles')->insert([
+            'cycle_id' => $cycleId,
+            'cycle_name' => 'Original Cycle 2',
+            'cycle_type' => 'annual',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'status' => 'planned',
+            'created_by' => $employee->employee_id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $this->planningProvider([
-            'action' => 'employee.update',
+            'action' => 'performance.cycle.update',
             'params' => [
-                'id' => $target->employee_id,
-                'employment_status' => 'on_leave',
-                // Not in the registry's param list for employee.update.
-                'employee_code' => 'EMP-HACKED',
+                'id' => $cycleId,
+                'status' => 'active',
+                // Not in the registry's param list for performance.cycle.update.
+                'created_by' => 'EMP-HACKED',
             ],
             'missing' => [],
-            'summary' => 'Put Test Person on leave.',
+            'summary' => 'Activate the review cycle 2.',
         ]);
 
         $this->actingAs($admin)
-            ->postJson('/ai/query', ['query' => 'put Test Person on leave'])
+            ->postJson('/ai/query', ['query' => 'activate the review cycle 2'])
             ->assertOk();
 
         $this->assertSame(
-            $target->employee_code,
-            DB::table('employees')->where('employee_id', $target->employee_id)->value('employee_code')
+            $employee->employee_id,
+            DB::table('review_cycles')->where('cycle_id', $cycleId)->value('created_by')
         );
     }
 }

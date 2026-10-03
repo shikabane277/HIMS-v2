@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login — HIMS Performance & Development</title>
+    @include('partials.security-protect')
     @include('partials.favicon')
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -46,6 +47,9 @@
             <p>Performance & Development Module</p>
         </div>
 
+        @if(request('timeout'))
+            <div class="hims-alert warning"><i class="bi bi-clock-history"></i> Your session has expired due to inactivity. Please sign in again.</div>
+        @endif
         @if(session('status'))
             <div class="hims-alert success" data-auto-dismiss><i class="bi bi-check-circle-fill"></i> {{ session('status') }}</div>
         @endif
@@ -70,19 +74,18 @@
                     <input type="password" id="password" name="password" class="hims-input" placeholder="Enter your password" required>
                     <button type="button" class="toggle-pw" onclick="togglePw()"><i class="bi bi-eye" id="pwEye"></i></button>
                 </div>
-                @if(Route::has('password.request'))
-                <div style="display:flex;justify-content:flex-end;margin-top:6px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+                    <label for="remember_device" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-size:12.5px;color:#475569;margin:0">
+                        <input type="checkbox" id="remember_device" name="remember_device" value="1" {{ old('remember_device') ? 'checked' : '' }} style="width:15px;height:15px;accent-color:var(--hims-primary);cursor:pointer;border-radius:4px">
+                        <span>Remember this PC for 30 days</span>
+                    </label>
+                    @if(Route::has('password.request'))
                     <a href="{{ route('password.request') }}" style="font-size:12px;color:var(--hims-primary);text-decoration:none;font-weight:500">Forgot password?</a>
+                    @endif
                 </div>
-                @endif
             </div>
 
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
-                <input type="checkbox" id="remember" name="remember" style="width:16px;height:16px;accent-color:var(--hims-primary)">
-                <label for="remember" style="font-size:13px;color:#6b7280;cursor:pointer">Keep me signed in</label>
-            </div>
-
-            <button type="submit" class="btn-hims btn-hims-primary" style="width:100%;justify-content:center;padding:12px;font-size:15px">
+            <button type="submit" class="btn-hims btn-hims-primary" style="width:100%;justify-content:center;padding:12px;font-size:15px;margin-top:8px">
                 <i class="bi bi-box-arrow-in-right"></i> Sign In to HIMS
             </button>
         </form>

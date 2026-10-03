@@ -1,9 +1,9 @@
 @extends('layouts.hims')
 @section('title','Required Training')
-@section('page-title','Learning Management')
-@section('breadcrumb','HIMS / Learning / Required Training')
+@section('page-title','Training Management')
+@section('breadcrumb','HIMS / Training / Required Training')
 @section('content')
-@include('partials.learning-tabs')
+@include('partials.training-tabs')
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>

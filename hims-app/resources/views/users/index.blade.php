@@ -51,7 +51,6 @@
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Manage login accounts that can access HIMS. New accounts appear immediately.</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="{{ route('audit.export') }}" class="btn-hims btn-hims-outline"><i class="bi bi-download"></i> Export Audit Log</a>
         <button type="button" class="btn-hims btn-hims-outline" data-modal-open="aiDataSettingsModal"><i class="bi bi-shield-lock"></i> AI Data Settings</button>
         <button type="button" class="btn-hims btn-hims-primary" data-modal-open="userCreateModal"><i class="bi bi-person-plus-fill"></i> Add User</button>
     </div>

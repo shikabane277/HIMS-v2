@@ -19,7 +19,37 @@
             {{ $e->position_title ?? $e->role_name }} · {{ $e->department_name }} · {{ $e->employee_code }}
         </p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        @if(!empty($allEmployees) && $allEmployees->count() > 1)
+        <div class="d-flex align-items-center gap-1" style="position:relative">
+            <label class="hims-label mb-0 text-nowrap" style="font-size:12px;color:#6b7280" for="switchEmployeeInput">Switch Employee:</label>
+            <div style="position:relative">
+                <i class="bi bi-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:11px;pointer-events:none"></i>
+                <input type="text"
+                       id="switchEmployeeInput"
+                       class="hims-input"
+                       placeholder="Type name to switch..."
+                       value="{{ $e->first_name }} {{ $e->last_name }}"
+                       style="padding:5px 12px 5px 24px;font-size:12px;width:190px"
+                       autocomplete="off">
+                <div id="switchEmployeeDropdown"
+                     style="display:none;position:absolute;top:calc(100% + 4px);right:0;width:290px;max-height:240px;overflow-y:auto;background:var(--hims-surface,#ffffff);border:1px solid var(--hims-border,#cbd5e1);border-radius:8px;box-shadow:0 10px 25px -4px rgba(0,0,0,0.12);z-index:9999">
+                    @foreach($allEmployees as $emp)
+                        <div class="switch-emp-item"
+                             data-id="{{ $emp->employee_id }}"
+                             data-name="{{ $emp->first_name }} {{ $emp->last_name }}"
+                             style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;background:{{ $emp->employee_id === $e->employee_id ? '#eff6ff' : '' }}">
+                            <div>
+                                <strong style="color:var(--hims-text,#0f172a)">{{ $emp->first_name }} {{ $emp->last_name }}</strong>
+                                <div style="font-size:11px;color:#64748b">{{ $emp->position_title ?? 'Staff' }}</div>
+                            </div>
+                            <span class="hims-badge gray" style="font-size:10px">{{ $emp->department_name }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+        @endif
         <a href="{{ route('competency.gap.index') }}" class="btn-hims btn-hims-ghost"><i class="bi bi-arrow-left"></i> Back</a>
         @can('view-employees')
         <a href="{{ route('employees.show', $e->employee_id) }}" class="btn-hims btn-hims-outline"><i class="bi bi-person"></i> Profile</a>
@@ -437,3 +467,51 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const switchInput = document.getElementById('switchEmployeeInput');
+    const switchDropdown = document.getElementById('switchEmployeeDropdown');
+    if (switchInput && switchDropdown) {
+        const items = switchDropdown.querySelectorAll('.switch-emp-item');
+
+        function filterSwitchItems(query) {
+            query = (query || '').toLowerCase().trim();
+            items.forEach(item => {
+                const name = (item.dataset.name || '').toLowerCase();
+                item.style.display = (!query || name.includes(query)) ? 'flex' : 'none';
+            });
+            switchDropdown.style.display = 'block';
+        }
+
+        switchInput.addEventListener('focus', function() {
+            this.select();
+            filterSwitchItems('');
+        });
+
+        switchInput.addEventListener('input', function() {
+            filterSwitchItems(this.value);
+        });
+
+        items.forEach(item => {
+            item.addEventListener('mouseenter', function() {
+                this.style.background = '#f1f5f9';
+            });
+            item.addEventListener('mouseleave', function() {
+                this.style.background = '';
+            });
+            item.addEventListener('click', function() {
+                window.location.href = '{{ url('/competency/gap-analysis/employee') }}/' + this.dataset.id;
+            });
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#switchEmployeeInput') && !e.target.closest('#switchEmployeeDropdown')) {
+                switchDropdown.style.display = 'none';
+            }
+        });
+    }
+});
+</script>
+@endpush

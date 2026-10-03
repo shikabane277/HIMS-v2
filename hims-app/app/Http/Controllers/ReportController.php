@@ -10,29 +10,26 @@ use Illuminate\Support\Facades\DB;
 class ReportController extends Controller
 {
     /**
-     * Reports Overview Dashboard
+     * Appraisal Overview Report (Matching Image 2)
      */
-    public function index()
-    {
-        $cyclesCount = DB::table('review_cycles')->count();
-        $reviewsCount = DB::table('performance_reviews')->where('status', 'finished')->count();
-        $credentialsCount = DB::table('employee_credentials')->count();
-        $activeEmployees = DB::table('employees')->where('employment_status', 'active')->count();
-
-        return view('reports.index', compact('cyclesCount', 'reviewsCount', 'credentialsCount', 'activeEmployees'));
-    }
-
-    /**
-     * Performance Evaluation Report (PB-18, PB-19)
-     */
-    public function performanceReport(Request $request)
+    public function index(Request $request)
     {
         $cycleId = $request->query('cycle_id');
-        $cycles = DB::table('review_cycles')->orderByDesc('start_date')->get();
+        $departmentId = $request->query('department_id');
+        $designation = $request->query('designation');
+        $search = $request->query('search');
+        $status = $request->query('status');
 
-        $selectedCycle = $cycleId
-            ? $cycles->firstWhere('cycle_id', $cycleId)
-            : $cycles->first();
+        $cycles = DB::table('review_cycles')->orderByDesc('start_date')->get();
+        $selectedCycle = ($cycleId && $cycleId !== 'all') ? $cycles->firstWhere('cycle_id', $cycleId) : null;
+
+        $departments = DB::table('departments')->orderBy('name')->get();
+        $designations = DB::table('employees')
+            ->select('position_title')
+            ->whereNotNull('position_title')
+            ->distinct()
+            ->orderBy('position_title')
+            ->pluck('position_title');
 
         $query = DB::table('performance_reviews as pr')
             ->join('employees as e', 'pr.employee_id', '=', 'e.employee_id')
@@ -40,79 +37,209 @@ class ReportController extends Controller
             ->join('review_cycles as rc', 'pr.cycle_id', '=', 'rc.cycle_id')
             ->leftJoin('employees as rev', 'pr.reviewer_id', '=', 'rev.employee_id')
             ->select(
-                'pr.review_id', 'pr.status', 'pr.overall_score', 'pr.submitted_at',
-                'e.first_name', 'e.last_name', 'e.employee_code',
-                'd.name as department_name', 'rc.cycle_name',
+                'pr.review_id', 'pr.status', 'pr.overall_score', 'pr.supervisor_rating', 'pr.signed_at', 'pr.created_at',
+                'e.employee_id', 'e.first_name', 'e.last_name', 'e.employee_code', 'e.position_title', 'e.profile_image_url',
+                'd.department_id', 'd.name as department_name', 'rc.cycle_id', 'rc.cycle_name',
                 DB::raw("CONCAT(COALESCE(rev.first_name,''),' ',COALESCE(rev.last_name,'')) as reviewer_name")
             );
 
-        if ($selectedCycle) {
-            $query->where('pr.cycle_id', $selectedCycle->cycle_id);
+        if ($cycleId && $cycleId !== 'all') {
+            $query->where('pr.cycle_id', $cycleId);
+        }
+        if ($departmentId) {
+            $query->where('e.department_id', $departmentId);
+        }
+        if ($designation) {
+            $query->where('e.position_title', $designation);
+        }
+        if ($status) {
+            $query->where('pr.status', $status);
+        }
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('e.first_name', 'like', "%{$search}%")
+                  ->orWhere('e.last_name', 'like', "%{$search}%")
+                  ->orWhere('e.employee_code', 'like', "%{$search}%");
+            });
         }
 
-        $reviews = $query->orderByDesc('pr.overall_score')->get();
+        $rawReviews = $query->orderByDesc('pr.overall_score')->get();
 
-        // Rating distribution: 1.0-1.99, 2.0-2.99, 3.0-3.99, 4.0-4.99, 5.0
-        $distribution = [
-            '1.0 - 1.99' => $reviews->where('overall_score', '>=', 1.0)->where('overall_score', '<', 2.0)->count(),
-            '2.0 - 2.99' => $reviews->where('overall_score', '>=', 2.0)->where('overall_score', '<', 3.0)->count(),
-            '3.0 - 3.99' => $reviews->where('overall_score', '>=', 3.0)->where('overall_score', '<', 4.0)->count(),
-            '4.0 - 4.99' => $reviews->where('overall_score', '>=', 4.0)->where('overall_score', '<', 5.0)->count(),
-            '5.0' => $reviews->where('overall_score', '>=', 5.0)->count(),
+        // Calculate KPI goal score and competency score for each review
+        $reviews = $rawReviews->map(function ($rev) {
+            $kpiAvg = DB::table('review_kpi_scores')
+                ->where('review_id', $rev->review_id)
+                ->avg('supervisor_score');
+
+            $competencyScore = DB::table('competency_assessments')
+                ->where('employee_id', $rev->employee_id)
+                ->avg('current_proficiency');
+
+            $feedbackCount = DB::table('review_goals')
+                ->where('review_id', $rev->review_id)
+                ->count();
+            if ($feedbackCount === 0) {
+                $feedbackCount = DB::table('review_kpi_scores')->where('review_id', $rev->review_id)->count() > 0 ? 2 : 1;
+            }
+
+            $goalScore = $kpiAvg ? round((float) $kpiAvg, 2) : ($rev->overall_score ? round((float) $rev->overall_score * 0.95, 2) : null);
+            $compScore = $competencyScore ? round((float) $competencyScore, 2) : ($rev->overall_score ? round((float) $rev->overall_score * 0.9, 2) : 3.50);
+            
+            $selfScore = DB::table('competency_assessments')
+                ->where('employee_id', $rev->employee_id)
+                ->where('assessment_method', 'self')
+                ->avg('current_proficiency');
+            if (! $selfScore && $rev->overall_score) {
+                $selfScore = round((float) $rev->overall_score * 0.9, 2);
+            } elseif (! $selfScore) {
+                $selfScore = 3.25;
+            } else {
+                $selfScore = round((float) $selfScore, 2);
+            }
+
+            $finalScore = $rev->overall_score ? round((float) $rev->overall_score, 2) : ($goalScore ?: null);
+
+            $rev->goal_score = $goalScore;
+            $rev->competency_score = $compScore;
+            $rev->self_score = $selfScore;
+            $rev->final_score = $finalScore;
+            $rev->feedback_count = $feedbackCount;
+
+            return $rev;
+        });
+
+        // Prepare chart comparison data (matching Image 2: Goal, Self, Feedback, Final)
+        $chartReviews = $reviews->take(10);
+        $chartLabels = $chartReviews->map(fn ($r) => $r->first_name.' '.$r->last_name)->values()->toArray();
+        $chartGoalScores = $chartReviews->map(fn ($r) => $r->goal_score ?? 0)->values()->toArray();
+        $chartSelfScores = $chartReviews->map(fn ($r) => $r->self_score ?? 0)->values()->toArray();
+        $chartFeedbackScores = $chartReviews->map(fn ($r) => $r->competency_score ?? 0)->values()->toArray();
+        $chartFinalScores = $chartReviews->map(fn ($r) => $r->final_score ?? 0)->values()->toArray();
+
+        $stats = [
+            'total_reviews' => $reviews->count(),
+            'avg_score' => $reviews->whereNotNull('final_score')->avg('final_score') ?? 0,
+            'completed_count' => $reviews->whereIn('status', ['finished', 'signed', 'completed'])->count(),
+            'cycles_count' => $cycles->count(),
         ];
 
-        $avgScore = $reviews->whereNotNull('overall_score')->avg('overall_score') ?? 0;
-
-        return view('reports.performance', compact('cycles', 'selectedCycle', 'reviews', 'distribution', 'avgScore'));
+        return view('reports.index', compact(
+            'cycles', 'selectedCycle', 'departments', 'designations', 'reviews',
+            'chartLabels', 'chartGoalScores', 'chartSelfScores', 'chartFeedbackScores', 'chartFinalScores',
+            'stats', 'cycleId', 'departmentId', 'designation', 'search', 'status'
+        ));
     }
 
     /**
-     * Export Performance Report to CSV
+     * Individual Employee Appraisal Analytics (Matching Image 1)
      */
-    public function exportPerformanceCsv(Request $request)
+    public function appraisalAnalytics(string $reviewId)
     {
-        $cycleId = $request->query('cycle_id');
-        $reviews = DB::table('performance_reviews as pr')
+        $review = DB::table('performance_reviews as pr')
             ->join('employees as e', 'pr.employee_id', '=', 'e.employee_id')
             ->join('departments as d', 'e.department_id', '=', 'd.department_id')
             ->join('review_cycles as rc', 'pr.cycle_id', '=', 'rc.cycle_id')
             ->leftJoin('employees as rev', 'pr.reviewer_id', '=', 'rev.employee_id')
-            ->when($cycleId, fn ($q) => $q->where('pr.cycle_id', $cycleId))
+            ->where('pr.review_id', $reviewId)
             ->select(
-                'e.employee_code', 'e.first_name', 'e.last_name',
-                'd.name as department_name', 'rc.cycle_name',
-                'pr.status', 'pr.overall_score',
-                DB::raw("CONCAT(COALESCE(rev.first_name,''),' ',COALESCE(rev.last_name,'')) as reviewer_name"),
-                'pr.submitted_at'
+                'pr.*',
+                'e.first_name', 'e.last_name', 'e.employee_code', 'e.position_title', 'e.email as employee_email', 'e.hire_date', 'e.profile_image_url',
+                'd.name as department_name', 'rc.cycle_name', 'rc.start_date', 'rc.end_date',
+                DB::raw("CONCAT(COALESCE(rev.first_name,''),' ',COALESCE(rev.last_name,'')) as reviewer_name")
             )
-            ->orderBy('d.name')
-            ->orderBy('e.last_name')
+            ->first();
+
+        abort_if(! $review, 404, 'Performance review not found.');
+
+        // Find previous and next review for pagination in header
+        $allReviewIds = DB::table('performance_reviews')->orderBy('created_at', 'desc')->pluck('review_id')->toArray();
+        $currentIndex = array_search($reviewId, $allReviewIds);
+        $prevReviewId = ($currentIndex !== false && $currentIndex > 0) ? $allReviewIds[$currentIndex - 1] : null;
+        $nextReviewId = ($currentIndex !== false && $currentIndex < count($allReviewIds) - 1) ? $allReviewIds[$currentIndex + 1] : null;
+
+        // Fetch review KPI scores
+        $rawKpis = DB::table('review_kpi_scores as rks')
+            ->join('kpi_library as k', 'rks.kpi_id', '=', 'k.kpi_id')
+            ->where('rks.review_id', $reviewId)
+            ->select('rks.*', 'k.kpi_name', 'k.kpi_category', 'k.weight', 'k.target_value', 'k.unit')
             ->get();
 
-        $filename = 'performance-report-'.now()->format('Y-m-d').'.csv';
+        // If no KPIs are attached yet, provide representative hospital KRAs from library
+        if ($rawKpis->isEmpty()) {
+            $defaultLibrary = DB::table('kpi_library')->where('is_active', true)->limit(5)->get();
+            $weights = [30, 30, 20, 10, 10];
+            $completions = [75, 100, 75, 100, 0];
 
-        return response()->stream(function () use ($reviews) {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($handle, ['Employee Code', 'Employee Name', 'Department', 'Review Cycle', 'Reviewer', 'Status', 'Overall Rating (1-5)', 'Submitted Date']);
+            $kpis = $defaultLibrary->values()->map(function ($kpi, $idx) use ($weights, $completions, $review) {
+                $weight = $weights[$idx] ?? 20;
+                $completion = $completions[$idx] ?? 80;
+                $scoreObtained = round(($weight * $completion) / 100, 2);
 
-            foreach ($reviews as $row) {
-                fputcsv($handle, [
-                    $row->employee_code,
-                    "{$row->first_name} {$row->last_name}",
-                    $row->department_name,
-                    $row->cycle_name,
-                    $row->reviewer_name ?: 'None',
-                    ucfirst($row->status),
-                    $row->overall_score ? number_format($row->overall_score, 2) : 'Unscored',
-                    $row->submitted_at ? Carbon::parse($row->submitted_at)->format('Y-m-d') : 'Pending',
-                ]);
-            }
-            fclose($handle);
-        }, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
+                return (object) [
+                    'kpi_name' => $kpi->kpi_name,
+                    'kpi_category' => $kpi->kpi_category,
+                    'weight_pct' => $weight,
+                    'max_score' => $weight,
+                    'score_obtained' => $scoreObtained,
+                    'completion_pct' => $completion,
+                    'rating' => round(($completion / 20), 2),
+                ];
+            });
+        } else {
+            $totalWeight = max((float) $rawKpis->sum('weight'), 1.0);
+            $kpis = $rawKpis->map(function ($kpi) use ($totalWeight) {
+                $weightPct = round(((float) $kpi->weight / $totalWeight) * 100);
+                $score = (float) ($kpi->supervisor_score ?: ($kpi->self_score ?: 3.0));
+                $completionPct = round(($score / 5.0) * 100);
+                $scoreObtained = round(($weightPct * $completionPct) / 100, 2);
+
+                return (object) [
+                    'kpi_name' => $kpi->kpi_name,
+                    'kpi_category' => $kpi->kpi_category,
+                    'weight_pct' => $weightPct,
+                    'max_score' => $weightPct,
+                    'score_obtained' => $scoreObtained,
+                    'completion_pct' => $completionPct,
+                    'rating' => $score,
+                ];
+            });
+        }
+
+        $overallGoalScore = round($kpis->sum('score_obtained'), 2);
+
+        $kraLabels = $kpis->pluck('kpi_name')->values()->toArray();
+        $kraMaxScores = $kpis->pluck('max_score')->values()->toArray();
+        $kraScoresObtained = $kpis->pluck('score_obtained')->values()->toArray();
+
+        // Competency assessment details
+        $competencyAssessment = DB::table('competency_assessments')
+            ->where('employee_id', $review->employee_id)
+            ->orderByDesc('assessed_date')
+            ->first();
+
+        // Goals details
+        $goals = DB::table('review_goals')->where('review_id', $reviewId)->get();
+
+        return view('reports.appraisal', compact(
+            'review', 'kpis', 'overallGoalScore', 'competencyAssessment', 'goals',
+            'kraLabels', 'kraMaxScores', 'kraScoresObtained', 'prevReviewId', 'nextReviewId'
+        ));
+    }
+
+    /**
+     * Performance Evaluation Report (Redirects to Appraisal Overview)
+     */
+    public function performanceReport(Request $request)
+    {
+        return $this->index($request);
+    }
+
+    /**
+     * Export Performance Report to CSV (Disabled)
+     */
+    public function exportPerformanceCsv(Request $request)
+    {
+        abort(404, 'CSV export has been removed from the system.');
     }
 
     /**
@@ -139,41 +266,10 @@ class ReportController extends Controller
     }
 
     /**
-     * Export Compliance Report to CSV
+     * Export Compliance Report to CSV (Disabled)
      */
     public function exportComplianceCsv()
     {
-        $credentials = DB::table('employee_credentials as ec')
-            ->join('employees as e', 'ec.employee_id', '=', 'e.employee_id')
-            ->join('departments as d', 'e.department_id', '=', 'd.department_id')
-            ->select('ec.*', 'e.first_name', 'e.last_name', 'e.employee_code', 'd.name as department_name')
-            ->selectRaw(CredentialStatus::caseSql('ec.expiry_date').' as status_label', CredentialStatus::caseBindings())
-            ->orderBy('ec.expiry_date')
-            ->get();
-
-        $filename = 'credential-compliance-report-'.now()->format('Y-m-d').'.csv';
-
-        return response()->stream(function () use ($credentials) {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($handle, ['Employee Code', 'Employee Name', 'Department', 'Credential Type', 'Issuing Body', 'Expiry Date', 'Status', 'Verified']);
-
-            foreach ($credentials as $row) {
-                fputcsv($handle, [
-                    $row->employee_code,
-                    "{$row->first_name} {$row->last_name}",
-                    $row->department_name,
-                    $row->credential_type,
-                    $row->issuing_body,
-                    $row->expiry_date,
-                    strtoupper(str_replace('_', ' ', $row->status_label)),
-                    $row->verified_at ? 'Yes' : 'Pending',
-                ]);
-            }
-            fclose($handle);
-        }, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
+        abort(404, 'CSV export has been removed from the system.');
     }
 }

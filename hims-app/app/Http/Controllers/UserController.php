@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Support\AuditTrail;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
@@ -18,7 +21,7 @@ class UserController extends Controller
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -81,7 +84,7 @@ class UserController extends Controller
         $email = strtolower(trim((string) $request->email));
         $request->merge(['email' => $email]);
 
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+        $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email',
             'password' => ['required', 'confirmed', Password::min(8)],
@@ -108,7 +111,7 @@ class UserController extends Controller
                 'employee_id' => $request->employee_id ?: null,
                 'email_verified_at' => now(),
             ]);
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             $msg = $e->getMessage();
             $code = $e->getCode();
             $driverCode = $e->errorInfo[1] ?? null;
@@ -121,7 +124,7 @@ class UserController extends Controller
                             'errors' => ['email' => ['A user with this email address already exists.']],
                         ], 422);
                     }
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'email' => 'A user with this email address already exists.',
                     ]);
                 }
@@ -132,7 +135,7 @@ class UserController extends Controller
                             'errors' => ['employee_id' => ['This employee already has an associated user account.']],
                         ], 422);
                     }
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'employee_id' => 'This employee already has an associated user account.',
                     ]);
                 }
@@ -216,19 +219,19 @@ class UserController extends Controller
                 $request->validate(['password' => ['confirmed', Password::min(8)]]);
                 $user->update(['password' => Hash::make($request->password)]);
             }
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             $msg = $e->getMessage();
             $code = $e->getCode();
             $driverCode = $e->errorInfo[1] ?? null;
 
             if ($code == 23000 || $driverCode == 1062) {
                 if (str_contains($msg, 'users_email_unique') || str_contains($msg, 'email')) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'email' => 'A user with this email address already exists.',
                     ]);
                 }
                 if (str_contains($msg, 'users_employee_id_unique') || str_contains($msg, 'employee_id')) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'employee_id' => 'This employee already has an associated user account.',
                     ]);
                 }
@@ -290,39 +293,7 @@ class UserController extends Controller
 
     public function exportAuditTrail(Request $request)
     {
-        $logs = DB::table('audit_trails as a')
-            ->leftJoin('users as u', 'a.user_id', '=', 'u.id')
-            ->select('a.audit_id', 'a.timestamp', 'a.action', 'a.resource_type', 'a.resource_id', 'a.ip_address', 'u.name as actor_name', 'a.after_state')
-            ->orderByDesc('a.timestamp')
-            ->limit(2000)
-            ->get();
-
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="hims-audit-trail-'.now()->format('Y-m-d').'.csv"',
-        ];
-
-        $callback = function () use ($logs) {
-            $file = fopen('php://output', 'w');
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($file, ['Audit ID', 'Timestamp', 'Action / Event', 'Resource Type', 'Resource ID', 'Actor', 'IP Address', 'Details']);
-
-            foreach ($logs as $log) {
-                fputcsv($file, [
-                    $log->audit_id,
-                    $log->timestamp,
-                    $log->action,
-                    $log->resource_type,
-                    $log->resource_id,
-                    $log->actor_name ?: 'System',
-                    $log->ip_address,
-                    is_string($log->after_state) ? $log->after_state : json_encode($log->after_state),
-                ]);
-            }
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        abort(404, 'CSV export has been removed from the system.');
     }
 
     public function destroy(User $user)

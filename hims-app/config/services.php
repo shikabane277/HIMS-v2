@@ -110,4 +110,25 @@ return [
         'certificate_issued' => env('ZAPIER_WEBHOOK_CERT_ISSUED', ''),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | External HR Systems Integration (HR1 and HR2)
+    |--------------------------------------------------------------------------
+    |
+    | HR1: Core Human Resources system (Employee master records & credentials/licenses)
+    | HR2: Talent & Development system (Competency framework & assessments)
+    |
+    */
+    'hr1' => [
+        'base_url' => env('HR1_API_BASE_URL', ''),
+        'api_key' => env('HR1_API_KEY', ''),
+        'timeout' => (int) env('HR1_API_TIMEOUT', 30),
+    ],
+
+    'hr2' => [
+        'base_url' => env('HR2_API_BASE_URL', ''),
+        'api_key' => env('HR2_API_KEY', ''),
+        'timeout' => (int) env('HR2_API_TIMEOUT', 30),
+    ],
+
 ];

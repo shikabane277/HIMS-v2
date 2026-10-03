@@ -1,0 +1,12 @@
+.env
+.env.*
+.git
+.github
+.playwright-mcp
+.claude
+/hims-app/tests
+/hims-app/node_modules
+/hims-app/storage/logs/*.log
+/hims-app/storage/framework/cache/*
+/hims-app/storage/framework/sessions/*
+/hims-app/storage/framework/views/*

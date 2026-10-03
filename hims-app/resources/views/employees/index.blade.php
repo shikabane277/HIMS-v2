@@ -8,23 +8,16 @@
     <div>
         <h2 style="font-size:20px;font-weight:700;margin:0">Employee Directory</h2>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">
-            @can('manage-employees')
-                Manage all hospital staff records, roles, and department assignments.
-            @else
-                Staff records for your department.
-            @endcan
+            Hospital staff directory synchronized from HR1 (Employee Master) & HR2 (Hospital Operations).
         </p>
+        <div class="d-inline-flex align-items-center gap-2 mt-2 px-3 py-1" style="background:rgba(22,163,74,0.08);border:1px solid var(--hims-border);border-radius:20px;font-size:12px;color:var(--hims-primary-dark);font-weight:600">
+            <i class="bi bi-link-45deg" style="font-size:15px"></i> Sourced from HR1 & HR2 &bull; Direct Add/Remove Disabled
+        </div>
     </div>
     @can('manage-employees')
     <div class="d-flex gap-2">
-        <button type="button" class="btn-hims btn-hims-outline" data-modal-open="importEmployeeModal">
-            <i class="bi bi-file-earmark-arrow-up"></i> Import CSV
-        </button>
         <a href="{{ route('employees.manager-setup') }}" class="btn-hims btn-hims-outline">
             <i class="bi bi-person-check-fill"></i> Manager Setup
-        </a>
-        <a href="{{ route('employees.create') }}" class="btn-hims btn-hims-primary">
-            <i class="bi bi-person-plus-fill"></i> Add Employee
         </a>
     </div>
     @endcan
@@ -131,20 +124,9 @@
                                 <i class="bi bi-eye"></i> View
                             </a>
                             @can('manage-employees')
-                            <a href="{{ route('employees.edit', $emp->employee_id) }}" class="btn-hims btn-hims-outline btn-sm">
+                            <a href="{{ route('employees.edit', $emp->employee_id) }}" class="btn-hims btn-hims-outline btn-sm" title="Edit employee details">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            @if($emp->employment_status !== 'terminated')
-                            <form method="POST" action="{{ route('employees.destroy', $emp->employee_id) }}"
-                                  onsubmit="return confirm('Deactivate {{ addslashes($emp->first_name.' '.$emp->last_name) }}? The record is kept but marked terminated.')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn-hims btn-sm" style="background:#fee2e2;color:#dc2626;border:none;cursor:pointer;border-radius:8px;padding:6px 10px;font-size:12px"
-                                        title="Deactivate employee">
-                                    <i class="bi bi-person-dash"></i>
-                                </button>
-                            </form>
-                            @endif
                             @endcan
                         </div>
                     </td>
@@ -157,10 +139,7 @@
                             No employees match that filter.
                             <a href="{{ route('employees.index') }}" class="text-primary-hims">Clear the filter</a>.
                         @else
-                            No employees found.
-                            @can('manage-employees')
-                                <a href="{{ route('employees.create') }}" class="text-primary-hims">Add the first one</a>.
-                            @endcan
+                            No employees found. Please check external HR1/HR2 synchronization.
                         @endif
                     </td>
                 </tr>
@@ -174,44 +153,6 @@
     </div>
     @endif
 </div>
-
-@can('manage-employees')
-<div class="hims-modal-backdrop" id="importEmployeeModal" role="dialog" aria-modal="true">
-    <div class="hims-modal">
-        <div class="hims-modal-header">
-            <h5><i class="bi bi-file-earmark-arrow-up"></i> Import Employees from CSV</h5>
-            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
-        </div>
-        <form method="POST" action="{{ route('employees.import') }}" enctype="multipart/form-data">
-            @csrf
-            <div class="hims-modal-body">
-                <p style="font-size:13px;color:#6b7280;margin-bottom:14px">
-                    Upload a CSV file to batch-import staff records. New user logins with temporary passwords will automatically be generated.
-                </p>
-                <div class="mb-3">
-                    <label class="hims-label" for="employee_csv">Select CSV File *</label>
-                    <input type="file" name="csv_file" id="employee_csv" class="hims-input" accept=".csv,text/csv" required>
-                </div>
-                <div class="p-3" style="background:#f8fafc;border-radius:6px;font-size:12.5px;color:#4b5563">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <strong>Expected Columns:</strong>
-                        <a href="{{ route('employees.import.template') }}" class="btn-hims btn-hims-ghost btn-sm" style="padding:2px 8px;font-size:12px">
-                            <i class="bi bi-download"></i> Download Template
-                        </a>
-                    </div>
-                    <code style="display:block;font-size:11px;color:#2563eb;word-break:break-all">
-                        first_name, last_name, email, department_code, role_slug, position_title, employment_status, hire_date
-                    </code>
-                </div>
-            </div>
-            <div class="hims-modal-footer">
-                <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
-                <button type="submit" class="btn-hims btn-hims-primary"><i class="bi bi-upload"></i> Upload & Import</button>
-            </div>
-        </form>
-    </div>
-</div>
-@endcan
 
 @include('partials.modal-js')
 @endsection

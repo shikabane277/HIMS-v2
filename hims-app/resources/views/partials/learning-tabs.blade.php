@@ -26,11 +26,12 @@
         <i class="bi bi-grid"></i> Overview
     </a>
 
-    @can('view-compliance')
-    <a href="{{ route('learning.assignments.index') }}"
-       class="hims-tab {{ request()->routeIs('learning.assignments.*') ? 'active' : '' }}">
-        <i class="bi bi-clipboard-check"></i> Required Training
+    <a href="{{ route('learning.modules.index') }}"
+       class="hims-tab {{ request()->routeIs('learning.modules.*') ? 'active' : '' }}">
+        <i class="bi bi-journal-bookmark"></i> Modules
     </a>
+
+    @can('view-compliance')
     <a href="{{ route('learning.renewals.index') }}"
        class="hims-tab {{ request()->routeIs('learning.renewals.*') ? 'active' : '' }}">
         <i class="bi bi-arrow-repeat"></i> Renewals
@@ -42,24 +43,9 @@
         <i class="bi bi-award"></i> My CPD
     </a>
 
-    <a href="{{ route('learning.certificates.index') }}"
-       class="hims-tab {{ request()->routeIs('learning.certificates.*') ? 'active' : '' }}">
-        <i class="bi bi-patch-check"></i> Certificates
-    </a>
-
     <a href="{{ route('learning.pathways.index') }}"
        class="hims-tab {{ request()->routeIs('learning.pathways.*') ? 'active' : '' }}">
         <i class="bi bi-signpost-split"></i> Pathways
-    </a>
-
-    <a href="{{ route('training.index') }}"
-       class="hims-tab {{ request()->routeIs('training.index') || request()->routeIs('training.sessions.*') ? 'active' : '' }}">
-        <i class="bi bi-calendar-event"></i> Sessions
-    </a>
-
-    <a href="{{ route('training.venues.index') }}"
-       class="hims-tab {{ request()->routeIs('training.venues.*') ? 'active' : '' }}">
-        <i class="bi bi-geo-alt"></i> Venues
     </a>
 
     @can('view-compliance')
@@ -86,12 +72,12 @@
                         {{ request()->routeIs('learning.index') || request()->routeIs('learning.courses.*') ? 'selected' : '' }}>
                     Overview
                 </option>
-                @can('view-compliance')
-                <option value="{{ route('learning.assignments.index') }}"
-                        data-icon="bi bi-clipboard-check"
-                        {{ request()->routeIs('learning.assignments.*') ? 'selected' : '' }}>
-                    Required Training
+                <option value="{{ route('learning.modules.index') }}"
+                        data-icon="bi bi-journal-bookmark"
+                        {{ request()->routeIs('learning.modules.*') ? 'selected' : '' }}>
+                    Modules
                 </option>
+                @can('view-compliance')
                 <option value="{{ route('learning.renewals.index') }}"
                         data-icon="bi bi-arrow-repeat"
                         {{ request()->routeIs('learning.renewals.*') ? 'selected' : '' }}>
@@ -103,25 +89,10 @@
                         {{ request()->routeIs('learning.cpd.*') || request()->routeIs('learning.cycles.mine') ? 'selected' : '' }}>
                     My CPD
                 </option>
-                <option value="{{ route('learning.certificates.index') }}"
-                        data-icon="bi bi-patch-check"
-                        {{ request()->routeIs('learning.certificates.*') ? 'selected' : '' }}>
-                    Certificates
-                </option>
                 <option value="{{ route('learning.pathways.index') }}"
                         data-icon="bi bi-signpost-split"
                         {{ request()->routeIs('learning.pathways.*') ? 'selected' : '' }}>
                     Pathways
-                </option>
-                <option value="{{ route('training.index') }}"
-                        data-icon="bi bi-calendar-event"
-                        {{ request()->routeIs('training.index') || request()->routeIs('training.sessions.*') ? 'selected' : '' }}>
-                    Sessions
-                </option>
-                <option value="{{ route('training.venues.index') }}"
-                        data-icon="bi bi-geo-alt"
-                        {{ request()->routeIs('training.venues.*') ? 'selected' : '' }}>
-                    Venues
                 </option>
                 @can('view-compliance')
                 <option value="{{ route('learning.accreditation') }}"

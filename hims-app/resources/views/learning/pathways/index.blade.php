@@ -3,6 +3,7 @@
 @section('page-title','Learning Management')
 @section('breadcrumb','HIMS / Learning / Pathways')
 @section('content')
+@include('partials.learning-tabs')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 style="font-size:20px;font-weight:700;margin:0">Learning Pathways</h2>

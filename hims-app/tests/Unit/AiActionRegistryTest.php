@@ -49,22 +49,35 @@ class AiActionRegistryTest extends TestCase
     }
 
     /**
-     * The bug this test exists for: a supervisor may reach the employees prefix
-     * group but not the destroy route inside it.
+     * The bug this test exists for: a supervisor may reach the succession prefix
+     * group but not the positions.store route inside it.
      */
     public function test_a_second_role_middleware_narrows_and_is_not_ignored(): void
     {
-        $middleware = Route::getRoutes()->getByName('employees.destroy')->gatherMiddleware();
+        $middleware = Route::getRoutes()->getByName('succession.positions.store')->gatherMiddleware();
         $roleLayers = array_values(array_filter($middleware, fn ($m) => str_starts_with($m, 'role:')));
 
-        $this->assertCount(2, $roleLayers, 'employees.destroy no longer carries two role layers — retarget this test.');
+        $this->assertCount(2, $roleLayers, 'succession.positions.store no longer carries two role layers — retarget this test.');
 
         $this->assertNull(
-            AiActionRegistry::get('employee.delete', $this->user('supervisor')),
-            'A supervisor was granted employee.delete: only the first role: layer was read.'
+            AiActionRegistry::get('succession.position.create', $this->user('supervisor')),
+            'A supervisor was granted succession.position.create: only the first role: layer was read.'
         );
-        $this->assertNotNull(AiActionRegistry::get('employee.delete', $this->user('admin')));
-        $this->assertNotNull(AiActionRegistry::get('employee.delete', $this->user('hr_manager')));
+        $this->assertNotNull(AiActionRegistry::get('succession.position.create', $this->user('admin')));
+        $this->assertNotNull(AiActionRegistry::get('succession.position.create', $this->user('hr_manager')));
+    }
+
+    /** AI has no CRUD capabilities over employees because records are synchronized from HR1/HR2. */
+    public function test_ai_has_no_crud_actions_on_employees(): void
+    {
+        foreach (['employee.create', 'employee.update', 'employee.delete'] as $action) {
+            foreach (['admin', 'hr_manager', 'supervisor', 'staff'] as $role) {
+                $this->assertNull(
+                    AiActionRegistry::get($action, $this->user($role)),
+                    "AI action {$action} is accessible to {$role}, but employees are synchronized from HR1 and HR2."
+                );
+            }
+        }
     }
 
     /** The same shape on a create route, so the fix is not specific to deletes. */
@@ -161,7 +174,6 @@ class AiActionRegistryTest extends TestCase
     public static function destructiveActions(): array
     {
         return [
-            'delete an employee' => ['employee.delete'],
             'delete a user' => ['user.delete'],
             'withdraw a candidate' => ['succession.candidate.withdraw'],
             'delete a milestone' => ['succession.milestone.delete'],

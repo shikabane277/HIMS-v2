@@ -3,7 +3,7 @@
 @section('page-title','Training Management')
 @section('breadcrumb','HIMS / Training')
 @section('content')
-@include('partials.learning-tabs')
+@include('partials.training-tabs')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 style="font-size:20px;font-weight:700;margin:0">Training Calendar & Sessions</h2>

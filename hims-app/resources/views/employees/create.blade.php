@@ -17,6 +17,14 @@
                 <h5><i class="bi bi-person-plus-fill"></i> New Employee Record</h5>
             </div>
             <div class="card-body">
+                <div class="hims-alert warning mb-4">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <div>
+                        <strong>Notice: Direct Employee Addition is Disabled</strong><br>
+                        Employee records are synchronized directly from external enterprise systems (HR1 Employee Master & HR2 Hospital Operations). Direct manual creation in HIMS is disabled.
+                    </div>
+                </div>
+
                 @if($errors->any())
                     <div class="hims-alert error mb-3">
                         <i class="bi bi-exclamation-circle-fill"></i>

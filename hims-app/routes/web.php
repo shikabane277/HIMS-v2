@@ -113,6 +113,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Neither has a GET page: both open a modal on the competency index
         // (Add Credential also on the credentials index) and post straight here.
         Route::middleware('role:admin,hr_manager,supervisor')->group(function () {
+            Route::post('/sync', [CompetencyController::class, 'syncHr'])->name('sync');
+            Route::put('/integrations/{id}', [CompetencyController::class, 'updateIntegration'])->name('integrations.update');
             Route::post('/assessments', [CompetencyController::class, 'storeAssessment'])->name('assessments.store');
             Route::get('/credentials/import/template', [CompetencyController::class, 'downloadCredentialsTemplate'])->name('credentials.import.template');
             Route::post('/credentials/import', [CompetencyController::class, 'importCredentialsCsv'])->name('credentials.import');
@@ -159,9 +161,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // staff is never offered a tab that would refuse them.
     Route::prefix('learning')->name('learning.')->group(function () {
         Route::get('/', [LearningController::class, 'index'])->name('index');
+        Route::get('/modules', [LearningController::class, 'modulesIndex'])->name('modules.index');
         Route::get('/pathways', [LearningController::class, 'pathwaysIndex'])->name('pathways.index');
         Route::get('/cpd', [LearningController::class, 'cpdIndex'])->name('cpd.index');
-        Route::get('/certificates', [LearningController::class, 'certificatesIndex'])->name('certificates.index');
+        Route::get('/certificates', fn() => redirect()->route('recognition.certificates.index'))->name('certificates.index');
         Route::get('/certificates/{code}', [LearningController::class, 'showCertificate'])->name('certificates.show');
 
         // Authoring the catalogue is HR/admin only. Courses and pathways are
@@ -314,12 +317,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // administrator may read the wall but cannot impersonate an employee.
     Route::prefix('recognition')->name('recognition.')->group(function () {
         Route::get('/', [RecognitionController::class, 'index'])->name('index');
+        Route::get('/certificates', [LearningController::class, 'certificatesIndex'])->name('certificates.index');
         Route::post('/posts', [RecognitionController::class, 'storePost'])->name('posts.store');
         Route::post('/posts/{postId}/react', [RecognitionController::class, 'react'])->name('react');
         Route::post('/posts/{postId}/comments', [RecognitionController::class, 'storeComment'])->name('comments.store');
 
         Route::middleware('role:admin,hr_manager')->group(function () {
             Route::post('/badges', [RecognitionController::class, 'storeBadge'])->name('badges.store');
+            Route::post('/posts/{postId}/admit-points', [RecognitionController::class, 'admitPoints'])->name('posts.admit_points');
+            Route::post('/posts/{postId}/reject-points', [RecognitionController::class, 'rejectPoints'])->name('posts.reject_points');
             Route::patch('/posts/{postId}/moderation', [RecognitionController::class, 'moderatePost'])->name('posts.moderate');
             Route::patch('/comments/{commentId}/moderation', [RecognitionController::class, 'moderateComment'])->name('comments.moderate');
         });
@@ -488,6 +494,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ── Reports & Analytics (PB-18, PB-19) ───────────────────
     Route::middleware('role:admin,hr_manager,supervisor')->prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('/appraisals/{id}', [ReportController::class, 'appraisalAnalytics'])->name('appraisal.show');
         Route::get('/performance', [ReportController::class, 'performanceReport'])->name('performance');
         Route::get('/performance/export', [ReportController::class, 'exportPerformanceCsv'])->name('performance.export');
         Route::get('/compliance', [ReportController::class, 'complianceReport'])->name('compliance');

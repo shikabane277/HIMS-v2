@@ -297,6 +297,7 @@ class DatabaseSeeder extends Seeder
 
         // ── 11. COMPETENCY FRAMEWORK, KPIs, ASSESSMENTS ────
         $this->call(CompetencyFrameworkSeeder::class);
+        $this->call(SuccessionSampleSeeder::class);
 
         echo "✅ HIMS seed data installed successfully.\n";
         echo "   Logins (all password: password)\n";

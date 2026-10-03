@@ -1,9 +1,9 @@
 @extends('layouts.hims')
 @section('title','Certificates of Completion')
-@section('page-title','Learning Management')
-@section('breadcrumb','HIMS / Learning / Certificates')
+@section('page-title','Recognition & Awards')
+@section('breadcrumb','HIMS / Recognition / Certificates')
 @section('content')
-@include('partials.learning-tabs')
+@include('partials.recognition-tabs')
 
 <div class="d-flex justify-content-between align-items-center mb-4" style="flex-wrap:wrap;gap:12px">
     <div>
@@ -13,8 +13,8 @@
         </p>
     </div>
     <div class="d-flex gap-2">
-        <a href="{{ route('learning.index') }}" class="btn-hims btn-hims-ghost">
-            <i class="bi bi-arrow-left"></i> Course Catalogue
+        <a href="{{ route('recognition.index') }}" class="btn-hims btn-hims-ghost">
+            <i class="bi bi-arrow-left"></i> Recognition Wall
         </a>
     </div>
 </div>

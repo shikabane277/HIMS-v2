@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -163,8 +164,9 @@ class CreateAdmin extends Command
                     'updated_at' => now(),
                 ]);
             });
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             $this->error('Failed to create administrator: an employee or user with this email/code already exists.');
+
             return self::FAILURE;
         }
 

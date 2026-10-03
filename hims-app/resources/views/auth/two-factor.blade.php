@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Two-Factor Authentication — HIMS Performance & Development</title>
+    @include('partials.security-protect')
     @include('partials.favicon')
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -148,6 +149,13 @@
                 >
             </div>
 
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:18px">
+                <label for="remember_device" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-size:13px;color:#475569;margin:0">
+                    <input type="checkbox" id="remember_device" name="remember_device" value="1" {{ !empty($rememberDevice) || old('remember_device') ? 'checked' : '' }} style="width:16px;height:16px;accent-color:var(--hims-primary);cursor:pointer;border-radius:4px">
+                    <span>Remember this PC for 30 days</span>
+                </label>
+            </div>
+
             <button type="submit" class="btn-hims btn-hims-primary" style="width:100%;justify-content:center;padding:12px;font-size:15px">
                 <i class="bi bi-shield-check"></i> Verify & Sign In
             </button>
@@ -171,7 +179,7 @@
         <div style="text-align:center">
             <p style="font-size:12px;color:#94a3b8;margin:0">
                 <i class="bi bi-shield-shaded" style="color:var(--hims-primary)"></i>
-                Codes expire after 10 minutes · Attempt-limited protection
+                Codes expire after 2 minutes · Attempt-limited protection
             </p>
         </div>
     </div>

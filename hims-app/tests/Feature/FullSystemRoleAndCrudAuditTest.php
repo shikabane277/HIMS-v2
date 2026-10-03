@@ -187,8 +187,8 @@ class FullSystemRoleAndCrudAuditTest extends TestCase
         $this->get(route('competency.index'))
             ->assertDontSee('Role Requirements')
             ->assertDontSee('data-modal-open="domainCreateModal"', false)
-            ->assertSee('data-modal-open="assessmentCreateModal"', false)
-            ->assertSee('data-modal-open="credentialCreateModal"', false);
+            ->assertDontSee('data-modal-open="hrIntegrationModal"', false)
+            ->assertDontSee('Sync HR1');
 
         $this->get(route('training.venues.index'))
             ->assertDontSee('data-modal-open="venueCreateModal"', false)

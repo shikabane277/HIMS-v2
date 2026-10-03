@@ -685,4 +685,101 @@ class LearningController extends Controller
 
         return view('learning.certificates.show', compact('certificate'));
     }
+
+    /**
+     * Learning Modules Catalogue & In-Page Z-Indexed PDF Reader
+     */
+    public function modulesIndex(Request $request)
+    {
+        $category = $request->query('category');
+        $search = $request->query('search');
+
+        $allModules = collect([
+            [
+                'id' => 'mod-capstone-1',
+                'module_code' => 'IT-CAP-101',
+                'title' => 'Capstone Project 1',
+                'subtitle' => 'Bachelor of Science in Information Technology',
+                'category' => 'Information Technology',
+                'theme' => 'slate',
+                'progress' => 0,
+                'format' => 'PDF Module',
+                'cpd_hours' => 2.0,
+                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
+            ],
+            [
+                'id' => 'mod-ojt-prac-1',
+                'module_code' => 'IT-OJT-201',
+                'title' => 'OJT - PRACTICUM1',
+                'subtitle' => 'Bachelor of Science in Information Technology',
+                'category' => 'Practicum & Training',
+                'theme' => 'teal',
+                'progress' => 0,
+                'format' => 'PDF Module',
+                'cpd_hours' => 3.0,
+                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
+            ],
+            [
+                'id' => 'mod-big-data',
+                'module_code' => 'IT-DATA-301',
+                'title' => 'Big Data Analysis',
+                'subtitle' => 'Bachelor of Science in Information Technology',
+                'category' => 'Analytics & Data',
+                'theme' => 'amber',
+                'progress' => 0,
+                'format' => 'PDF Module',
+                'cpd_hours' => 2.0,
+                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
+            ],
+            [
+                'id' => 'mod-it-elec-4',
+                'module_code' => 'IT-ELEC-401',
+                'title' => 'IT ELECTIVE 4 (System Integration and Architecture 2)',
+                'subtitle' => 'Bachelor of Science in Information Technology',
+                'category' => 'System Architecture',
+                'theme' => 'crimson',
+                'progress' => 0,
+                'format' => 'PDF Module',
+                'cpd_hours' => 2.5,
+                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
+            ],
+            [
+                'id' => 'mod-inf-101',
+                'module_code' => 'MOD-INF-101',
+                'title' => 'Hospital Infection Control & Hand Hygiene Protocols',
+                'subtitle' => 'Hospital Infection Prevention & Patient Safety Unit',
+                'category' => 'Clinical Safety',
+                'theme' => 'teal',
+                'progress' => 0,
+                'format' => 'PDF Module',
+                'cpd_hours' => 1.5,
+                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
+            ],
+        ]);
+
+        $categories = $allModules->pluck('category')->unique()->values();
+
+        $modules = $allModules;
+        if ($category && $category !== 'all') {
+            $modules = $modules->where('category', $category);
+        }
+
+        if ($search) {
+            $searchLower = strtolower($search);
+            $modules = $modules->filter(function ($m) use ($searchLower) {
+                return str_contains(strtolower($m['title']), $searchLower)
+                    || str_contains(strtolower($m['module_code']), $searchLower)
+                    || str_contains(strtolower($m['description']), $searchLower);
+            });
+        }
+
+        $stats = [
+            'total_modules' => $allModules->count(),
+            'pdf_modules' => $allModules->where('format', 'PDF Module')->count(),
+            'total_cpd' => $allModules->sum('cpd_hours'),
+            'categories_count' => $categories->count(),
+        ];
+
+        return view('learning.modules.index', compact('modules', 'categories', 'category', 'search', 'stats'));
+    }
 }

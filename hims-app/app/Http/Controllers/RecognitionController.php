@@ -15,6 +15,12 @@ class RecognitionController extends Controller
     public function index(Request $request)
     {
         $currentEmployeeId = $this->currentEmployeeId();
+        $hasGivenToday = $currentEmployeeId
+            ? DB::table('recognition_posts')
+                ->where('author_id', $currentEmployeeId)
+                ->whereDate('created_at', now()->toDateString())
+                ->exists()
+            : false;
         $view = in_array($request->query('view'), ['feed', 'sent', 'received', 'private'], true)
             ? $request->query('view')
             : 'feed';
@@ -68,11 +74,12 @@ class RecognitionController extends Controller
             ->where('rp.moderation_status', 'approved')
             ->select(
                 'rp.post_id', 'rp.author_id', 'rp.recipient_id', 'rp.message', 'rp.post_type',
-                'rp.is_public', 'rp.is_featured', 'rp.created_at',
+                'rp.is_public', 'rp.is_featured', 'rp.created_at', 'rp.points_status',
+                'rp.points_admitted_by', 'rp.points_admitted_at',
                 'author.first_name as author_first_name', 'author.last_name as author_last_name',
                 'recipient.first_name as recipient_first_name', 'recipient.last_name as recipient_last_name',
                 'department.name as recipient_department',
-                'badge.badge_name', 'badge.badge_icon', 'badge.badge_color', 'badge.hospital_value',
+                'badge.badge_name', 'badge.badge_icon', 'badge.badge_color', 'badge.hospital_value', 'badge.points_value',
             )
             ->selectSub(function ($query) {
                 $query->from('recognition_reactions as reaction_count')
@@ -154,8 +161,25 @@ class RecognitionController extends Controller
 
         $moderationPosts = collect();
         $moderationComments = collect();
+        $pendingPointsPosts = collect();
 
         if ($canModerate) {
+            $pendingPointsPosts = DB::table('recognition_posts as rp')
+                ->join('employees as author', 'rp.author_id', '=', 'author.employee_id')
+                ->join('employees as recipient', 'rp.recipient_id', '=', 'recipient.employee_id')
+                ->leftJoin('recognition_badges as badge', 'rp.badge_id', '=', 'badge.badge_id')
+                ->where('rp.points_status', 'pending')
+                ->where('rp.moderation_status', 'approved')
+                ->select(
+                    'rp.post_id', 'rp.message', 'rp.points_status', 'rp.created_at',
+                    'badge.badge_name', 'badge.points_value',
+                    'author.first_name as author_first_name', 'author.last_name as author_last_name',
+                    'recipient.first_name as recipient_first_name', 'recipient.last_name as recipient_last_name',
+                )
+                ->orderByDesc('rp.created_at')
+                ->limit(15)
+                ->get();
+
             $moderationPosts = DB::table('recognition_posts as rp')
                 ->join('employees as author', 'rp.author_id', '=', 'author.employee_id')
                 ->join('employees as recipient', 'rp.recipient_id', '=', 'recipient.employee_id')
@@ -184,7 +208,7 @@ class RecognitionController extends Controller
 
         return view('recognition.index', compact(
             'stats', 'posts', 'comments', 'employees', 'badges', 'view', 'currentEmployeeId',
-            'canModerate', 'moderationPosts', 'moderationComments',
+            'canModerate', 'moderationPosts', 'moderationComments', 'pendingPointsPosts', 'hasGivenToday',
         ));
     }
 
@@ -194,6 +218,16 @@ class RecognitionController extends Controller
 
         if (! $authorId) {
             return back()->withInput()->with('error', 'Your account is not linked to an employee profile, so it cannot post recognition.');
+        }
+
+        // Daily limit: A user is limited to only one recognition post per calendar day
+        $alreadyGivenToday = DB::table('recognition_posts')
+            ->where('author_id', $authorId)
+            ->whereDate('created_at', now()->toDateString())
+            ->exists();
+
+        if ($alreadyGivenToday) {
+            return back()->withInput()->with('error', 'Daily limit reached: You can only submit recognition once per day. Thank you for appreciating your colleagues!');
         }
 
         $validated = $request->validate([
@@ -228,6 +262,9 @@ class RecognitionController extends Controller
                 'is_public' => $isPublic,
                 'is_featured' => false,
                 'moderation_status' => 'approved',
+                'points_status' => 'pending',
+                'points_admitted_by' => null,
+                'points_admitted_at' => null,
                 'link_to_review_id' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -248,9 +285,10 @@ class RecognitionController extends Controller
             'recipient_id' => $recipient->employee_id,
             'is_public' => $isPublic,
             'post_type' => $postType,
+            'points_status' => 'pending',
         ]);
 
-        return redirect()->route('recognition.index')->with('success', $isPublic ? 'Recognition posted.' : 'Private recognition sent.');
+        return redirect()->route('recognition.index')->with('success', $isPublic ? 'Recognition posted. Points are queued for admin admission.' : 'Private recognition sent. Points are queued for admin admission.');
     }
 
     public function react(Request $request, string $postId, NotificationService $notifications)
@@ -465,6 +503,70 @@ class RecognitionController extends Controller
         return $employee ? trim($employee->first_name.' '.$employee->last_name) : 'A colleague';
     }
 
+    public function admitPoints(Request $request, string $postId, NotificationService $notifications)
+    {
+        abort_unless(auth()->user()->hasRole('admin', 'hr_manager'), 403);
+
+        $post = DB::table('recognition_posts as rp')
+            ->leftJoin('recognition_badges as b', 'rp.badge_id', '=', 'b.badge_id')
+            ->where('rp.post_id', $postId)
+            ->select('rp.*', 'b.points_value', 'b.badge_name')
+            ->first();
+
+        abort_if(! $post, 404);
+
+        $adminEmployeeId = $this->currentEmployeeId();
+        $points = $post->points_value ?? 1;
+
+        DB::table('recognition_posts')->where('post_id', $postId)->update([
+            'points_status' => 'admitted',
+            'points_admitted_by' => $adminEmployeeId,
+            'points_admitted_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrail::record('recognition_points_admitted', 'recognition_posts', $postId, afterState: [
+            'points_status' => 'admitted',
+            'points' => $points,
+            'admitted_by' => $adminEmployeeId,
+        ]);
+
+        $authorName = $this->employeeName($post->author_id);
+
+        $notifications->notify(
+            $post->recipient_id,
+            'recognition_points_admitted',
+            "Recognition points admitted (+{$points} pts)",
+            "An administrator has admitted +{$points} recognition points for your appreciation from {$authorName}.",
+            'recognition_post',
+            $postId,
+        );
+
+        return back()->with('success', "Points successfully admitted (+{$points} pts) for recipient.");
+    }
+
+    public function rejectPoints(Request $request, string $postId)
+    {
+        abort_unless(auth()->user()->hasRole('admin', 'hr_manager'), 403);
+
+        $post = DB::table('recognition_posts')->where('post_id', $postId)->first();
+        abort_if(! $post, 404);
+
+        DB::table('recognition_posts')->where('post_id', $postId)->update([
+            'points_status' => 'rejected',
+            'points_admitted_by' => $this->currentEmployeeId(),
+            'points_admitted_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrail::record('recognition_points_rejected', 'recognition_posts', $postId, afterState: [
+            'points_status' => 'rejected',
+            'rejected_by' => $this->currentEmployeeId(),
+        ]);
+
+        return back()->with('success', 'Points for this recognition were denied.');
+    }
+
     private function topDepartmentThisMonth(): string
     {
         return DB::table('recognition_posts as rp')
@@ -473,6 +575,7 @@ class RecognitionController extends Controller
             ->leftJoin('recognition_badges as badge', 'rp.badge_id', '=', 'badge.badge_id')
             ->where('rp.moderation_status', 'approved')
             ->where('rp.is_public', true)
+            ->where('rp.points_status', 'admitted')
             ->whereBetween('rp.created_at', [now()->startOfMonth(), now()->endOfMonth()])
             ->select('department.name')
             ->selectRaw('SUM(COALESCE(badge.points_value, 1)) as recognition_points')

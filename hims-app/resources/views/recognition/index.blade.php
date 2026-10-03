@@ -16,9 +16,15 @@
         </button>
         @endcan
         @if($currentEmployeeId)
-        <button type="button" class="btn-hims btn-hims-primary" data-modal-open="recognitionPostModal">
-            <i class="bi bi-stars"></i> Give Recognition
-        </button>
+            @if($hasGivenToday)
+            <button type="button" class="btn-hims btn-hims-outline" disabled title="You have already given recognition today. Limit is 1 per day.">
+                <i class="bi bi-check2-all text-success"></i> Recognition Given Today (1/1)
+            </button>
+            @else
+            <button type="button" class="btn-hims btn-hims-primary" data-modal-open="recognitionPostModal">
+                <i class="bi bi-stars"></i> Give Recognition
+            </button>
+            @endif
         @endif
     </div>
 </div>
@@ -31,24 +37,11 @@
 @endif
 @if(! $currentEmployeeId)
     <div class="hims-alert warning mb-3"><i class="bi bi-link-45deg"></i> Link this account to an employee profile to post, react, or comment.</div>
+@elseif($hasGivenToday)
+    <div class="hims-alert info mb-3"><i class="bi bi-info-circle-fill"></i> <strong>Daily Recognition Limit:</strong> You have submitted your appreciation for today. Daily limit is 1 recognition per user to ensure meaningful feedback. You may give another recognition tomorrow.</div>
 @endif
 
-<div class="hims-tabs" aria-label="Recognition views">
-    <a href="{{ route('recognition.index') }}" class="hims-tab {{ $view === 'feed' ? 'active' : '' }}">
-        <i class="bi bi-activity"></i> Wall
-    </a>
-    <a href="{{ route('recognition.index', ['view' => 'received']) }}" class="hims-tab {{ $view === 'received' ? 'active' : '' }}">
-        <i class="bi bi-inbox"></i> Received
-    </a>
-    <a href="{{ route('recognition.index', ['view' => 'sent']) }}" class="hims-tab {{ $view === 'sent' ? 'active' : '' }}">
-        <i class="bi bi-send"></i> Sent
-    </a>
-    @if($canModerate)
-    <a href="{{ route('recognition.index', ['view' => 'private']) }}" class="hims-tab {{ $view === 'private' ? 'active' : '' }}">
-        <i class="bi bi-lock"></i> Private
-    </a>
-    @endif
-</div>
+@include('partials.recognition-tabs')
 
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-stars"></i></div><div class="stat-value">{{ $stats['total_posts'] }}</div><div class="stat-label">Approved Recognition</div></div></div>
@@ -89,6 +82,19 @@
                             </span>
                             @if(! $post->is_public)<span class="hims-badge gray"><i class="bi bi-lock"></i> Private</span>@endif
                             @if($post->is_featured)<span class="hims-badge yellow"><i class="bi bi-pin-angle-fill"></i> Featured</span>@endif
+                            @if($post->points_status === 'admitted')
+                                <span class="hims-badge green" title="Admin manual approval complete: Points admitted into employee record and leaderboard">
+                                    <i class="bi bi-check-circle-fill"></i> +{{ $post->points_value ?? 1 }} Pts Admitted
+                                </span>
+                            @elseif($post->points_status === 'pending')
+                                <span class="hims-badge yellow" title="Points awaiting admin manual admission before being credited">
+                                    <i class="bi bi-clock-history"></i> +{{ $post->points_value ?? 1 }} Pts Pending Approval
+                                </span>
+                            @elseif($post->points_status === 'rejected')
+                                <span class="hims-badge red" title="Points denied by admin">
+                                    <i class="bi bi-x-circle"></i> Points Denied
+                                </span>
+                            @endif
                         </div>
                     </div>
 
@@ -99,7 +105,7 @@
                         </span>
                         <div>
                             <div style="font-size:13px;font-weight:700">{{ $post->badge_name }}</div>
-                            @if($post->hospital_value)<div style="font-size:11px;color:#6b7280">{{ $post->hospital_value }}</div>@endif
+                            @if($post->hospital_value)<div style="font-size:11px;color:#6b7280">{{ $post->hospital_value }} &middot; {{ $post->points_value ?? 1 }} pts</div>@endif
                         </div>
                     </div>
                     @endif
@@ -118,6 +124,23 @@
                         <button type="button" class="btn-hims btn-hims-ghost btn-sm" data-comment-toggle="comment-{{ $post->post_id }}">
                             <i class="bi bi-chat"></i> {{ $post->comments_count }}
                         </button>
+                        @endif
+
+                        @if($canModerate && $post->points_status === 'pending')
+                        <div class="d-flex align-items-center gap-1 ms-sm-2">
+                            <form method="POST" action="{{ route('recognition.posts.admit_points', $post->post_id) }}" style="margin:0">
+                                @csrf
+                                <button type="submit" class="btn-hims btn-hims-success btn-sm" title="Manually admit points for recipient">
+                                    <i class="bi bi-check2-circle"></i> Admit {{ $post->points_value ?? 1 }} Pts
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('recognition.posts.reject_points', $post->post_id) }}" style="margin:0">
+                                @csrf
+                                <button type="submit" class="btn-hims btn-hims-ghost btn-sm text-danger" title="Reject points">
+                                    <i class="bi bi-x-circle"></i>
+                                </button>
+                            </form>
+                        </div>
                         @endif
 
                         @if($canModerate)
@@ -189,6 +212,41 @@
     </div>
 
     <div class="col-xl-4 d-flex flex-column gap-3">
+        @if($canModerate && $pendingPointsPosts->isNotEmpty())
+        <div class="hims-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-coin text-warning"></i> Points Approval Queue</h5>
+                <span class="hims-badge yellow">{{ $pendingPointsPosts->count() }} pending</span>
+            </div>
+            <div class="card-body d-flex flex-column gap-3">
+                <p style="font-size:11.5px;color:#64748b;margin:0 0 6px 0;">Points require manual admin admission before crediting to employee accounts and leaderboard.</p>
+                @foreach($pendingPointsPosts as $item)
+                <div style="padding-bottom:12px;border-bottom:1px solid var(--hims-border)">
+                    <div class="d-flex justify-content-between align-items-center gap-2">
+                        <strong style="font-size:12.5px">{{ $item->author_first_name }} &rarr; {{ $item->recipient_first_name }}</strong>
+                        <span class="hims-badge blue">+{{ $item->points_value ?? 1 }} pts</span>
+                    </div>
+                    <div style="font-size:12px;color:#4b5563;margin-top:4px">{{ \Illuminate\Support\Str::limit($item->message, 85) }}</div>
+                    <div class="d-flex gap-2 mt-2">
+                        <form method="POST" action="{{ route('recognition.posts.admit_points', $item->post_id) }}" style="margin:0">
+                            @csrf
+                            <button type="submit" class="btn-hims btn-hims-success btn-sm" style="padding:3px 10px;font-size:11.5px">
+                                <i class="bi bi-check2"></i> Admit Points
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ route('recognition.posts.reject_points', $item->post_id) }}" style="margin:0">
+                            @csrf
+                            <button type="submit" class="btn-hims btn-hims-ghost text-danger btn-sm" style="padding:3px 8px;font-size:11.5px" title="Deny points">
+                                <i class="bi bi-x"></i> Reject
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
         @if($canModerate && ($moderationPosts->isNotEmpty() || $moderationComments->isNotEmpty()))
         <div class="hims-card">
             <div class="card-header"><h5><i class="bi bi-shield-exclamation"></i> Moderation Queue</h5></div>

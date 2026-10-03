@@ -369,6 +369,12 @@ what the two screens actually render.
 
 ### B. Competency Management
 
+*   **Automated HR1 & HR2 Integration (No Manual Inputting)**:
+    Manual inputting of staff credentials, CSV batch uploads, and manual competency assessment scoring have been retired in favor of automated API feeds from external hospital HR systems:
+    *   **HR1 (Core HR System)**: Feeds employee clinical credentials, professional licenses (e.g. PRC medical/nursing license, board certificates, BLS, ACLS), issuing authorities, and issue/expiry dates.
+    *   **HR2 (Talent & Development System)**: Feeds the competency framework (domains, categories, competencies, required proficiency standards) and employee proficiency assessments.
+    *   **Database & Environment Configuration**: Configurable via `.env` (`HR1_API_BASE_URL`, `HR1_API_KEY`, `HR2_API_BASE_URL`, `HR2_API_KEY`) or managed dynamically in the `system_integrations` database table.
+    *   **Synchronization Engine**: Driven by `App\Services\HrIntegrationService`, triggered via the UI ("Sync HR1 & HR2" button, HR Integrations modal) or the CLI (`php artisan hims:sync-hr`).
 *   **JCI Accreditation Mapping**: Maps compliance guidelines directly to required skills (SQE.3, SQE.4, SQE.5 standards) via the `jci_standard_code` on each competency category.
 *   **Credential Monitoring**: Displays statuses for clinical licences (e.g. PRC licence, board certs, BLS, ACLS), derived in PHP from the expiry date on every read:
     *   🟢 **Active** — valid and current

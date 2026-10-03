@@ -8,17 +8,24 @@
         <h2 style="font-size:20px;font-weight:700;margin:0">Credentials & Licenses</h2>
         <p style="color:#6b7280;font-size:13px;margin:4px 0 0">Track professional licenses, board certifications, and clinical credentials.</p>
     </div>
-    @can('manage-competency')
-        <div class="d-flex gap-2">
-            <button type="button" class="btn-hims btn-hims-outline" data-modal-open="importCredentialModal">
-                <i class="bi bi-file-earmark-arrow-up"></i> Import CSV
-            </button>
-            <button type="button" class="btn-hims btn-hims-primary" data-modal-open="credentialCreateModal">
-                <i class="bi bi-patch-plus-fill"></i> Add Credential
-            </button>
-        </div>
-    @endcan
 </div>
+
+@php
+    $hr1Connected = ($hr1Integration->last_sync_status ?? null) === 'success' && !empty($hr1Integration->base_url);
+@endphp
+
+@if(! $hr1Connected)
+<div class="hims-alert warning mb-4">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <strong>Integration Notice:</strong> External system <strong>HR1 (Employee Master &amp; Clinical Credentials)</strong> is currently <strong>Not Connected</strong>. Showing local sample data.
+</div>
+@else
+<div class="hims-alert success mb-4">
+    <i class="bi bi-check-circle-fill"></i>
+    <strong>Integration Active:</strong> HR1 credentials feed is connected and synchronizing via backend automation.
+</div>
+@endif
+
 <div class="row g-3 mb-4">
     <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-clipboard-data"></i></div><div class="stat-value">{{ $stats['total'] ?? 0 }}</div><div class="stat-label">Total Credentials</div></div></div>
     <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-check2-circle"></i></div><div class="stat-value">{{ $stats['valid'] ?? 0 }}</div><div class="stat-label">Valid</div></div></div>
@@ -75,45 +82,7 @@
     @endif
 </div>
 
-@can('manage-competency')
-    @include('competency.credentials._create-modal')
 
-<div class="hims-modal-backdrop" id="importCredentialModal" role="dialog" aria-modal="true">
-    <div class="hims-modal">
-        <div class="hims-modal-header">
-            <h5><i class="bi bi-file-earmark-arrow-up"></i> Import Credentials from CSV</h5>
-            <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
-        </div>
-        <form method="POST" action="{{ route('competency.credentials.import') }}" enctype="multipart/form-data">
-            @csrf
-            <div class="hims-modal-body">
-                <p style="font-size:13px;color:#6b7280;margin-bottom:14px">
-                    Upload a CSV file to batch-import licenses and certifications linked to staff employee codes.
-                </p>
-                <div class="mb-3">
-                    <label class="hims-label" for="cred_csv">Select CSV File *</label>
-                    <input type="file" name="csv_file" id="cred_csv" class="hims-input" accept=".csv,text/csv" required>
-                </div>
-                <div class="p-3" style="background:#f8fafc;border-radius:6px;font-size:12.5px;color:#4b5563">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <strong>Expected Columns:</strong>
-                        <a href="{{ route('competency.credentials.import.template') }}" class="btn-hims btn-hims-ghost btn-sm" style="padding:2px 8px;font-size:12px">
-                            <i class="bi bi-download"></i> Download Template
-                        </a>
-                    </div>
-                    <code style="display:block;font-size:11px;color:#2563eb;word-break:break-all">
-                        employee_code, credential_type, credential_number, issuing_body, issue_date, expiry_date
-                    </code>
-                </div>
-            </div>
-            <div class="hims-modal-footer">
-                <button type="button" class="btn-hims btn-hims-outline" data-modal-dismiss>Cancel</button>
-                <button type="submit" class="btn-hims btn-hims-primary"><i class="bi bi-upload"></i> Upload & Import</button>
-            </div>
-        </form>
-    </div>
-</div>
-@endcan
 
 @can('view-audit-history')
 @include('partials._audit_history_modal')

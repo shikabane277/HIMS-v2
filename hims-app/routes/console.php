@@ -24,3 +24,14 @@ if (config('hims.credential_scan_enabled')) {
         ->withoutOverlapping()
         ->onOneServer();
 }
+
+/*
+| Automated HR1 and HR2 synchronization.
+|
+| Background schedule to pull staff clinical credentials from HR1 and competency
+| assessments from HR2 hourly, avoiding manual intervention.
+*/
+Schedule::command('hims:sync-hr --system=all')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer();

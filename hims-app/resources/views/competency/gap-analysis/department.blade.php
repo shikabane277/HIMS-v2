@@ -15,7 +15,42 @@
             {{ $analysis['headcount'] }} active staff · generated {{ $analysis['generated_at']->diffForHumans() }}
         </p>
     </div>
-    <a href="{{ route('competency.gap.index') }}" class="btn-hims btn-hims-ghost"><i class="bi bi-arrow-left"></i> Back</a>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        @if(!empty($departments) && $departments->isNotEmpty())
+        <div class="d-flex align-items-center gap-1" style="position:relative">
+            <label class="hims-label mb-0 text-nowrap" style="font-size:12px;color:#6b7280" for="switchDeptInput">Switch Department:</label>
+            <div style="position:relative">
+                <i class="bi bi-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:11px;pointer-events:none"></i>
+                <input type="text"
+                       id="switchDeptInput"
+                       class="hims-input"
+                       placeholder="Type department..."
+                       value="{{ $analysis['department']->name ?? 'Whole Organisation' }}"
+                       style="padding:5px 12px 5px 24px;font-size:12px;width:190px"
+                       autocomplete="off">
+                <div id="switchDeptDropdown"
+                     style="display:none;position:absolute;top:calc(100% + 4px);right:0;width:280px;max-height:240px;overflow-y:auto;background:var(--hims-surface,#ffffff);border:1px solid var(--hims-border,#cbd5e1);border-radius:8px;box-shadow:0 10px 25px -4px rgba(0,0,0,0.12);z-index:9999">
+                    <div class="switch-dept-item"
+                         data-url="{{ route('competency.gap.department') }}"
+                         data-name="Whole Organisation"
+                         style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:12.5px;font-weight:{{ empty($departmentId) ? '600' : 'normal' }};background:{{ empty($departmentId) ? '#eff6ff' : '' }}">
+                        <i class="bi bi-diagram-2" style="margin-right:6px"></i> Whole Organisation
+                    </div>
+                    @foreach($departments as $d)
+                        <div class="switch-dept-item"
+                             data-url="{{ route('competency.gap.department', ['department' => $d->department_id]) }}"
+                             data-name="{{ $d->name }}"
+                             style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;background:{{ ($departmentId ?? null) === $d->department_id ? '#eff6ff' : '' }}">
+                            <strong style="color:var(--hims-text,#0f172a)">{{ $d->name }}</strong>
+                            <span class="hims-badge gray" style="font-size:10px">Dept</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+        @endif
+        <a href="{{ route('competency.gap.index') }}" class="btn-hims btn-hims-ghost"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
 </div>
 
 <div class="hims-card mb-4" style="border-left:4px solid var(--hims-primary)">
@@ -163,3 +198,52 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const switchInput = document.getElementById('switchDeptInput');
+    const switchDropdown = document.getElementById('switchDeptDropdown');
+    if (switchInput && switchDropdown) {
+        const items = switchDropdown.querySelectorAll('.switch-dept-item');
+
+        function filterSwitchDepts(query) {
+            query = (query || '').toLowerCase().trim();
+            items.forEach(item => {
+                const name = (item.dataset.name || '').toLowerCase();
+                const matches = !query || name.includes(query);
+                item.style.display = matches ? (item.dataset.name.includes('Whole') ? 'block' : 'flex') : 'none';
+            });
+            switchDropdown.style.display = 'block';
+        }
+
+        switchInput.addEventListener('focus', function() {
+            this.select();
+            filterSwitchDepts('');
+        });
+
+        switchInput.addEventListener('input', function() {
+            filterSwitchDepts(this.value);
+        });
+
+        items.forEach(item => {
+            item.addEventListener('mouseenter', function() {
+                this.style.background = '#f1f5f9';
+            });
+            item.addEventListener('mouseleave', function() {
+                this.style.background = '';
+            });
+            item.addEventListener('click', function() {
+                window.location.href = this.dataset.url;
+            });
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#switchDeptInput') && !e.target.closest('#switchDeptDropdown')) {
+                switchDropdown.style.display = 'none';
+            }
+        });
+    }
+});
+</script>
+@endpush

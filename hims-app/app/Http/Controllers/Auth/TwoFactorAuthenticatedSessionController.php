@@ -33,6 +33,7 @@ class TwoFactorAuthenticatedSessionController extends Controller
 
         return view('auth.two-factor', [
             'maskedEmail' => TwoFactorService::maskEmail($user->email),
+            'rememberDevice' => (bool) $request->session()->get('login.remember_device'),
         ]);
     }
 
@@ -94,17 +95,28 @@ class TwoFactorAuthenticatedSessionController extends Controller
         RateLimiter::clear($userThrottleKey);
         $user->resetTwoFactorCode();
 
-        $remember = (bool) $request->session()->pull('login.remember', false);
-        $request->session()->forget('login.id');
+        $rememberDevice = $request->boolean('remember_device') || (bool) $request->session()->get('login.remember_device');
 
-        Auth::login($user, $remember);
+        $request->session()->forget(['login.id', 'login.remember', 'login.remember_device']);
+
+        Auth::login($user, false);
         $request->session()->regenerate();
+        $request->session()->put('hims_last_activity', time());
 
-        if ($user->must_change_password) {
-            return redirect()->route('profile.edit')->with('warning', 'Please change your temporary password before proceeding.');
+        $cookie = null;
+        if ($rememberDevice) {
+            $cookie = TwoFactorService::trustDevice($request, $user);
         }
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $redirect = $user->must_change_password
+            ? redirect()->route('profile.edit')->with('warning', 'Please change your temporary password before proceeding.')
+            : redirect()->intended(route('dashboard', absolute: false));
+
+        if ($cookie) {
+            $redirect->withCookie($cookie);
+        }
+
+        return $redirect;
     }
 
     /**
@@ -137,7 +149,7 @@ class TwoFactorAuthenticatedSessionController extends Controller
         $code = TwoFactorService::generateCode();
         $user->update([
             'two_factor_code' => hash('sha256', $code),
-            'two_factor_expires_at' => now()->addMinutes(10),
+            'two_factor_expires_at' => now()->addMinutes(2),
         ]);
 
         $sent = TwoFactorService::sendCode($user, $code);

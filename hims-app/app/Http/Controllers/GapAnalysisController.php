@@ -23,18 +23,27 @@ class GapAnalysisController extends Controller
     {
         $user = auth()->user();
 
+        // If an employee is explicitly selected, redirect straight to their analysis
+        if ($request->filled('employee_id')) {
+            return redirect()->route('competency.gap.employee', $request->query('employee_id'));
+        }
+
         // Supervisors are pinned to their own department; HR/admin may choose.
         $departmentId = $user->seesWholeOrganisation()
             ? $request->query('department')
             : $user->departmentId();
 
-        $employees = DB::table('employees as e')
+        $employeesQuery = DB::table('employees as e')
             ->join('departments as d', 'e.department_id', '=', 'd.department_id')
             ->where('e.employment_status', 'active')
             ->select('e.employee_id', 'e.first_name', 'e.last_name', 'e.position_title', 'd.name as department_name');
 
-        $employees = $this->scopeToVisibleEmployees($employees)
+        $allEmployees = $this->scopeToVisibleEmployees(clone $employeesQuery)
             ->orderBy('e.first_name')->get();
+
+        $employees = $this->scopeToVisibleEmployees(
+            $employeesQuery->when($departmentId, fn ($q, $dept) => $q->where('e.department_id', $dept))
+        )->orderBy('e.first_name')->get();
 
         // The department rollup is deterministic-only here; the AI narrative is
         // fetched on demand so the landing page stays fast.
@@ -42,6 +51,7 @@ class GapAnalysisController extends Controller
 
         return view('competency.gap-analysis.index', [
             'employees' => $employees,
+            'allEmployees' => $allEmployees,
             'departments' => $user->seesWholeOrganisation()
                                 ? DB::table('departments')->orderBy('name')->get()
                                 : collect(),
@@ -64,7 +74,18 @@ class GapAnalysisController extends Controller
             abort(404);
         }
 
-        return view('competency.gap-analysis.employee', ['analysis' => $result]);
+        $employeesQuery = DB::table('employees as e')
+            ->join('departments as d', 'e.department_id', '=', 'd.department_id')
+            ->where('e.employment_status', 'active')
+            ->select('e.employee_id', 'e.first_name', 'e.last_name', 'e.position_title', 'd.name as department_name');
+
+        $allEmployees = $this->scopeToVisibleEmployees($employeesQuery)
+            ->orderBy('e.first_name')->get();
+
+        return view('competency.gap-analysis.employee', [
+            'analysis' => $result,
+            'allEmployees' => $allEmployees,
+        ]);
     }
 
     /**
@@ -81,8 +102,14 @@ class GapAnalysisController extends Controller
         abort_if(! $user->seesWholeOrganisation() && ! $departmentId, 403,
             'Your account is not linked to a department.');
 
+        $departments = $user->seesWholeOrganisation()
+            ? DB::table('departments')->orderBy('name')->get()
+            : collect();
+
         return view('competency.gap-analysis.department', [
             'analysis' => $this->analysis->analyseDepartment($departmentId, withAi: true),
+            'departments' => $departments,
+            'departmentId' => $departmentId,
         ]);
     }
 

@@ -14,12 +14,47 @@
                 <i class="bi bi-shield-check"></i> Role Requirements
             </a>
         @endcan
-        @can('manage-competency')
-            <button type="button" class="btn-hims btn-hims-outline" data-modal-open="assessmentCreateModal"><i class="bi bi-clipboard-check"></i> New Assessment</button>
-            <button type="button" class="btn-hims btn-hims-primary" data-modal-open="credentialCreateModal"><i class="bi bi-patch-check"></i> Add Credential</button>
-        @endcan
     </div>
 </div>
+
+@php
+    $hr1Connected = ($integrations['hr1']->last_sync_status ?? null) === 'success' && !empty($integrations['hr1']->base_url);
+    $hr2Connected = ($integrations['hr2']->last_sync_status ?? null) === 'success' && !empty($integrations['hr2']->base_url);
+@endphp
+
+@if(! $hr1Connected || ! $hr2Connected)
+<div class="hims-alert warning mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 w-100">
+        <div>
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <strong>Integration Notice:</strong>
+            @if(! $hr1Connected && ! $hr2Connected)
+                External HR systems (HR1 &amp; HR2) are currently <strong>Not Connected</strong>. Showing local sample data.
+            @elseif(! $hr1Connected)
+                <strong>HR1 (Credentials)</strong> is <strong>Not Connected</strong>. HR2 is connected.
+            @else
+                <strong>HR2 (Competencies)</strong> is <strong>Not Connected</strong>. HR1 is connected.
+            @endif
+        </div>
+        <div class="d-flex align-items-center gap-3" style="font-size:12px">
+            <span>
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{{ $hr1Connected ? '#16a34a' : '#d97706' }}"></span>
+                HR1: {{ $hr1Connected ? 'Connected' : 'Not Connected' }}
+            </span>
+            <span>
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{{ $hr2Connected ? '#16a34a' : '#d97706' }}"></span>
+                HR2: {{ $hr2Connected ? 'Connected' : 'Not Connected' }}
+            </span>
+        </div>
+    </div>
+</div>
+@else
+<div class="hims-alert success mb-4">
+    <i class="bi bi-check-circle-fill"></i>
+    <strong>Integration Active:</strong> External HR systems (HR1 &amp; HR2) are connected and synchronizing via backend automation.
+</div>
+@endif
+
 
 <div class="row g-3 mb-4">
     <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-bullseye"></i></div><div class="stat-value">{{ $stats['total_competencies'] ?? 0 }}</div><div class="stat-label">Total Competencies</div></div></div>
@@ -112,12 +147,8 @@
 <div class="hims-card">
     <div class="card-header">
         <h5><i class="bi bi-diagram-3"></i> Competency Domains</h5>
-        @can('manage-competency-framework')
-        <button type="button" class="btn-hims btn-hims-primary btn-sm" data-modal-open="domainCreateModal"><i class="bi bi-plus"></i> Add Domain</button>
-        @endcan
     </div>
     <div class="card-body" style="padding:0">
-        <table class="hims-table">
         <table class="hims-table">
             <thead><tr><th>Domain</th><th>Categories</th><th>Competencies</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
@@ -139,36 +170,7 @@
                         @endif
                     </td>
                     <td data-label="Actions">
-                        <div class="d-flex gap-2">
-                            <a href="{{ route('competency.domains.show', $domain->domain_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
-                            @can('manage-competency-framework')
-                            <button type="button" class="btn-hims btn-hims-outline btn-sm"
-                                    data-modal-open="domainEditModal"
-                                    data-domain-edit
-                                    data-action="{{ route('competency.domains.update', $domain->domain_id) }}"
-                                    data-name="{{ $domain->domain_name }}"
-                                    data-desc="{{ $domain->description ?? '' }}"
-                                    data-active="{{ ($domain->is_active ?? true) ? '1' : '0' }}">
-                                Edit
-                            </button>
-                            <form method="POST" action="{{ route('competency.domains.toggle-status', $domain->domain_id) }}">
-                                @csrf
-                                @method('PATCH')
-                                <button type="submit" class="btn-hims btn-sm"
-                                        style="background:{{ ($domain->is_active ?? true) ? '#fef3c7' : '#dcfce7' }};color:{{ ($domain->is_active ?? true) ? '#b45309' : '#15803d' }};border:none;border-radius:8px;padding:6px 10px;cursor:pointer">
-                                    {{ ($domain->is_active ?? true) ? 'Deactivate' : 'Activate' }}
-                                </button>
-                            </form>
-                            <form method="POST" action="{{ route('competency.domains.destroy', $domain->domain_id) }}"
-                                  onsubmit="return confirm('Delete competency domain {{ addslashes($domain->domain_name) }}?')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn-hims btn-sm" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 10px;cursor:pointer">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
-                            @endcan
-                        </div>
+                        <a href="{{ route('competency.domains.show', $domain->domain_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
                     </td>
                 </tr>
                 @empty
@@ -178,12 +180,4 @@
         </table>
     </div>
 </div>
-@can('manage-competency')
-    @include('competency.assessments._create-modal')
-    @include('competency.credentials._create-modal')
-@endcan
-@can('manage-competency-framework')
-    @include('competency.domains._create-modal')
-    @include('competency.domains._edit-modal')
-@endcan
 @endsection

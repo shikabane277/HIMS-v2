@@ -12,6 +12,10 @@
                 @if($errors->any() && old('_modal') === 'recognitionPostModal')
                 <div class="hims-alert error mb-3"><i class="bi bi-exclamation-circle-fill"></i> {{ $errors->first() }}</div>
                 @endif
+                <div class="hims-alert info mb-3" style="font-size:12px;line-height:1.5">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <strong>Hospital Policy:</strong> Submissions are limited to <strong>1 recognition per user per day</strong>. Value badge points require manual admission by an administrator before being credited to the recipient's points and leaderboard.
+                </div>
                 <div class="row g-3">
                     <div class="col-12">
                         <label class="hims-label" for="recognition_recipient">Colleague *</label>

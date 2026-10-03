@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\AuditTrail;
+use App\Services\HrIntegrationService;
 use App\Support\CredentialStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -67,70 +67,14 @@ class CompetencyController extends Controller
 
         $employees = $this->scopeToVisibleEmployees(DB::table('employees')->orderBy('first_name'), 'employee_id')->get();
         $competencies = DB::table('competencies')->orderBy('competency_name')->get();
+        $integrations = DB::table('system_integrations')->get()->keyBy('system_code');
 
-        return view('competency.index', compact('stats', 'departments', 'gap_matrix', 'credential_alerts', 'domains', 'employees', 'competencies', 'filterDepartmentId'));
+        return view('competency.index', compact('stats', 'departments', 'gap_matrix', 'credential_alerts', 'domains', 'employees', 'competencies', 'filterDepartmentId', 'integrations'));
     }
 
     public function storeAssessment(Request $request)
     {
-        $request->validate([
-            'employee_id' => 'required|string|exists:employees,employee_id',
-            'competency_id' => 'required|string|exists:competencies,competency_id',
-            'current_proficiency' => 'required|integer|min:1|max:5',
-            'assessment_method' => 'nullable|in:observation,self_assessment,supervisor_rating,practical_test,written_exam',
-            'assessed_date' => 'nullable|date',
-            'next_assessment_due' => 'nullable|date',
-            'notes' => 'nullable|string',
-        ]);
-
-        $this->authorizeEmployeeAccess($request->employee_id);
-
-        $assessedBy = $this->currentEmployeeId();
-        if (! $assessedBy) {
-            return back()->withInput()->withErrors([
-                'employee_id' => 'Your user account must be linked to an employee profile to record competency assessments.',
-            ]);
-        }
-
-        $emp = DB::table('employees')->where('employee_id', $request->employee_id)->first();
-        $roleReq = $emp ? DB::table('role_competency_requirements')
-            ->where('role_id', $emp->role_id)
-            ->where('competency_id', $request->competency_id)
-            ->value('minimum_proficiency') : null;
-
-        $globalReq = DB::table('competencies')
-            ->where('competency_id', $request->competency_id)
-            ->value('required_proficiency');
-
-        $reqProf = $roleReq ?? $globalReq ?? 3;
-        $gap = (int) $request->current_proficiency - (int) $reqProf;
-
-        $assessmentId = (string) Str::uuid();
-
-        DB::table('competency_assessments')->insert([
-            'assessment_id' => $assessmentId,
-            'employee_id' => $request->employee_id,
-            'competency_id' => $request->competency_id,
-            'assessed_by' => $assessedBy,
-            'assessment_method' => $request->assessment_method ?: 'supervisor_rating',
-            'current_proficiency' => $request->current_proficiency,
-            'gap' => $gap,
-            'notes' => $request->notes,
-            'assessed_date' => $request->assessed_date ?: now()->toDateString(),
-            'next_assessment_due' => $request->next_assessment_due ?: now()->addYear()->toDateString(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        AuditTrail::record('store_assessment', 'competency_assessments', $assessmentId, afterState: [
-            'employee_id' => $request->employee_id,
-            'competency_id' => $request->competency_id,
-            'current_proficiency' => $request->current_proficiency,
-            'gap' => $gap,
-            'assessment_method' => $request->assessment_method ?: 'supervisor_rating',
-        ]);
-
-        return redirect()->route('competency.index')->with('success', 'Assessment recorded.');
+        return redirect()->route('competency.index')->with('error', 'Manual assessment input is disabled. Assessments are automatically pulled from HR2.');
     }
 
     public function credentialsIndex(Request $request)
@@ -174,159 +118,62 @@ class CompetencyController extends Controller
         ];
 
         $employees = $this->scopeToVisibleEmployees(DB::table('employees')->orderBy('first_name'), 'employee_id')->get();
+        $hr1Integration = DB::table('system_integrations')->where('system_code', 'hr1')->first();
 
-        return view('competency.credentials.index', compact('credentials', 'stats', 'employees'));
+        return view('competency.credentials.index', compact('credentials', 'stats', 'employees', 'hr1Integration'));
     }
 
     public function storeCredential(Request $request)
     {
-        $request->validate([
-            'employee_id' => 'required|string|exists:employees,employee_id',
-            'credential_type' => 'required|string|max:50',
-            'credential_number' => 'nullable|string|max:100',
-            'issuing_body' => 'nullable|string|max:150',
-            'issue_date' => 'nullable|date',
-            'expiry_date' => 'nullable|date|after_or_equal:issue_date',
-        ]);
-
-        $this->authorizeEmployeeAccess($request->employee_id);
-
-        $credentialId = (string) Str::uuid();
-        $encNumber = $request->credential_number ? Crypt::encryptString($request->credential_number) : null;
-
-        DB::table('employee_credentials')->insert([
-            'credential_id' => $credentialId,
-            'employee_id' => $request->employee_id,
-            'credential_type' => $request->credential_type,
-            'credential_number' => $encNumber,
-            'issuing_body' => $request->issuing_body,
-            'issue_date' => $request->issue_date ?: null,
-            'expiry_date' => $request->expiry_date ?: null,
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
-
-        AuditTrail::record('store_credential', 'employee_credentials', $credentialId, afterState: [
-            'employee_id' => $request->employee_id,
-            'credential_type' => $request->credential_type,
-            'issuing_body' => $request->issuing_body,
-            'expiry_date' => $request->expiry_date,
-        ]);
-
-        return redirect()->route('competency.credentials.index')->with('success', 'Credential added.');
+        return redirect()->route('competency.credentials.index')->with('error', 'Manual credential input is disabled. Credentials and licenses are automatically pulled from HR1.');
     }
 
     public function downloadCredentialsTemplate()
     {
-        abort_unless(auth()->user()->can('manage-competency'), 403);
-
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="credentials_import_template.csv"',
-        ];
-
-        return response()->stream(function () {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($handle, ['employee_code', 'credential_type', 'credential_number', 'issuing_body', 'issue_date', 'expiry_date']);
-            fputcsv($handle, ['EMP-0001', 'PRC Medical License', '0123456', 'Professional Regulation Commission', '2024-01-01', '2027-01-01']);
-            fputcsv($handle, ['EMP-0002', 'BLS Certification', 'BLS-9921', 'American Heart Association', '2025-06-01', '2027-06-01']);
-            fclose($handle);
-        }, 200, $headers);
+        abort(404, 'CSV import has been removed from the system.');
     }
 
     public function importCredentialsCsv(Request $request)
     {
+        return redirect()->route('competency.credentials.index')->with('error', 'CSV credential import is disabled. Credentials and licenses are automatically pulled from HR1.');
+    }
+
+    public function syncHr(Request $request, HrIntegrationService $hrService)
+    {
+        abort_unless(auth()->user()->can('manage-competency'), 403);
+
+        $system = $request->input('system', 'all');
+        $result = $hrService->sync($system);
+
+        if ($result['success']) {
+            return redirect()->back()->with('success', $result['message']);
+        }
+
+        return redirect()->back()->with('error', $result['message']);
+    }
+
+    public function updateIntegration(Request $request, $id, HrIntegrationService $hrService)
+    {
         abort_unless(auth()->user()->can('manage-competency'), 403);
 
         $request->validate([
-            'csv_file' => 'required|file|mimes:csv,txt|max:5120',
+            'base_url' => 'nullable|string|max:255',
+            'api_key' => 'nullable|string',
+            'timeout' => 'nullable|integer|min:5|max:120',
+            'is_active' => 'nullable|boolean',
         ]);
 
-        $file = $request->file('csv_file');
-        $handle = fopen($file->getRealPath(), 'r');
-        if (! $handle) {
-            return back()->with('error', 'Unable to open CSV file.');
-        }
+        $integration = DB::table('system_integrations')->where('integration_id', $id)->first();
+        abort_if(! $integration, 404);
 
-        $bom = fread($handle, 3);
-        if ($bom !== chr(0xEF).chr(0xBB).chr(0xBF)) {
-            rewind($handle);
-        }
+        $hrService->updateConfig($integration->system_code, [
+            'base_url' => $request->base_url,
+            'api_key' => $request->api_key,
+            'timeout' => $request->timeout ?: 30,
+            'is_active' => $request->boolean('is_active'),
+        ]);
 
-        $header = fgetcsv($handle);
-        if (! $header) {
-            fclose($handle);
-
-            return back()->with('error', 'CSV file is empty.');
-        }
-
-        $header = array_map(fn ($h) => trim(strtolower($h)), $header);
-        $imported = 0;
-        $skipped = 0;
-
-        $employeesByCode = DB::table('employees')->get()->keyBy(fn ($e) => strtoupper($e->employee_code));
-        $employeesByEmail = DB::table('employees')->get()->keyBy(fn ($e) => strtolower($e->email));
-
-        DB::beginTransaction();
-        try {
-            while (($row = fgetcsv($handle)) !== false) {
-                if (empty(array_filter($row))) {
-                    continue;
-                }
-
-                $data = array_combine($header, array_pad($row, count($header), ''));
-                $codeOrEmail = trim($data['employee_code'] ?? ($data['email'] ?? ''));
-                $type = trim($data['credential_type'] ?? '');
-
-                if (empty($codeOrEmail) || empty($type)) {
-                    $skipped++;
-
-                    continue;
-                }
-
-                $emp = $employeesByCode->get(strtoupper($codeOrEmail)) ?? $employeesByEmail->get(strtolower($codeOrEmail));
-                if (! $emp) {
-                    $skipped++;
-
-                    continue;
-                }
-
-                $credId = (string) Str::uuid();
-                $credNumber = trim($data['credential_number'] ?? ($data['license_number'] ?? ''));
-                $encNumber = $credNumber ? Crypt::encryptString($credNumber) : null;
-                $issueDate = ! empty($data['issue_date']) ? date('Y-m-d', strtotime($data['issue_date'])) : null;
-                $expiryDate = ! empty($data['expiry_date']) ? date('Y-m-d', strtotime($data['expiry_date'])) : null;
-
-                DB::table('employee_credentials')->insert([
-                    'credential_id' => $credId,
-                    'employee_id' => $emp->employee_id,
-                    'credential_type' => $type,
-                    'credential_number' => $encNumber,
-                    'issuing_body' => trim($data['issuing_body'] ?? ''),
-                    'issue_date' => $issueDate,
-                    'expiry_date' => $expiryDate,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                $imported++;
-            }
-
-            DB::commit();
-            fclose($handle);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            fclose($handle);
-
-            return back()->with('error', 'Credentials CSV import failed: '.$e->getMessage());
-        }
-
-        $msg = "Imported {$imported} credentials successfully.";
-        if ($skipped > 0) {
-            $msg .= " ({$skipped} invalid or unmatched rows skipped)";
-        }
-
-        return redirect()->route('competency.credentials.index')->with('success', $msg);
+        return redirect()->back()->with('success', "{$integration->system_name} API settings updated successfully.");
     }
 
     /**

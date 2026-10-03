@@ -124,6 +124,13 @@ final class HimsKnowledge
         completion. Completing a course credits its CPD hours automatically.
 
         WHAT HIMS DOES NOT HAVE — never describe any of this as if it exists:
+        - No direct employee creation, update, editing, or deletion. Employee master
+          records and operational statuses are synchronized from external systems
+          (HR1 Employee Master and HR2 Hospital Operations). Neither users nor the
+          AI assistant have the ability to create, add, edit, modify, deactivate, or
+          delete employee records in HIMS. If asked, explain that employee records
+          are synchronized from HR1 and HR2.
+        - No CSV import or export functionality anywhere in the system.
         - No self-service course enrolment. There is no "Enrol" or "Join" button
           anywhere, on the catalogue or on a course's own page, and no request or
           approval workflow to ask for one. Every course enrolment is created by

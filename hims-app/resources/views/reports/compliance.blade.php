@@ -18,9 +18,6 @@
         <button type="button" class="btn-hims btn-hims-outline" onclick="window.print()">
             <i class="bi bi-printer"></i> Print / PDF
         </button>
-        <a href="{{ route('reports.compliance.export') }}" class="btn-hims btn-hims-primary">
-            <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
-        </a>
     </div>
 </div>
 

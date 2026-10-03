@@ -135,17 +135,34 @@
 
 @can('manage-succession')
 @push('modals')
-<div class="hims-modal-backdrop" id="nominationModal" style="display:none">
-    <div class="hims-modal" style="max-width:520px">
+@include('partials.modal-js')
+<div class="hims-modal-backdrop" id="nominationModal" role="dialog" aria-modal="true" aria-labelledby="nominationModalTitle">
+    <div class="hims-modal" style="max-width:540px">
         <div class="hims-modal-header">
-            <h4><i class="bi bi-person-plus"></i> Nominate Successor</h4>
+            <h4 id="nominationModalTitle"><i class="bi bi-person-plus"></i> Nominate Successor</h4>
             <button type="button" class="hims-modal-close" data-modal-dismiss>&times;</button>
         </div>
+        @if(($positions ?? collect())->isEmpty())
+            <div class="hims-modal-body">
+                <div class="hims-alert warning mb-3">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>No Critical Positions Found:</strong> You must create at least one critical position before you can nominate a succession candidate.
+                </div>
+                <div style="text-align:center;padding:12px 0">
+                    <a href="{{ route('succession.positions.create') }}" class="btn-hims btn-hims-primary">
+                        <i class="bi bi-briefcase"></i> Add Critical Position First
+                    </a>
+                </div>
+            </div>
+            <div class="hims-modal-footer">
+                <button type="button" class="btn-hims btn-hims-ghost" data-modal-dismiss>Close</button>
+            </div>
+        @else
         <form method="POST" action="{{ route('succession.candidates.store') }}">
             @csrf
             <div class="hims-modal-body">
                 <div class="mb-3">
-                    <label class="hims-label">Candidate</label>
+                    <label class="hims-label">Candidate *</label>
                     <select name="employee_id" class="hims-input hims-select" required>
                         <option value="">Select Employee...</option>
                         @foreach($employees ?? [] as $emp)
@@ -154,7 +171,7 @@
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="hims-label">Target Position</label>
+                    <label class="hims-label">Target Critical Position *</label>
                     <select name="position_id" class="hims-input hims-select" required>
                         <option value="">Select Target Position...</option>
                         @foreach($positions ?? [] as $pos)
@@ -162,8 +179,30 @@
                         @endforeach
                     </select>
                 </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6">
+                        <label class="hims-label">Performance Score (1–5) *</label>
+                        <select name="performance_score" class="hims-input hims-select" required>
+                            <option value="1">1 - Low / Unsatisfactory</option>
+                            <option value="2">2 - Developing</option>
+                            <option value="3" selected>3 - Consistent / Meets</option>
+                            <option value="4">4 - High / Exceeds</option>
+                            <option value="5">5 - Exceptional</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="hims-label">Potential Score (1–5) *</label>
+                        <select name="potential_score" class="hims-input hims-select" required>
+                            <option value="1">1 - Limited</option>
+                            <option value="2">2 - Growth within Role</option>
+                            <option value="3" selected>3 - Moderate / Cross-Functional</option>
+                            <option value="4">4 - High / Leadership</option>
+                            <option value="5">5 - Exceptional / Executive</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="mb-3">
-                    <label class="hims-label">Readiness Stage</label>
+                    <label class="hims-label">Readiness Stage *</label>
                     <select name="readiness_level" class="hims-input hims-select" required>
                         <option value="ready_now">Ready Now</option>
                         <option value="1_2_years" selected>Ready in 1–2 Years</option>
@@ -181,13 +220,14 @@
                     </select>
                 </div>
                 <div class="mb-3">
-                    {{-- Field name matches the column exactly. It used to be
-                         `notes`, which nothing validated and nothing inserted,
-                         so every rationale typed here was silently thrown
-                         away. --}}
-                    <label class="hims-label" for="nomination_notes">Notes</label>
-                    <textarea id="nomination_notes" name="nomination_notes" class="hims-input" rows="3" maxlength="2000" placeholder="Nomination rationale or initial goals...">{{ old('nomination_notes') }}</textarea>
-                    <p style="font-size:12px;color:#6b7280;margin:4px 0 0">Confidential HR data — hidden from supervisors, like the ratings above.</p>
+                    <label class="hims-label" for="nomination_notes">Notes &amp; Rationale</label>
+                    <textarea id="nomination_notes" name="nomination_notes" class="hims-input" rows="3" maxlength="2000" placeholder="Nomination rationale or initial leadership goals...">{{ old('nomination_notes') }}</textarea>
+                    <p style="font-size:12px;color:#6b7280;margin:4px 0 0">Confidential leadership assessment data.</p>
+                </div>
+                <div style="font-size:12.5px;color:var(--hims-primary);text-align:right">
+                    <a href="{{ route('succession.candidates.create') }}" style="color:inherit;text-decoration:none;font-weight:500">
+                        Open full nomination page with live 9-Box grid preview &rarr;
+                    </a>
                 </div>
             </div>
             <div class="hims-modal-footer">
@@ -195,6 +235,7 @@
                 <button type="submit" class="btn-hims btn-hims-primary">Submit Nomination</button>
             </div>
         </form>
+        @endif
     </div>
 </div>
 @endpush

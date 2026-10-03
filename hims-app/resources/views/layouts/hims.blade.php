@@ -18,6 +18,7 @@
         };
     </script>
     <title>@yield('title', 'Dashboard') — HIMS</title>
+    @include('partials.security-protect')
     @include('partials.favicon')
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -60,15 +61,13 @@
             <span class="nav-icon"><i class="bi bi-cpu"></i></span> AI Gap Analysis
         </a>
         @endcan
-        {{-- One entry for the whole Learning module, both halves. The
-             institutional pages (what the hospital requires, who is short of it,
-             the accreditation report) used to be a second "Compliance" sidebar
-             entry; they are now tabs inside Learning, gated individually by
-             partials/learning-tabs.blade.php. `learning.*` covers all of them. --}}
-        <a href="{{ route('learning.index') }}" class="sidebar-link {{ request()->routeIs('learning.*') || request()->routeIs('training.*') ? 'active' : '' }}">
+        <a href="{{ route('learning.index') }}" class="sidebar-link {{ request()->routeIs('learning.*') && ! request()->routeIs('learning.assignments.*') && ! request()->routeIs('learning.certificates.*') ? 'active' : '' }}">
             <span class="nav-icon"><i class="bi bi-book"></i></span> Learning
         </a>
-        <a href="{{ route('recognition.index') }}" class="sidebar-link {{ request()->routeIs('recognition.*') ? 'active' : '' }}">
+        <a href="{{ route('training.index') }}" class="sidebar-link {{ request()->routeIs('training.*') || request()->routeIs('learning.assignments.*') || request()->routeIs('compliance.assignments.*') || request()->routeIs('compliance.index') ? 'active' : '' }}">
+            <span class="nav-icon"><i class="bi bi-calendar-event"></i></span> Training
+        </a>
+        <a href="{{ route('recognition.index') }}" class="sidebar-link {{ request()->routeIs('recognition.*') || request()->routeIs('learning.certificates.*') ? 'active' : '' }}">
             <span class="nav-icon"><i class="bi bi-stars"></i></span> Recognition
         </a>
         @can('view-succession')
@@ -1033,6 +1032,7 @@
     }, true);
 </script>
 <script src="{{ asset('js/hims-select.js') }}?v={{ file_exists(public_path('js/hims-select.js')) ? filemtime(public_path('js/hims-select.js')) : 1 }}"></script>
+@include('partials.session-timeout-modal')
 @stack('scripts')
 </body>
 </html>

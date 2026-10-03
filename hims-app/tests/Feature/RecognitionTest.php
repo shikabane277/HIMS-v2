@@ -331,6 +331,74 @@ class RecognitionTest extends TestCase
         $this->post('/recognition/posts')->assertRedirect(route('login'));
     }
 
+    public function test_recognition_points_start_pending_and_require_admin_approval(): void
+    {
+        $department = $this->department('Cardiology');
+        $authorId = $this->employee($department, 'author_pts@example.org', 'Carlo', 'Dizon');
+        $recipientId = $this->employee($department, 'recipient_pts@example.org', 'Diana', 'Santos');
+        $adminId = $this->employee($this->department('Executive'), 'admin_pts@example.org', 'Admin', 'Officer');
+
+        $author = $this->user('staff', $authorId, 'author_pts@example.org');
+        $admin = $this->user('admin', $adminId, 'admin_pts@example.org');
+        $badgeId = DB::table('recognition_badges')->where('badge_name', 'Clinical Excellence')->value('badge_id');
+
+        $this->actingAs($author)->post(route('recognition.posts.store'), [
+            'recipient_id' => $recipientId,
+            'badge_id' => $badgeId,
+            'message' => 'Exceptional response during code blue protocol.',
+        ])->assertRedirect(route('recognition.index'));
+
+        $post = DB::table('recognition_posts')->where('recipient_id', $recipientId)->first();
+        $this->assertNotNull($post);
+        $this->assertSame('pending', $post->points_status);
+        $this->assertNull($post->points_admitted_by);
+
+        // Staff cannot admit points
+        $this->actingAs($author)->post(route('recognition.posts.admit_points', $post->post_id))
+            ->assertForbidden();
+
+        // Admin admits points
+        $this->actingAs($admin)->post(route('recognition.posts.admit_points', $post->post_id))
+            ->assertRedirect();
+
+        $postFresh = DB::table('recognition_posts')->where('post_id', $post->post_id)->first();
+        $this->assertSame('admitted', $postFresh->points_status);
+        $this->assertSame($adminId, $postFresh->points_admitted_by);
+        $this->assertNotNull($postFresh->points_admitted_at);
+    }
+
+    public function test_user_can_only_post_recognition_once_per_day(): void
+    {
+        $department = $this->department('Pediatrics');
+        $authorId = $this->employee($department, 'author_daily@example.org', 'Gina', 'Cruz');
+        $recipient1Id = $this->employee($department, 'rec1_daily@example.org', 'Hana', 'Reyes');
+        $recipient2Id = $this->employee($department, 'rec2_daily@example.org', 'Ian', 'Tan');
+
+        $author = $this->user('staff', $authorId, 'author_daily@example.org');
+
+        // First post of the day succeeds
+        $this->actingAs($author)->post(route('recognition.posts.store'), [
+            'recipient_id' => $recipient1Id,
+            'message' => 'Great teamwork on the pediatric ward.',
+        ])->assertRedirect(route('recognition.index'));
+
+        $this->assertDatabaseHas('recognition_posts', [
+            'author_id' => $authorId,
+            'recipient_id' => $recipient1Id,
+        ]);
+
+        // Second post on the same day is rejected
+        $this->actingAs($author)->post(route('recognition.posts.store'), [
+            'recipient_id' => $recipient2Id,
+            'message' => 'Second recognition on the same day.',
+        ])->assertSessionHas('error');
+
+        $this->assertDatabaseMissing('recognition_posts', [
+            'author_id' => $authorId,
+            'recipient_id' => $recipient2Id,
+        ]);
+    }
+
     private function department(string $name): string
     {
         $id = (string) Str::uuid();

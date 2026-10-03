@@ -25,25 +25,6 @@
     </div>
     <div class="d-flex gap-2">
         <a href="{{ route('competency.index') }}" class="btn-hims btn-hims-ghost"><i class="bi bi-arrow-left"></i> Back to Competency</a>
-        @can('manage-competency-framework')
-        <button type="button" class="btn-hims btn-hims-outline"
-                data-modal-open="domainEditModal"
-                data-domain-edit
-                data-action="{{ route('competency.domains.update', $domain->domain_id) }}"
-                data-name="{{ $domain->domain_name }}"
-                data-desc="{{ $domain->description ?? '' }}"
-                data-active="{{ ($domain->is_active ?? true) ? '1' : '0' }}">
-            <i class="bi bi-pencil"></i> Edit Domain
-        </button>
-        <form method="POST" action="{{ route('competency.domains.toggle-status', $domain->domain_id) }}">
-            @csrf
-            @method('PATCH')
-            <button type="submit" class="btn-hims btn-hims-outline"
-                    style="background:{{ ($domain->is_active ?? true) ? '#fef3c7' : '#dcfce7' }};color:{{ ($domain->is_active ?? true) ? '#b45309' : '#15803d' }}">
-                <i class="bi bi-power"></i> {{ ($domain->is_active ?? true) ? 'Deactivate' : 'Activate' }}
-            </button>
-        </form>
-        @endcan
     </div>
 </div>
 
@@ -141,7 +122,4 @@
 </div>
 @endforelse
 
-@can('manage-competency-framework')
-    @include('competency.domains._edit-modal')
-@endcan
 @endsection

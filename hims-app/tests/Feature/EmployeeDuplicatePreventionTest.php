@@ -13,7 +13,9 @@ class EmployeeDuplicatePreventionTest extends TestCase
     use RefreshDatabase;
 
     private string $deptId;
+
     private string $roleId;
+
     private User $adminUser;
 
     protected function setUp(): void

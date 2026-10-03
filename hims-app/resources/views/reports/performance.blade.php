@@ -21,9 +21,6 @@
         <button type="button" onclick="window.print()" class="btn-hims btn-hims-outline">
             <i class="bi bi-printer"></i> Print / PDF
         </button>
-        <a href="{{ route('reports.performance.export', ['cycle_id' => $selectedCycle->cycle_id ?? null]) }}" class="btn-hims btn-hims-primary">
-            <i class="bi bi-download"></i> Export CSV
-        </a>
     </div>
 </div>
 

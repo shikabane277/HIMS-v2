@@ -28,15 +28,36 @@ class AuthenticatedSessionController extends Controller
     {
         $user = $request->authenticate();
 
+        // If this PC is remembered for 30 days, bypass 2FA and sign in directly
+        if (TwoFactorService::isDeviceTrusted($request, $user)) {
+            $request->session()->forget(['login.id', 'login.remember', 'login.remember_device']);
+
+            Auth::login($user, false);
+            $request->session()->regenerate();
+            $request->session()->put('hims_last_activity', time());
+
+            if ($user->must_change_password) {
+                return redirect()->route('profile.edit')->with('warning', 'Please change your temporary password before proceeding.');
+            }
+
+            return redirect()->intended(route('dashboard', absolute: false));
+        }
+
+        // Store remember device preference from login form for the 2FA step
+        if ($request->boolean('remember_device')) {
+            $request->session()->put('login.remember_device', true);
+        } else {
+            $request->session()->forget('login.remember_device');
+        }
+
         $code = TwoFactorService::generateCode();
 
         $user->update([
             'two_factor_code' => hash('sha256', $code),
-            'two_factor_expires_at' => now()->addMinutes(10),
+            'two_factor_expires_at' => now()->addMinutes(2),
         ]);
 
         $request->session()->put('login.id', $user->id);
-        $request->session()->put('login.remember', $request->boolean('remember'));
 
         $sent = TwoFactorService::sendCode($user, $code);
 
