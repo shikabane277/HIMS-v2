@@ -32,3 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*'),
         );
     })->create();
+
+if ($storage = env('APP_STORAGE')) {
+    $app->useStoragePath($storage);
+}
+
+return $app;
