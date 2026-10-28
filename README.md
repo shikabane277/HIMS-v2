@@ -26,12 +26,10 @@
 
 ## Features
 
-The application provides **six domain modules** — Performance, Competency, AI Gap
-Analysis, Learning, Recognition and Succession — plus Employees / Departments /
-Users & Access administration and the Dashboard and My Development surfaces. The
-former Training and Compliance modules are **not** among them: both were folded into
-Learning, which now carries all eight of their tabs. The bullets below group the
-features by the work they do, so Learning gets three of them.
+The application provides **seven domain modules** — Performance, Competency, AI Gap
+Analysis, Learning, Training, Recognition, and Succession — plus **Reports & Analytics**,
+Employees / Departments / Users & Access / Audit Trail administration, Profile & GDPR
+Data Portability, and the Dashboard and My Development surfaces.
 
 - **Performance appraisal** — review cycles, a weighted KPI library, and supervisor
   reviews. Review authority follows the *reporting line* (`employees.supervisor_id`),
@@ -41,36 +39,43 @@ features by the work they do, so Learning gets three of them.
   they may do inside HIMS.** New assignments require an active People Manager with a
   linked Supervisor, HR Manager, or Admin account; the flag never promotes an account.
 - **Competency management** — a seeded framework of domains, categories and
-  competencies; per-employee assessments; department-level skills-gap matrix; and
-  credential tracking with expiry and reassessment windows.
-- **Learning & CPD** — a course catalogue, required-training assignment, learning
-  pathways, renewal oversight, accreditation reporting, and CPD logging with a
-  separate verification step. Course enrolment is assignment-only; completing a
-  course credits verified CPD hours.
-- **Training logistics, inside Learning** — the **Sessions** and **Venues** tabs:
-  session scheduling with a same-venue/same-start-time guard, self-service
-  registration, roster attendance marking, and post-session feedback from anyone
-  marked present. Both tabs are visible to every role; the write controls inside them
-  check the role separately.
+  competencies; per-employee assessments; department-level skills-gap matrix;
+  credential tracking with expiry and reassessment windows; and external HR1/HR2 API
+  synchronization (`system_integrations`).
+- **Learning & CPD** — a course catalogue, **6 hospital clinical & compliance modules**
+  (`/learning/modules`: `MOD-INF-101` through `MOD-DPA-601`), required-training
+  assignment, learning pathways, renewal oversight, accreditation reporting, and CPD
+  logging with a separate verification step. Course enrolment is assignment-only;
+  completing a course credits verified CPD hours.
+- **Training logistics** — session scheduling with a same-venue/same-start-time guard,
+  self-service registration, roster attendance marking, and post-session feedback from
+  anyone marked present.
 - **Succession planning** — key positions, named candidates, confidential readiness
   data, vacancy risk, quarterly position reviews, evidence and development milestones.
 - **Recognition** — named public or private badges/posts, audience-limited comments and
   reactions, moderation and a public-only leaderboard.
+- **Reports & Analytics (`/reports`)** — executive workforce, performance, competency,
+  learning, and compliance analytics with custom report generation and CSV export.
 - **AI Gap Analysis** — a per-employee and per-department competency gap narrative
-  built from assessments, review scores and written review feedback, with the
-  hospital's two AI data-sharing switches (withhold comments, redact names) applied
-  before anything leaves for the provider. Admin, HR manager and supervisor only.
+  built from assessments and review scores, with strict privacy defaults
+  (`ai_include_comments = 0`, `ai_redact_names = 1`). Admin, HR manager and supervisor only.
 - **Compliance & accreditation oversight, inside Learning** — the **Required
   Training**, **Renewals** and **Reports** tabs, all three behind the
   `view-compliance` gate. Assign multiple courses or sessions at once to an employee,
   department, role, or the whole hospital and chase completion from modal rosters.
-  Learning's full tab strip is Overview · Required Training · Renewals · My CPD ·
-  Pathways · Sessions · Venues · Reports — eight tabs, five of them ungated.
 - **AI assistant** — provider-agnostic (Gemini, OpenAI, Anthropic, or any
   OpenAI-compatible host). It answers questions about the app *and* executes actions
   on request, gated by the signed-in user's role and written to an audit trail.
-  Destructive actions require an explicit in-chat confirmation. Conversations are
-  saved per account, shown in the assistant history panel, and searchable by their owner.
+  **Employee personal data is strictly off-limits (`AiAccessPolicy` blocks `employees`
+  for all roles).** Destructive actions require an explicit in-chat confirmation.
+- **Security, 2FA, Record Access & GDPR / RA 10173 Compliance** — mandatory Two-Factor
+  Authentication on every login (Email OTP or RFC 6238 Authenticator App TOTP),
+  5-minute silent session inactivity timeout, in-place **Record Access Password**
+  blur/unlock gate (`RecordAccess`), HTTP security headers (`SecurityHeaders`),
+  explicit GDPR privacy consent banner, self-service **Download My Data (JSON)**
+  (`GET /profile/export-data`), self-service account erasure (`DELETE /profile`),
+  separated employee PII anonymization (`POST /employees/{id}/anonymize`), and daily
+  automated data retention pruning (`php artisan hims:prune-expired-data`).
 
 Also included: a Facebook-style in-app notification feed with unread/read state and
 deep links, a permission-aware global search that opens the relevant module/tab, and
@@ -174,8 +179,8 @@ change.
 
 | Email | Role | Sees |
 |---|---|---|
-| `admin@hospital.ph` | `admin` | everything, including **Users & Access** and the AI data-sharing settings |
-| `l.garcia@hospital.ph` | `hr_manager` | everything **except** Users & Access — user accounts and the AI settings are admin-only |
+| `admin@hospital.ph` | `admin` | everything, including **Users & Access**, **Audit Trail**, and **Record Access Password** configuration |
+| `l.garcia@hospital.ph` | `hr_manager` | everything **except** Users & Access and Audit Trail — user accounts and security settings are admin-only |
 | `m.santos@hospital.ph` | `supervisor` | own record + direct reports |
 | `j.reyes@hospital.ph` | `staff` | own record only |
 | `r.lim@hospital.ph` | `staff` | own record only |
@@ -192,6 +197,12 @@ their reporting line, not their department.
 # (in-app notifications always; email only if CREDENTIAL_ALERT_EMAIL is on)
 php artisan hims:scan-credential-expiry
 php artisan hims:scan-credential-expiry --dry-run   # report only, writes and sends nothing
+
+# Synchronize employee records from configured HR1 & HR2 external APIs
+php artisan hims:sync-hr
+
+# GDPR Art. 5(1)(e) automated data retention pruning (expired tokens, old read notifications, old AI chats)
+php artisan hims:prune-expired-data
 
 # Verify your mail transport actually works
 php artisan hims:mail-test you@example.com
@@ -241,7 +252,8 @@ list; these are the settings that matter most.
 
 ### Mail
 
-"Forgot password?" sends a real email, so a real transport is required. Set
+Two-Factor Authentication Email OTPs, email verification, and opt-in credential alerts
+send real emails, so a real transport is required in production. Set
 `MAIL_MAILER` to `gmail`, `outlook`, `yahoo`, or `brevo` — host, port and encryption
 are preconfigured for each — then supply `MAIL_USERNAME`, `MAIL_PASSWORD` (an **app
 password**, not your account password) and `MAIL_FROM_ADDRESS` (must be the same

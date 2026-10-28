@@ -2,7 +2,7 @@
 
 What is in the database that looks alive but is not, and what is in the docs that was never built. Read this before adding a table whose name already appears in a migration, or before wiring up something the older documentation implies already exists.
 
-Live schema, verified: **51 tables + 1 view, 31 applied migration rows.**
+Live schema, verified: **53 tables + 1 view, 40 applied migration rows.**
 
 ---
 
@@ -84,12 +84,14 @@ Anything added on these paths must gate its tests — see `.claude/rules/testing
 
 ## Field-level encryption scope
 
-Limited to exactly two columns, via Laravel `Crypt::encryptString()` / `decryptString()`:
+Applied to four columns, via Laravel `Crypt::encryptString()` / `decryptString()`:
 
 - `employees.phone`
 - `employee_credentials.credential_number`
+- `system_integrations.api_key`
+- `users.totp_secret`
 
-**Every other domain field is database plaintext.** Do not describe the schema as encrypted at rest beyond these two.
+**Every other domain field is database plaintext.** Do not describe the schema as encrypted at rest beyond these four.
 
 ---
 
@@ -97,8 +99,7 @@ Limited to exactly two columns, via Laravel `Crypt::encryptString()` / `decryptS
 
 None of the following exist. They appear in older architecture documentation; treat any reference to them as aspirational, not as something to integrate with.
 
-- Tamper-proof audit trail observers (hash chaining). `audit_trails` is written selectively by `App\Support\AuditTrail::record()`; coverage is deliberately partial and there is no chaining. See `.claude/rules/authorization.md`.
-- TOTP MFA.
+- Tamper-proof audit trail observers (hash chaining). `audit_trails` is written selectively by `App\Support\AuditTrail::record()`; coverage is deliberately selective and there is no chaining. See `.claude/rules/authorization.md`.
 - Redis caching.
 - The `notifications` queue. (The `notifications` *table* is live; the queue is not.)
-- Any REST API — there is no `routes/api.php`, no Sanctum, no Passport.
+- Any client REST API — there is no `routes/api.php`, no Sanctum, no Passport (`/api/cron/{action}` in `routes/web.php` is a bearer-token scheduler webhook only).

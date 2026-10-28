@@ -29,15 +29,17 @@ Welcome to the **HIMS Performance & Development Module**! This guide describes w
 
 ## 1. Getting Started
 
-### Logging In
+### Logging In & Mandatory Two-Factor Authentication (2FA)
 
 1. Open your web browser and go to your hospital's HIMS website.
-2. Enter your **email address** and **password**.
-3. Click **Log In**.
+2. Enter your **email address** and **password**, then click **Log In**.
+3. Complete the **Two-Factor Verification** step:
+   - **If you have enabled an Authenticator App (TOTP)** on your profile, enter the 6-digit code from your authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.).
+   - **Otherwise (Email OTP)**, HIMS sends a 6-digit verification code to your email address (valid for 2 minutes). Enter the code and click **Verify**.
+4. If an Administrator recently created your account or reset your password, you will be prompted to set a new password before reaching the dashboard.
+5. On your first login, a **Data Privacy & GDPR Notice** banner appears at the bottom of the screen. Click **I Understand & Consent** to record your acknowledgement.
 
-If you forgot your password, click **"Forgot your password?"** on the login page. You will receive an email with a link to reset it.
-
-There is no self-registration — accounts are created for you by an Administrator.
+There is no self-registration and no self-service "Forgot Password" link — accounts and password resets are administered by an Administrator through **Users & Access**.
 
 ### Navigation
 
@@ -382,7 +384,7 @@ Two places on the page show this:
 
 A review cycle that carries no written comment is still listed, saying exactly that. A cycle where somebody was scored but nobody wrote anything down is worth knowing about.
 
-> **Two things to be aware of.** These comments are sent to the AI provider to be summarised — the same external service the assistant uses — **unless your administrator has turned that off**. Two switches on the user-administration screen govern it: one stops written comments leaving the hospital at all (the AI is then told the text was withheld, so it cannot quietly guess), and one blanks the employee's own name and any patient identifier out of the text before it is sent. Name redaction is the safe default: if the setting cannot be read for any reason, HIMS redacts. Bear it in mind anyway when writing a review comment — avoid patient names and identifying details, as you should in any personnel record. And the summary is a summary; where a decision turns on exactly what was said, read the comment itself in **Written Feedback on Record** rather than the paraphrase above it.
+> **Strict Privacy Default for Written Comments.** By default, HIMS withholds verbatim review comments from external AI providers (`ai_include_comments = 0`) and redacts employee/patient names (`ai_redact_names = 1`) whenever comments are processed. Even so, avoid typing patient names or unnecessary personal identifiers into review comments, as you should in any personnel record. Where a decision turns on exactly what was said, read the comment itself in **Written Feedback on Record** rather than the summary above it.
 
 > **If the AI service is unavailable**, the numbers and tables still work; only the AI-written commentary is replaced with a ⚠️ message. The **Written Feedback on Record** card is unaffected — the comments are read straight from the reviews.
 
@@ -402,6 +404,18 @@ Browse available courses organised by category:
 - **Soft Skills** — communication, leadership, teamwork
 
 Each course record carries CPD hours, difficulty, duration, passing score, and retake limit.
+
+#### Hospital Clinical & Compliance Modules (`/learning/modules`)
+
+Click the **Modules** tab inside Learning to browse six curated hospital clinical and compliance learning modules:
+- **MOD-INF-101** — Hospital Infection Prevention & Control (2 CPD)
+- **MOD-BLS-201** — Basic Life Support & Emergency Code Blue (3 CPD)
+- **MOD-MED-301** — High-Alert Medication Safety & IV Administration (2 CPD)
+- **MOD-PAT-401** — JCI International Patient Safety Goals (IPSG 1–6) (2.5 CPD)
+- **MOD-TRI-501** — Emergency Department Triage & Patient Acuity (ESI) (3 CPD)
+- **MOD-DPA-601** — Hospital Data Privacy (RA 10173) & HIPAA Confidentiality (1.5 CPD)
+
+Each module card includes an interactive lesson preview modal and quick links to the Course Catalogue and CPD log.
 
 #### Getting Assigned to a Course
 
@@ -849,14 +863,12 @@ The assistant follows the same access rules as the rest of HIMS, based on your r
 | Training schedules and registration | Everyone |
 | Employee recognition | Everyone |
 | Succession planning and the talent pipeline | Admins, HR Managers, Supervisors |
-| Other employees' records, salaries, disciplinary history | Admins, HR Managers, Supervisors |
+| Other employees' personal records, salaries, contact details, or disciplinary history | **Nobody** *(strictly prohibited for all roles to protect employee privacy)* |
 | Department administration | Admins, HR Managers |
 | Hospital-wide analytics (attrition, turnover, comparisons) | Admins, HR Managers |
 | User accounts, passwords, and system roles | Admins only |
 
-If you ask about something outside your access, the assistant will say so plainly and suggest raising it with your supervisor or the HR department instead. This is not an error — it is the same boundary that hides those pages from your sidebar.
-
-> If an ordinary question is refused because it happened to mention a restricted word, rephrase it. For example, ask "what does the training cover?" rather than including a colleague's salary in the same sentence.
+If you ask about something outside your access — or about any employee's personal records — the assistant will refuse before any data reaches the AI provider.
 
 ---
 
@@ -866,8 +878,10 @@ If you ask about something outside your access, the assistant will say so plainl
 
 Available to **Admins**, **HR Managers**, and **Supervisors** (view only for Supervisors).
 
-- **View** the employee directory and profiles within your scope *(Admins/HR: everyone; Supervisors: direct reports)*
+- **View** the employee directory and profiles within your scope *(Admins/HR: everyone; Supervisors: direct reports)*. Sensitive employee records are blurred until unlocked with the **Record Access Password** (see [§14](#14-account--security)).
 - **Add**, **edit**, and **delete** employees *(Admins and HR Managers)*
+- **Sync HR1 & HR2** — Admins and HR Managers can synchronize employee records and configure external HR API endpoints from the Employees page.
+- **Anonymize PII (GDPR Right to Erasure)** — For employees whose status is `resigned` or `terminated`, Admins and HR Managers can click **Anonymize PII** on the employee's profile to scrub personal identifiers while preserving aggregate historical integrity.
 - Use **People Manager** on Create/Edit Employee to control eligibility for new **Reports To** assignments. This never changes the employee's HIMS account role.
 - Open **Manager Setup** to find People Managers without accounts, Staff-only managers, Supervisor accounts not marked as managers, inactive managers with active reports, and active employees with no manager.
 
@@ -884,45 +898,59 @@ Available to **Admins** and **HR Managers**.
 
 > **The department head cannot be set from this screen, or from anywhere else in HIMS.** `head_employee_id` is populated only by the demo seeder, so a department you create here has no head recorded — which matters because the credential-alert escalation copies the department head in. Departments added through this screen escalate to the employee and their supervisor only.
 
-### Sidebar: 🔐 Users & Access (Admin only)
+### Sidebar: 📊 Reports & Analytics (Admins & HR Managers)
+
+- **View** executive workforce, performance, competency, training, and compliance analytics
+- **Generate Custom Reports** and **Export CSV** datasets for hospital leadership and accreditation audits
+
+### Sidebar: 🔐 Users & Access & Audit Trail (Admin only)
 
 - **Add User** — create a login account and link it to an employee record
 - **Assign roles** (Admin, HR Manager, Supervisor, Staff)
+- **Activate / Deactivate accounts** and **Force password change** on next login
 - **Set a new password** for a user from the edit screen
 - **Unlock** a locked account, from the button that appears on its row
 - **Delete** an account
-- **AI Data Settings** — two switches governing what leaves the hospital for the AI provider: whether supervisors' written review comments are included in gap-analysis prompts at all, and whether employee and patient names are blanked out of them first. The panel also names the provider currently configured. Both default to on (comments included, names redacted), and redaction is what HIMS falls back to if the setting cannot be read.
-
-> There is no activate/deactivate switch. After five failed password attempts, the account is locked for 15 minutes; an Administrator can also unlock it earlier from **Users & Access**. The system will not let you remove or demote the last remaining Administrator.
+- **Record Access Password** — set or rotate the master password required to unblur confidential employee, credential, and user-account records across HIMS
+- **Audit Trail (`/audit`)** — inspect and export attributable security and administrative events
 
 ---
 
 ## 14. Account & Security
 
-### Changing Your Password
+### Profile, Password & Authenticator App (2FA)
 
-1. Log in to the system.
-2. Click your **name** at the bottom of the sidebar to open your Profile.
-3. Enter your current password and your new password.
-4. Click **Update Password**.
+1. Click your **name** at the bottom of the sidebar (or open `/profile`).
+2. **Update Password:** Enter your current password and your new password, then click **Save**.
+3. **Two-Factor Authentication (RFC 6238 TOTP):** Under the Two-Factor Authentication section, enter your password to generate a TOTP secret/QR key, add it to your Authenticator app, and confirm with a 6-digit code. Once confirmed, login will ask for your Authenticator code instead of sending an email OTP.
 
-### Forgot Your Password?
+### Downloading Your Personal Data (GDPR Data Portability)
 
-1. On the login page, click **"Forgot your password?"**
-2. Enter your email address.
-3. Check your inbox for a password reset link.
-4. Click the link and set a new password. Each link works only once.
+Every authenticated user can download a complete, machine-readable JSON copy of all personal data HIMS holds about them:
 
-> **Note:** The reset email may take a few minutes to arrive. Check your spam/junk folder if you don't see it.
+1. Open your **Profile** (`/profile`) by clicking your name at the bottom of the sidebar.
+2. Scroll to the **Data Privacy & Portability (GDPR)** section.
+3. Click **Download My Data (JSON)** (`GET /profile/export-data`).
+4. Your browser downloads `hims-personal-data-{id}-{date}.json` containing your account profile, linked employee record (with phone and credential numbers decrypted for you), performance reviews, KPI scores, goals, competency assessments, credentials, course enrollments, CPD records, training registrations, recognition activity, notifications, AI chat sessions, and audit history.
+
+### Deleting Your Account (GDPR Right to Erasure)
+
+In the **Delete Account** section on `/profile`, you can enter your current password to permanently delete your HIMS login account (`DELETE /profile`). Your AI chat sessions, trusted device tokens, and active browser sessions are erased immediately, and any linked employee record is unlinked.
+
+### Record Access Password (Blur & Unlock Gate)
+
+Sensitive tables and records (such as the Employees directory, Credentials register, and Users & Access table) are **blurred by default** to prevent shoulder-surfing at clinical workstations.
+
+- Enter the **Record Access Password** in the overlay card and click **Unlock Records** to unblur sensitive records for **5 minutes**.
+- While unlocked, a green **Records Unlocked** badge appears in the top bar; click **Lock** at any time to re-blur the screen immediately.
 
 ### How the System Protects Your Account
 
-- Passwords are stored hashed, never in readable form.
-- After 5 failed attempts, email/IP rate limiting applies and the account is locked for 15 minutes. An Administrator can unlock it earlier.
-- Employee phone numbers and credential numbers are encrypted in the database with Laravel `Crypt`; most other domain fields are not field-encrypted.
-- Your session ends when you log out.
-
-> **What the system does not do:** there is no two-factor authentication and no comprehensive log of record views. Selected writes — including performance-review lifecycle changes, succession changes, recognition, employee/account administration, compliance operations, and AI-executed actions — are audited, but the audit trail is not a complete history of every edit.
+- **Mandatory 2FA** on every login (Email OTP with 2-minute expiry or RFC 6238 Authenticator App with replay protection).
+- **5-Minute Silent Inactivity Timeout:** If you leave HIMS idle for 5 minutes, your session ends automatically and redirects to the login page on your next click.
+- **Account Lockout:** After 5 failed login attempts, your account is locked for 15 minutes (or until an Administrator unlocks it).
+- **Field-Level Encryption at Rest:** Employee phone numbers, credential licence numbers, external HR API keys, and TOTP secrets are encrypted in the database using AES-256-CBC (`Crypt`).
+- **Audit Logging:** Logins, 2FA events, Record Access unlocks, GDPR data exports/deletions, and sensitive administrative writes are recorded in `audit_trails`.
 
 ### Logging Out
 
@@ -1047,13 +1075,19 @@ A: It follows the same role-based rules as the rest of HIMS, so it will not disc
 **Q: How do I delete a conversation?**
 A: Open the assistant panel, find the conversation in the list, and delete it there. You can also clear all of your conversations at once.
 
-### Account Issues
+### Account, Security & Privacy Issues
 
-**Q: I didn't receive the password reset email. What should I do?**
-A: Wait a few minutes and check your spam/junk folder. If it still hasn't arrived, contact your system administrator.
+**Q: I forgot my password. How do I reset it?**
+A: Self-service password reset by email is disabled for security. Contact your System Administrator to reset your password in **Users & Access**; you will be prompted to choose a new password as soon as you sign in.
 
 **Q: I've been blocked after too many login attempts. What now?**
-A: Wait 15 minutes for the account lock to expire, or ask an Administrator to unlock the account. If you have forgotten the password, use the reset link instead.
+A: Wait 15 minutes for the account lock to expire, or ask an Administrator to unlock the account from **Users & Access**.
+
+**Q: Why are employee names and tables blurred on my screen?**
+A: Sensitive workforce, credential, and account tables are protected by the **Record Access Password** gate to prevent shoulder-surfing. Enter the Record Access Password in the unlock overlay to unblur records for 5 minutes.
+
+**Q: How do I download a copy of all my personal data?**
+A: Open your **Profile** (`/profile`) by clicking your name at the bottom of the sidebar, scroll to **Data Privacy & Portability (GDPR)**, and click **Download My Data (JSON)**.
 
 ---
 
@@ -1068,4 +1102,4 @@ If you have questions that aren't covered in this guide:
 ---
 
 *HIMS Performance & Development Module — User Guide*
-*Last updated: August 15, 2026*
+*Last updated: October 28, 2026 (v2.6.0)*

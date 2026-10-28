@@ -28,19 +28,20 @@ Vite/Tailwind pipeline. Data access is **raw Query Builder** (`DB::table(...)`),
 ```mermaid
 graph TD
     subgraph "Presentation Layer (Client-Side)"
-        A["Blade Templates + public/css/hims.css<br/>(Bootstrap Icons font only)"] --- B["Vanilla JS Event Handlers"]
+        A["Blade Templates + public/css/hims.css<br/>(Bootstrap Icons font only)"] --- B["Vanilla JS Event Handlers<br/>(Modals, RecordAccess Overlay, GDPR Banner, AI Rail)"]
     end
 
-    subgraph "Application Layer (Laravel MVC)"
-        C["Web Routing (routes/web.php) & Rate Limiting"] --> D["Laravel Breeze Session Auth"]
-        D --> RB["Gates + 'role' Middleware (RBAC)"]
-        RB --> E["Controllers (Performance, Competency, Learning + Compliance,<br/>Training, Succession, Recognition, Employees, Users)"]
-        E --> F["AiProvider Contract → AiManager<br/>(Gemini / OpenAI / Anthropic / Compatible)"]
+    subgraph "Application Layer (Laravel 13 MVC)"
+        C["Web Routing (routes/web.php) & Rate Limiting"] --> SH["SecurityHeaders + EnforceSessionTimeout (5m)<br/>+ EnsurePasswordIsChanged"]
+        SH --> D["Laravel Breeze Session Auth + Mandatory 2FA<br/>(Email OTP / RFC 6238 TOTP)"]
+        D --> RB["20 Gates + 'role' Middleware (RBAC)<br/>+ RecordAccess Gate (In-Place Blur/Unlock)"]
+        RB --> E["Controllers (Performance, Competency, GapAnalysis,<br/>Learning, Compliance, Training, Succession, Recognition,<br/>Reports, Employees, Users, Profile/GDPR)"]
+        E --> F["AiProvider Contract → AiManager<br/>(Gemini / OpenAI / Anthropic / Compatible)<br/>🔒 Zero Employee Data Access"]
     end
 
     subgraph "Data Layer"
-        E --> H["Raw Query Builder (DB::table)"]
-        H --> I["MySQL 8 (51 Tables, 1 View, 2 Triggers)"]
+        E --> H["Raw Query Builder (DB::table)<br/>+ Crypt Field Encryption"]
+        H --> I["MySQL 8 (53 Tables, 1 View, 2 Triggers, 40 Migrations)"]
     end
 
     A --> C
@@ -50,15 +51,16 @@ graph TD
 
 | Layer | Implementation |
 |---|---|
-| **Frontend** | HTML5 + hand-authored `public/css/hims.css` (1808 lines) + vanilla JS. **Bootstrap Icons** (font glyphs) via CDN only — the Bootstrap CSS *framework* is not used, so no reboot/normalise layer exists and the stylesheet must declare its own element defaults (see the `.hims-table th` note in §1). Tailwind/Vite are installed but the domain UI bypasses the build (`resources/css/app.css` is 3 lines). Most domain views extend `layouts/hims`; only `profile/edit` uses Breeze's `x-app-layout`. Record creation happens in **modals** (`.hims-modal-backdrop` / `.hims-modal`, z-index 1200, transparent backdrop acting purely as a dismissal hit area) driven by one shared controller, `partials/modal-js.blade.php`, and rendered through a `@stack('modals')` outside `<main>` so their `position: fixed` resolves against the viewport rather than the animated (transformed) content wrapper; multi-select uses **checkbox lists** (`.hims-checklist`), not `<select multiple>`. Tabular data uses one `.hims-table` style, with regression tests enforcing header/data alignment on the desktop grid and, below 768px, the restacking of every table into labelled record cards — `thead` hidden, each row a bordered card, each cell printing its own heading from `data-label` — so that no screen asks for a horizontal swipe. The same rule shapes the rest of the mobile block: flex rows of buttons wrap by name (`justify-content-between`, `.hims-card .card-header`, and the `.gap-1`…`.gap-4` utilities, since a *nested* action group left unwrapped puts a primary button past the right edge), and `display: contents` on `.topbar-left` promotes the page title out of its own box onto a full-width bar row beside a widened `--hims-topbar-h`, because clamping it inside the desktop 64px bar truncated every title longer than about 22 characters at 320px. Because the stylesheet and favicon are served outside the build, their URLs carry the file's own content hash (`substr(md5_file($path), 0, 8)`) from `partials/app-css.blade.php` and `partials/favicon.blade.php` — a constant URL behind `Cache-Control: max-age=14400` and Cloudflare would otherwise serve a release's new markup to clients still holding the previous CSS. |
-| **Backend** | **PHP ^8.3**, **Laravel 13.22**. Controllers + `routes/web.php` routing. |
-| **Database** | MySQL 8 (`DB_CONNECTION=mysql`). `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`; MySQL triggers auto-compute competency gap; **three statuses are derived rather than stored** — `App\Support\CredentialStatus` (credential expiry), `CycleStatus` (review cycle closed) and `ReviewStatus` (review frozen) all compute from a date on every read, in PHP and as bound SQL; 1 view. |
-| **Authentication** | Breeze v2.4 session auth on the `users` table. Login throttling = 5 attempts (`LoginRequest`), `throttle:6,1` on verification/password routes. Public self-registration is disabled — admins provision accounts via `UserController`. |
-| **Authorisation** | Gates defined in `AppServiceProvider::registerGates()` + the `role` route middleware, both keyed on `users.role`. See [§3.2](#32-granular-access-control-rbac). The AI assistant adds a third form — subject-matter RBAC applied in the controller rather than by middleware, see [§3.2.1](#321-subject-matter-rbac-for-the-ai-assistant). |
+| **Frontend** | HTML5 + hand-authored `public/css/hims.css` + vanilla JS. **Bootstrap Icons** (font glyphs) via CDN only — the Bootstrap CSS *framework* is not used, so no reboot/normalise layer exists and the stylesheet must declare its own element defaults (see the `.hims-table th` note in §1). Tailwind/Vite are installed but the domain UI bypasses the build (`resources/css/app.css` is 3 lines). Domain views extend `layouts/hims` (including `profile/edit`). Record creation happens in **modals** (`.hims-modal-backdrop` / `.hims-modal`, z-index 1200, transparent backdrop acting purely as a dismissal hit area) driven by one shared controller, `partials/modal-js.blade.php`, and rendered through a `@stack('modals')` outside `<main>` so their `position: fixed` resolves against the viewport rather than the animated (transformed) content wrapper; multi-select uses **checkbox lists** (`.hims-checklist`), not `<select multiple>`. Tabular data uses one `.hims-table` style, with regression tests enforcing header/data alignment on the desktop grid and, below 768px, the restacking of every table into labelled record cards — `thead` hidden, each row a bordered card, each cell printing its own heading from `data-label` — so that no screen asks for a horizontal swipe. Sensitive workforce pages render with an in-place CSS blur (`.hims-record-blurred`) and unlock overlay when the **Record Access Password** gate is locked. Because the stylesheet and favicon are served outside the build, their URLs carry the file's own content hash (`substr(md5_file($path), 0, 8)`) from `partials/app-css.blade.php` and `partials/favicon.blade.php`. |
+| **Backend** | **PHP ^8.3**, **Laravel 13.22**. Controllers + `routes/web.php` routing, plus `SecurityHeaders`, `EnforceSessionTimeout`, and `EnsurePasswordIsChanged` middleware in the `web` stack. |
+| **Database** | MySQL 8 (`DB_CONNECTION=mysql`). **53 tables, 1 view, 2 triggers, 40 applied migrations**. `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`; MySQL triggers auto-compute competency gap; **three statuses are derived rather than stored** — `App\Support\CredentialStatus` (credential expiry), `CycleStatus` (review cycle closed) and `ReviewStatus` (review frozen) all compute from a date on every read, in PHP and as bound SQL. |
+| **Authentication** | Breeze v2.4 session auth on the `users` table + **Mandatory Two-Factor Authentication (2FA)** via Email OTP (2-minute expiry, SHA-256 hashed) or RFC 6238 TOTP Authenticator (`users.totp_secret` encrypted at rest, replay-protected via `totp_consumed_counter`). Login throttling = 5 attempts (`LoginRequest`, 15-minute lockout on 5th failure). Strict **5-minute silent session idle timeout** (`EnforceSessionTimeout`) and immediate session termination when `is_active = false`. Public self-registration and self-service "Forgot Password" are disabled — admins provision accounts and issue temporary passwords via `UserController` (`must_change_password` enforced by `EnsurePasswordIsChanged`). |
+| **Authorisation** | 20 Gates defined in `AppServiceProvider::registerGates()` + the `role` route middleware, both keyed on `users.role`, plus the **Record Access Password Gate (`App\Support\RecordAccess`)** protecting sensitive employee/credential screens. See [§3.2](#32-granular-access-control-rbac). The AI assistant adds subject-matter RBAC in `AiAccessPolicy` with a **strict prohibition on employee personal data across all roles**; see [§3.2.1](#321-subject-matter-rbac-for-the-ai-assistant). |
+| **Privacy & GDPR** | Strict GDPR & Philippine Data Privacy Act (RA 10173) controls: Art. 7/13 consent banner (`POST /profile/gdpr-consent`), Art. 15/20 JSON data portability export (`GET /profile/export-data`), Art. 17 cascading account erasure (`DELETE /profile`) and separated employee PII anonymization (`POST /employees/{id}/anonymize`), and Art. 5(1)(e) automated data retention pruning (`php artisan hims:prune-expired-data` / `GET /api/cron/prune`). |
 | **Cache / session / queue** | `CACHE_STORE=database`, `SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`. The application makes no `Cache::` calls of its own and dispatches no queued jobs. |
 | **Timezone** | `APP_TIMEZONE=Asia/Manila` (`config/app.php`). **An authorization setting, not a display one** — the three derived statuses above all ask "has this date passed?" against `now()->toDateString()`, so under Laravel's stock UTC default a Philippine cycle stayed editable until 8am the day after it ended. See [§2.2.1](#221-review-and-cycle-status-are-derived-from-the-cycles-end-date). |
-| **AI Engine** | Provider-agnostic. Consumers depend on `App\Contracts\AiProvider`; `AiManager` resolves the driver from `AI_PROVIDER` (`gemini`\|`openai`\|`anthropic`\|`compatible`). Gemini is the default. See [§5](#5-ai-provider-layer). |
-| **Mail** | SMTP presets (`gmail`, `outlook`, `yahoo`) plus a Brevo HTTPS API transport. Used by password reset only. See [§4](#4-outbound-mail). |
+| **AI Engine** | Provider-agnostic. Consumers depend on `App\Contracts\AiProvider`; `AiManager` resolves the driver from `AI_PROVIDER` (`gemini`\|`openai`\|`anthropic`\|`compatible`). Gemini is the default. Employee personal records are strictly off-limits to the AI assistant across all roles. See [§5](#5-ai-provider-layer). |
+| **Mail** | SMTP presets (`gmail`, `outlook`, `yahoo`) plus a Brevo HTTPS API transport. Used by 2FA Email OTP delivery, email verification, and opt-in credential expiry notifications. See [§4](#4-outbound-mail). |
 | **Local Staging** | Laragon (Apache/Nginx + PHP + MySQL) on Windows. |
 | **Data Access** | Raw `DB::table()` Query Builder in controllers. `App\Models\User` is the only Eloquent model; there are no policies, observers, or repositories for the domain tables. |
 
@@ -66,9 +68,10 @@ graph TD
 
 ## 2. Database Design (MySQL 8.0+)
 
-The current MySQL database contains **51 tables and 1 view**, with **31 applied migration rows**. This includes
+The current MySQL database contains **53 tables and 1 view**, with **40 applied migration rows**. This includes
 Laravel's own `users`, `sessions`, `cache`, `jobs`, `failed_jobs`, `job_batches`, `password_reset_tokens`, and
-`cache_locks` infrastructure tables plus the HIMS domain tables. All
+`cache_locks` infrastructure tables, security/integration tables (`system_integrations`, `user_trusted_devices`,
+`system_settings`, `audit_trails`), plus the HIMS domain tables. All
 domain record identifiers (`PRIMARY KEY` & `FOREIGN KEY`) use standard `CHAR(36)` UUID formatting, **generated in
 PHP via `Str::uuid()` at insert time** — nothing is auto-generated by MySQL, so an insert that omits the PK will
 fail. `created_at`/`updated_at` must likewise be set manually, since Query Builder has no timestamp magic.
@@ -76,8 +79,9 @@ fail. `created_at`/`updated_at` must likewise be set manually, since Query Build
 > **Removed legacy schema.** Later migrations dropped `peer_reviews` and the unused placeholder tables
 > `permissions`, `role_permissions`, `system_users`, `course_modules`, `quiz_questions`, `quiz_attempts`,
 > `training_tests`, `training_test_results`, `succession_reviews`, and `credential_types`. They are not part of
-> the 51-table live baseline. Real authentication runs off Laravel's `users`, extended with `role`, a nullable
-> `employee_id`, failed-attempt, and lockout columns.
+> the 53-table live baseline. Real authentication runs off Laravel's `users`, extended with `role`, a nullable
+> `employee_id`, `is_active`, `must_change_password`, 2FA/TOTP (`two_factor_code`, `two_factor_expires_at`,
+> `totp_secret`, `totp_enabled_at`, `totp_consumed_counter`), failed-attempt, and lockout columns.
 >
 > Renewal rules intentionally match the live free-text `employee_credentials.credential_type` values instead
 > of depending on the removed placeholder `credential_types` table. See
@@ -548,16 +552,15 @@ pre-removal row. Training sessions still allow self-registration, so a null
 passed, stamping `met` or `shortfall` so the history records the outcome rather than leaving every old cycle
 `open`. It runs from the same nightly `hims:scan-credential-expiry` command as the credential sweep.
 
-### 2.11 Settings
+### 2.11 Settings & External Integrations
 
 *   **`system_settings`**: A key/value table created by migration `..._000005`, `key` as the primary key
-    (`string`) and a nullable `text` `value`, with timestamps. It currently holds exactly two rows, both
-    governing what employee free text may be sent to the AI provider:
-    `ai_include_comments` and `ai_redact_names`. Written by `UserController::updateAiSettings()`, read by
-    `App\Support\ReviewFeedback::promptLines()`. See the administrator controls in
-    [§2.2.3](#223-the-written-half-of-a-review-is-the-half-that-states-a-cause) for the semantics and the
-    fail-safe default. Values are stored as the strings `'1'` / `'0'`, and `ai_redact_names` treats
-    anything other than `'0'` as on — so an absent row redacts.
+    (`string`) and a nullable `text` `value`, with timestamps. It holds:
+    *   `record_access_password_hash` — Bcrypt hash of the master Record Access Password configured by the Administrator (`UserController::updateRecordAccessPassword()`), verified by `RecordAccessController` to unblur sensitive employee/credential screens.
+    *   `gdpr_consent_user_{user_id}` — JSON record of GDPR Art. 7/13 & PH RA 10173 privacy notice acknowledgement (`acknowledged_at`, `ip_address`, `user_agent`, `version`), written by `ProfileController::acknowledgeGdprConsent()`.
+    *   `ai_include_comments` and `ai_redact_names` — Read by `App\Support\ReviewFeedback::promptLines()` with GDPR data-minimization fail-safe defaults (`ai_include_comments` defaults to `'0'`, `ai_redact_names` defaults to `'1'`).
+*   **`system_integrations`**: Stores external HR1 (Core HR credentials/licences) and HR2 (Talent & Competency frameworks) API base URLs, encrypted API keys (`Crypt::encryptString`), active flags, and `last_synced_at` timestamps.
+*   **`user_trusted_devices`**: Schema retained for historical migration lineage (`2026_10_04_000001_create_user_trusted_devices_table`), though the 30-day trusted-device 2FA bypass has been retired so every login requires live 2FA verification.
 
 ### 2.12 Database Views
 *   **`v_recognition_leaderboard`**: Renders monthly scoring profiles.
@@ -610,49 +613,71 @@ DELIMITER ;
 
 The controls below are the ones the application actually enforces.
 
-> **Controls and limitations.** Field-level encryption exists for employee phone and credential number only.
-> There is **no multi-factor authentication**, **no table-driven permission model**, no comprehensive read/access
-> log, and no tamper-evident hash chain. Audit coverage is selective rather than universal; see
-> [§3.4](#34-write-tracking). The compliance posture of HIPAA / Philippine Data Privacy Act RA 10173 is **not met**.
+> **Controls and limitations.** Field-level encryption (`Crypt::encryptString`) protects `employees.phone`,
+> `employee_credentials.credential_number`, `system_integrations.api_key`, and `users.totp_secret`.
+> **Mandatory Multi-Factor Authentication (2FA)** (Email OTP & RFC 6238 TOTP), a **5-minute silent idle timeout**,
+> **HTTP Security Headers** (`SecurityHeaders`), the **Record Access Password Gate** (`App\Support\RecordAccess`),
+> **AI Employee Data Prohibition**, and **GDPR / Philippine Data Privacy Act (RA 10173) Data Subject Rights**
+> (consent recording, JSON data portability export, right to erasure, separated employee PII anonymization, and
+> automated storage-limitation pruning) are all implemented and active. There is no table-driven permission model,
+> no comprehensive read-every-row access log, and no cryptographic hash chain on `audit_trails`; see
+> [§3.4](#34-write-tracking).
 
-### 3.1 Portal Authentication (Laravel Breeze)
+### 3.1 Portal Authentication, Mandatory 2FA & Session Lifecycle
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Web as Login & Auth Controllers
+    participant TwoFA as TwoFactorService / TotpService
+    participant MW as EnforceSessionTimeout + EnsurePasswordIsChanged
+    participant Rec as RecordAccess Gate (Blur / Unlock)
+
+    User->>Web: POST /login (email, password)
+    alt 5th Failed Attempt
+        Web-->>User: Set users.locked_until (+15 mins) & Reject
+    else Valid Credentials & is_active = true
+        Web->>TwoFA: Issue 2FA Challenge (Email OTP 2m / TOTP)
+        TwoFA-->>User: Redirect to /two-factor-challenge
+        User->>TwoFA: POST /two-factor-challenge (6-digit code)
+        TwoFA->>TwoFA: Verify SHA-256 OTP or RFC 6238 TOTP (check totp_consumed_counter)
+        TwoFA-->>User: Regenerate Session + Set hims_last_activity
+    end
+    User->>MW: Authenticated Request
+    MW->>MW: Verify is_active=true, idle <= 5m, must_change_password=false
+    MW->>Rec: Access Protected Workforce / Credential Page
+    alt Record Access Locked
+        Rec-->>User: Render Page Blurred (.hims-record-blurred) + Unlock Overlay
+        User->>Rec: POST /record-access/unlock (Record Access Password)
+        Rec-->>User: Set session('record_access_granted_at') + Audit Trail + Unblur
+    else Record Access Unlocked (within 5m window)
+        Rec-->>User: Render Unblurred Content
+    end
+```
 
 *   **Session-based Authentication**: Laravel Breeze v2.4 on the `users` table via the `web` guard
     (`Auth::attempt`). Passwords are bcrypt-hashed (`BCRYPT_ROUNDS=12`).
-*   **No public registration**: self-service signup is deliberately disabled. Accounts are provisioned by an
-    admin through `UserController` (`role:admin`-gated `users` resource routes).
+*   **Mandatory Two-Factor Authentication (2FA)**: Every login transitions to `/two-factor-challenge`
+    (`TwoFactorAuthenticatedSessionController`). Users authenticate via **Email OTP** (6-digit code, 2-minute TTL,
+    SHA-256 hashed in `users.two_factor_code`) or **RFC 6238 TOTP Authenticator** (`TotpService`). TOTP secrets are
+    encrypted at rest (`Crypt::encryptString`), require current-password confirmation on enrollment, and record the
+    accepted time-step in `users.totp_consumed_counter` to block replay attacks within the ±1 tolerance window.
+    Failed SMTP delivery never leaks the OTP on screen, and the 30-day "Remember this PC" bypass has been removed.
+*   **No public registration & no self-service password reset**: Self-service signup and `/forgot-password` are
+    deliberately disabled. Accounts are provisioned by an admin through `UserController` (`role:admin`). When an
+    administrator sets a password on `/users`, `must_change_password` is set and `EnsurePasswordIsChanged` forces
+    the user to set a personal password before accessing any module.
 *   **Brute Force Protection**: `App\Http\Requests\Auth\LoginRequest` rate-limits on an email+IP throttle key
     and tracks failures on `users`. The fifth failed attempt sets `locked_until` for **15 minutes**. Success
     clears the counter/lock, and an Admin can unlock early through `UserController::unlockAccount()`.
-    Password-reset and email-verification routes carry `throttle:6,1`.
+*   **5-Minute Silent Session Timeout & Immediate Deactivation**: `EnforceSessionTimeout` checks `hims_last_activity`
+    on every request and terminates sessions idle for more than 5 minutes (`SESSION_IDLE_TIMEOUT=300`,
+    `SESSION_LIFETIME=5`) with zero warning modals, redirecting to `/login?timeout=1`. It also immediately terminates
+    any active session if the user's account is deactivated (`is_active = false`).
 *   **CSRF Protection**: Laravel's `VerifyCsrfToken` runs in the default `web` middleware group; all
     state-changing Blade forms emit `@csrf`.
-*   **Session cookie**: `HttpOnly` and `SameSite=Lax` by framework default. `SESSION_ENCRYPT=false` and
-    `SESSION_DRIVER=database` in the current environment. The `Secure` flag only applies over HTTPS — the local
-    environment runs `APP_ENV=local` / `APP_URL=http://localhost:8000`, so it is **not** set locally.
-    `bootstrap/app.php` calls `trustProxies(at: '*')` so deployment behind a TLS-terminating proxy
-    (Railway) yields correct HTTPS scheme and asset URLs.
-
-#### Password reset by email
-
-The standard Breeze broker flow over `password_reset_tokens`: `/forgot-password` accepts an address,
-`Password::sendResetLink()` mails a signed link to **that** address if it belongs to a `users` row, and
-`/reset-password/{token}` sets the new hash. Tokens are **single-use** — consumed on success, and a replayed
-link is rejected. Both routes carry `throttle:6,1`.
-
-Security properties worth noting:
-
-*   **No account enumeration beyond Laravel's default.** An unregistered address returns the framework's
-    "We can't find a user with that email address" — this is Breeze's stock behaviour, retained as-is. If
-    enumeration resistance is required, switch to a generic confirmation for every submission.
-*   **Transport failures do not leak configuration.** `PasswordResetLinkController::store()` wraps
-    `sendResetLink()` because `PasswordBroker` calls `sendPasswordResetNotification()` unguarded — an
-    unreachable SMTP host would otherwise surface as a **500 on an unauthenticated page**. The visitor gets a
-    generic message; the mailer name, host, and exception go to `Log::error` for an operator. A separate
-    `Log::warning` fires when `MAIL_MAILER` is `log`/`array`, so a deployment that silently swallows reset
-    mail is visible in the log rather than to the user.
-*   **Deployment dependency**: the emailed link is built from `APP_URL`. A wrong `APP_URL` yields a link that
-    resolves nowhere for the recipient — the reset itself works, the URL does not. See [§4](#4-outbound-mail).
+*   **Session cookie**: `HttpOnly` and `SameSite=Lax` by framework default. `bootstrap/app.php` configures
+    `trustProxies` from `APP_TRUSTED_PROXIES` rather than a wildcard `*`.
 
 ### 3.2 Granular Access Control (RBAC)
 
@@ -784,14 +809,13 @@ reverse, so correcting spelling cannot open a topic — it can only close one th
 When the re-check is what produced the refusal, the reply says how the message was read, so the person is not
 left thinking the same question worked a moment ago.
 
-The topic → role map mirrors the route middleware, so the chat cannot be more permissive than the rest of the
-app:
+The topic → role map mirrors the route middleware, with one strict privacy override: **employee personal records are blocked for ALL roles (`roles => []`)**, so the chat can never be used to query, inspect, or modify employee personal data:
 
-| Topic | Roles permitted | Mirrors |
+| Topic | Roles permitted | Mirrors / Policy |
 |---|---|---|
 | `users` — user accounts, passwords, system roles | `admin` | `users.*` (`role:admin`) |
 | `succession` — succession planning, talent pipeline, readiness | `admin`, `hr_manager`, `supervisor` | succession group |
-| `employees` — other employees' records, salary, disciplinary history | `admin`, `hr_manager`, `supervisor` | employees group |
+| `employees` — employee records, profiles, contact info, salary, disciplinary history | **None (`[]`) — strictly prohibited for all roles** | Strict GDPR / RA 10173 AI employee data prohibition |
 | `departments` — department administration | `admin`, `hr_manager` | `departments.*` |
 | `org_analytics` — hospital-wide figures, attrition/turnover, cross-department comparison | `admin`, `hr_manager` | `view-org-analytics` Gate |
 
@@ -895,16 +919,31 @@ dedupe-to-edit, scoring restricted to the named reviewer, the end-date freeze at
 write, refusing a create into an ended cycle, and the `performance.show` scoping. The seven tests that drive a
 read screen are MySQL-gated — the listings select `CONCAT()`, which sqlite does not provide.
 
-### 3.3 Data Protection
+### 3.3 Data Protection, Record Access Gate & GDPR / RA 10173 Compliance
 
-*   **In-Transit**: TLS is terminated by the hosting proxy in deployment; `trustProxies(at: '*')` in
-    `bootstrap/app.php` ensures Laravel generates `https://` URLs behind it. **TLS 1.3-only enforcement and HSTS
-    headers are not configured in the application.** Local development runs plain HTTP.
-*   **At-Rest**: `employees.phone` and `employee_credentials.credential_number` are encrypted with Laravel
-    `Crypt::encryptString()` on write and decrypted in their authorized controllers. Migration
-    `2026_08_14_000004_encrypt_existing_phone_and_credential_numbers.php` encrypts existing rows. This is not
-    comprehensive: most performance, competency, and succession fields remain
-    database plaintext.
+*   **In-Transit & HTTP Security Headers (`SecurityHeaders`)**: TLS is terminated by the hosting proxy in deployment;
+    `bootstrap/app.php` configures `trustProxies` from `APP_TRUSTED_PROXIES`. Every response passes through
+    `App\Http\Middleware\SecurityHeaders`, which enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+    `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`,
+    a strict `Content-Security-Policy` (`frame-ancestors 'none'; base-uri 'self'; form-action 'self'`), and
+    `Strict-Transport-Security: max-age=31536000; includeSubDomains` over HTTPS. Authenticated responses also receive
+    `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` to prevent browser caching of workforce PII on shared terminals.
+*   **At-Rest Encryption (`Crypt::encryptString`)**: `employees.phone`, `employee_credentials.credential_number`,
+    `system_integrations.api_key`, and `users.totp_secret` are encrypted at rest with AES-256-CBC via Laravel
+    `Crypt::encryptString()` on write and decrypted only in authorized controllers/services.
+*   **Record Access Password Gate (`App\Support\RecordAccess` & `RecordAccessController`)**: Sensitive employee,
+    credential, and account-coverage views (`/employees`, `/employees/{id}`, `/employees/{id}/edit`,
+    `/employees/manager-setup`, `/competency/credentials`, `/learning/accounts`, etc.) render blurred
+    (`.hims-record-blurred`) behind an in-place glassmorphic unlock overlay (`partials/record-access-overlay.blade.php`)
+    until the user enters the admin-configured **Record Access Password** (`POST /record-access/unlock`). Unlocking
+    grants a 5-minute (`300s`) session window (`record_access_granted_at`) and can be manually re-locked at any time
+    via the lock badge (`POST /record-access/lock`). All unlock/failure/lock events are recorded in `audit_trails`
+    (`record_access_unlocked`, `record_access_failed`, `record_access_locked`).
+*   **GDPR & Philippine Data Privacy Act (RA 10173) Data Subject Rights**:
+    *   **Lawfulness & Transparency (Art. 7, 13–14)**: Persistent Data Privacy Notice banner (`partials/gdpr-privacy-banner.blade.php`) with explicit consent recording (`POST /profile/gdpr-consent` → `system_settings` + `audit_trails` action `gdpr_consent_acknowledged`).
+    *   **Right of Access & Data Portability (Art. 15 & 20)**: Authenticated users can download a complete, machine-readable JSON archive of all personal data held across HIMS via `GET /profile/export-data` (`ProfileController::exportData()`), audited as `gdpr_data_exported`.
+    *   **Right to Erasure / Anonymization (Art. 17)**: Self-service account deletion (`DELETE /profile`) cascades cleanup of `ai_chat_messages`, `ai_chat_sessions`, `sessions`, `user_trusted_devices`, and `system_settings` consent keys while scrubbing `ip_address`, `user_agent`, and `metadata` in `audit_trails`. HR/Admins can also anonymize separated (`resigned`/`terminated`) employees via `POST /employees/{id}/anonymize` (`EmployeeController::anonymize()`), scrubbing name, email, phone, and profile image while preserving anonymized statistical integrity.
+    *   **Storage Limitation (Art. 5(1)(e))**: `php artisan hims:prune-expired-data` (scheduled daily at `02:00` and callable via `GET /api/cron/prune`) purges read notifications older than 90 days, AI chat sessions/messages older than 180 days, expired sessions, and anonymizes IP/User-Agent fields on audit trails older than 365 days.
 *   **Input validation**: every write path validates via `$request->validate([...])`; all queries go through
     Query Builder parameter binding, so SQL injection is mitigated even though raw `DB::table()` is used.
     Where raw SQL fragments are needed (`DB::raw` for `CONCAT`, `DATE_FORMAT`, `FIELD`), they contain no
@@ -993,13 +1032,15 @@ Three deliberate gaps:
 
 ## 4. Outbound Mail
 
-Password reset is the only feature that sends mail *by default*. The credential-expiry sweep also sends mail, but
-only where `CREDENTIAL_ALERT_EMAIL` has been switched on (`config/hims.php:19`, default `false`) — see
-`ScanCredentialExpiry::emailIfEnabled()`, which posts `Mail::raw()` to the subject employee and to any escalation
-recipient with no `users` row. Both paths are entirely dependent on the transport being real.
-The failure mode is silent by design in Laravel: `MAIL_MAILER=log` accepts every message, writes it to
-`storage/logs/laravel.log`, and reports success — so the app tells the user "We have emailed your password
-reset link" while nothing is delivered.
+Two-Factor Authentication (Email OTP via `TwoFactorService`) and email verification send mail *by default*. The
+credential-expiry sweep also sends mail, but only where `CREDENTIAL_ALERT_EMAIL` has been switched on
+(`config/hims.php:19`, default `false`) — see `ScanCredentialExpiry::emailIfEnabled()`, which posts `Mail::raw()`
+to the subject employee and to any escalation recipient with no `users` row. Both paths depend on a real mail
+transport in production. (Self-service password reset was removed in favour of administrator-issued temporary
+passwords with forced change on next login.)
+The failure mode is silent by design in Laravel when `MAIL_MAILER=log`: it accepts every message and writes it to
+`storage/logs/laravel.log`. In 2FA, if an live SMTP transport fails, `TwoFactorService` catches the error and keeps
+the user on the 2FA challenge screen with an IT support notice — it **never** displays the OTP code on screen.
 
 **Provider presets.** `config/mail.php` defines `gmail`, `outlook`, and `yahoo` alongside the stock `smtp`
 mailer, each with host, port (587) and scheme baked in, so `MAIL_MAILER` alone selects the provider and only
@@ -1083,11 +1124,11 @@ vendor, so the provider can be swapped by changing one env var.
 ```mermaid
 graph LR
     A["AiController::query()"] --> T["AiTypoCorrector<br/>(reading of the message)"]
-    T --> P["AiAccessPolicy<br/>(subject-matter RBAC)"]
+    T --> P["AiAccessPolicy<br/>(subject-matter RBAC;<br/>🔒 employees blocked for all)"]
     T --> V["ACTION_VERBS<br/>(pre-filter)"]
     V --> PL["AiActionPlanner<br/>(classify → action key + params)"]
     PL --> AR["AiActionRegistry<br/>(role gates from route middleware)"]
-    AR --> ER["AiEntityResolver<br/>(name → UUID)"]
+    AR --> ER["AiEntityResolver<br/>(name → UUID;<br/>🔒 employee lookup disabled)"]
     ER --> EX["AiActionExecutor<br/>(invoke controller, audit)"]
     EX --> C["Existing Controllers<br/>(validation, safety rails, flash)"]
     A --> B["App\\Contracts\\AiProvider<br/>ask(prompt, history, scope)"]
@@ -1130,7 +1171,7 @@ pass can add a refusal and never remove one ([§3.2.1](#321-subject-matter-rbac-
 | `AiActionRegistry` | Catalogue: action key → route name, param list, `destructive` flag, mirror spec. Derives required roles from `$route->gatherMiddleware()`. |
 | `AiActionPlanner` | Builds the classifier prompt from `catalogueFor()`, calls `$ai->ask()`, decodes the JSON through the existing `AbstractAiProvider` decoder, re-checks the returned key against `availableTo()`. |
 | `AiActionExecutor` | Synthesises the `Request`, resolves named params, pre-fills update fields from the current row, invokes the controller method by reflection, catches exceptions, calls `AuditTrail::record()`, reads the flash bag for the controller's own message. |
-| `AiEntityResolver` | Name/code/email → UUID for employees, users, departments, cycles, courses, sessions, competencies, positions, badges, pathways, venues, posts. Employee lookups run through the class's **own** `scopeEmployees()` — admin/HR resolve everyone, a supervisor resolves their department, everyone else only themselves. That is deliberately *wider* than `Controller::scopeToVisibleEmployees()`, which now follows the reporting line ([§3.2.2](#322-performance-review-authority)); resolving a name grants nothing, because the controller the executor calls applies the real rule. >1 match returns a disambiguation error; 0 returns a not-found error, **since v2.22.0 carrying a `— did you mean "…"?` suffix** when one scoped record is close enough. Suggesting is not resolving: the fuzzy pass runs *only* after the real query returned nothing, so it cannot widen a successful match or change which row resolves — the action still stops. Its candidate pool is the already-scoped pool capped at `SUGGEST_POOL = 500`, so a suggestion can never name a record the caller could not have reached by spelling it correctly, which would leak a record's existence through a misspelling. |
+| `AiEntityResolver` | Name/code/email → UUID for users, departments, cycles, courses, sessions, competencies, positions, badges, pathways, venues, posts. **Employee lookups (`employee`, `instructor`, `mentor`) are disabled (`🔒 Employee data access is disabled for the AI assistant`)** so the AI assistant never resolves or reads employee records. For other entities, >1 match returns a disambiguation error; 0 returns a not-found error, **since v2.22.0 carrying a `— did you mean "…"?` suffix** when one scoped record is close enough. Suggesting is not resolving: the fuzzy pass runs *only* after the real query returned nothing, so it cannot widen a successful match or change which row resolves — the action still stops. Its candidate pool is the already-scoped pool capped at `SUGGEST_POOL = 500`, so a suggestion can never name a record the caller could not have reached by spelling it correctly, which would leak a record's existence through a misspelling. |
 | `AiTypoCorrector` | **New in v2.22.0.** The reading of a chat message: `correct()` returns `{text, changes}` and `note()` renders the changes as the sentence shown to the user. A token is a candidate only if it is ≥5 characters, unknown to the domain vocabulary, absent from the `NEVER_CORRECT` stop-list, not inside a quoted span, not an identifier (code/email/date/underscored column), and not capitalised mid-sentence — that last rule is what keeps surnames like *Reyes* and *Cruze* out of reach of *course*. At most `MAX_CORRECTIONS = 3` words are re-read per message: a message needing four was misunderstood, not mistyped. The per-token allowance is deliberately tighter than `FuzzyMatch::ceiling()` — **1 edit under 8 characters, 2 at 8 or more** — because this rewrites text rather than offering a suggestion. Case is restored from the original token, so `CRATE` → `CREATE`. |
 | `App\Support\FuzzyMatch` | **New in v2.22.0.** The edit-distance primitive under both of the above, in the same shape as the other `App\Support` helpers (`final class`, static, no DB, no Carbon). Optimal String Alignment rather than PHP's `levenshtein()`, for two reasons: `levenshtein()` prices a transposition at 2 edits, which puts the commonest keyboard slip (`confrim`) as far away as an unrelated word, and it counts **bytes**, which would put every accented surname in this hospital out of reach. The DP therefore walks `mb_str_split()`. The allowance scales with term length (`ceiling()`: ≤3 → 0, ≤6 → 1, ≤10 → 2, else 3) — a three-character word gets none at all, because nearly every edit of one lands on another real word. Ambiguity is the caller's decision, which is why there are two entry points: `closest()`/`closestOf()` return **null** on a tie, and everything that resolves a record uses those; `preferred()` settles a tie by candidate order and only `AiTypoCorrector` uses it, because a guess that merely reshapes text is shown to the person and costs nothing if wrong. |
 | `App\Support\AuditTrail` | Single `record()` helper inserting into `audit_trails`. Picks `action` from the spec (`ai_create`/`ai_update`/`ai_delete`) and always populates `ip_address` (NOT NULL). |
@@ -1140,23 +1181,26 @@ pass can add a refusal and never remove one ([§3.2.1](#321-subject-matter-rbac-
 ## 6. Routing & Module Map (as-built)
 
 All application routes live in **`routes/web.php`** (plus `auth.php`, `console.php`). There is **no `api.php`
-and no `/api/v1` REST layer** — `bootstrap/app.php` registers only `web` and `commands` routing. Every domain
+and no `/api/v1` REST layer** — `bootstrap/app.php` registers only `web` and `commands` routing (with `/api/cron/{action}` declared in `web.php` for scheduled cron triggers `sync`, `scan`, and `prune`). Every domain
 route sits behind `['auth', 'verified']`, with per-route `role:` gating.
 
 | Module | Handler | Views | Access |
 |---|---|---|---|
 | Dashboard | `DashboardController` | `dashboard.blade.php` + `dashboard/partials/` | all authenticated |
-| Performance | `PerformanceController` | `performance/` (+ `cycles/`, `reviews/`) | read: all, **row-scoped to own / authored / direct reports** · review create: `admin,hr_manager,supervisor` **and** the chain-of-command check ([§3.2.2](#322-performance-review-authority)) · scoring: same role gate, then **the named `reviewer_id` only**, and refused once the cycle's end date has passed · cycles: `admin,hr_manager` |
-| Competency | `CompetencyController` | `competency/` (+ `assessments/`, `credentials/`, `domains/`) | read: all · assess: `admin,hr_manager,supervisor` · domains: `admin,hr_manager` |
+| Performance | `PerformanceController` | `performance/` (+ `cycles/`, `reviews/`, `kpis/`) | read: all, **row-scoped to own / authored / direct reports** · review create: `admin,hr_manager,supervisor` **and** the chain-of-command check ([§3.2.2](#322-performance-review-authority)) · scoring: same role gate, then **the named `reviewer_id` only**, and refused once the cycle's end date has passed · cycles & KPIs: `admin,hr_manager` |
+| Competency | `CompetencyController` | `competency/` (+ `assessments/`, `credentials/`, `domains/`, `role-requirements/`) | read: all · assess & HR1/HR2 sync: `admin,hr_manager,supervisor` · domains & role requirements: `admin,hr_manager` · credentials blurred until Record Access unlocked |
 | Gap Analysis | `GapAnalysisController` (`competency.gap.*`) | `competency/gap-analysis/` | `admin,hr_manager,supervisor` |
-| Learning | `LearningController` + `ComplianceController` | `learning/` (+ `courses/`, `cpd/`, `pathways/`, `assignments/`, `renewals/`) | one sidebar entry and canonical `learning.*` routes · catalogue/CPD/pathways: all authenticated · course/pathway authoring: `admin,hr_manager` · Required Training/Renewals/Reports: `admin,hr_manager,supervisor`, read lists row-scoped · assignment: same roles; a single-employee target is access-checked, while department/role/all expand the selected organisational target · rules/sync/accounts: `admin,hr_manager` · `learning.cycles.mine`: all roles |
-| Training | `TrainingController` | `training/` (+ `sessions/`, `venues/`) | read/register: all · own feedback: all (needs attendance) · check-in: `admin,hr_manager,supervisor` — the session's instructor and any admin/HR mark anyone present, a supervisor who is not the instructor only registrants in their own department · sessions: `+supervisor` · venues: `admin,hr_manager` |
+| Learning | `LearningController` + `ComplianceController` | `learning/` (+ `courses/`, `modules/`, `cpd/`, `pathways/`, `assignments/`, `renewals/`) | canonical `learning.*` routes · catalogue/modules (`MOD-INF-101`–`MOD-DPA-601`)/CPD/pathways: all authenticated · course/pathway authoring: `admin,hr_manager` · Required Training/Renewals/Reports: `admin,hr_manager,supervisor`, read lists row-scoped · rules/sync/accounts: `admin,hr_manager` (`accounts` blurred until Record Access unlocked) · `learning.cycles.mine`: all roles |
+| Training | `TrainingController` | `training/` (+ `sessions/`, `venues/`) | read/register: all · own feedback: all (needs attendance) · check-in & sessions: `admin,hr_manager,supervisor` · venues: `admin,hr_manager` |
 | Succession | `SuccessionController` | `succession/` (+ `candidates/`, `positions/`) | `admin,hr_manager,supervisor` (staff: no access) · admin/HR full confidential management · supervisors see redacted direct-report candidates/positions and manage those milestones only |
-| Recognition | `RecognitionController` | `recognition/` (+ `badges/`, `posts/`, `comments/`) | public wall: all · private: sender/recipient/HR/Admin · writes require a linked employee · badges/moderation: `admin,hr_manager` |
-| Employees | `EmployeeController` | `employees/` | group `admin,hr_manager,supervisor`; supervisor read is direct-report scoped · CRUD: `admin,hr_manager` |
-| Departments | **inline closures in `routes/web.php`** (no controller) | `departments/index.blade.php` | `admin,hr_manager` |
-| Users | `UserController` (resource, no `show`) | `users/` | `admin` only |
-| AI | `AiController` | rendered inside the app shell (`partials/ai-rail`) | all authenticated — **no `role:` middleware by design**; the boundary is subject matter, applied in the controller ([§3.2.1](#321-subject-matter-rbac-for-the-ai-assistant)) |
+| Recognition | `RecognitionController` | `recognition/` (+ `badges/`, `posts/`, `comments/`, `certificates/`) | public wall: all · private: sender/recipient/HR/Admin · writes require a linked employee · badges/moderation/points: `admin,hr_manager` |
+| Reports & Analytics | `ReportController` | `reports/` (`index`, `performance`, `compliance`, `appraisal`) | `admin,hr_manager,supervisor` (includes CSV exports for performance & compliance) |
+| Employees | `EmployeeController` | `employees/` | group `admin,hr_manager,supervisor`; supervisor read is direct-report scoped · CRUD & separated PII anonymize (`POST /employees/{id}/anonymize`): `admin,hr_manager` · blurred until Record Access unlocked |
+| Departments | **inline closures in `routes/web.php`** (no controller) | `departments/index.blade.php` | `admin,hr_manager` (create, update, delete when empty) |
+| Users & Audit | `UserController` (resource, no `show`) | `users/` | `users.*`, `settings.record-access-password`: `admin` only · `/audit/history` & `/audit/export`: `admin,hr_manager` |
+| Record Access Gate | `RecordAccessController` | `partials/record-access-overlay.blade.php` | all authenticated (`POST /record-access/unlock`, `POST /record-access/lock`) |
+| Profile, 2FA & GDPR | `ProfileController` | `profile/` (`edit.blade.php`, `totp-setup.blade.php`) | all authenticated (`GET /profile/export-data` JSON portability, `POST /profile/gdpr-consent`, `DELETE /profile` cascading erasure, TOTP setup/confirm/disable) |
+| AI | `AiController` | rendered inside the app shell (`partials/ai-rail`) | all authenticated — **no `role:` middleware by design**; boundary is subject matter (`AiAccessPolicy`, with employee data strictly prohibited for all roles) ([§3.2.1](#321-subject-matter-rbac-for-the-ai-assistant)) |
 
 > Departments have no controller — `routes/web.php` handles them with inline closures. The stale
 > `App\Http\Controllers\DepartmentController` import that used to sit at the top of that file has since been

@@ -70,4 +70,19 @@ Private recognition is searchable only by its sender, recipient, or HR/Admin mod
 
 ## Audit Access
 
-Audit history is restricted to HR and administrators: `GET /audit/history` carries `role:admin,hr_manager`, so staff and supervisors cannot retrieve the endpoint directly and UI visibility is not the control. The audit trail is attributable but selective: reads are not comprehensively logged, ordinary edits outside the covered workflows may not create an audit row, and there is no hash chaining — do not read the table as a complete history.
+Audit history is restricted to administrators (`/audit` and `/audit/export` carry `role:admin`, and `GET /audit/history` carries `role:admin,hr_manager`), so staff and supervisors cannot retrieve the endpoint directly and UI visibility is not the control. The audit trail is attributable and covers logins, 2FA verification, Record Access unlocks/locks, GDPR data exports/erasure/anonymization, review lifecycle changes, succession, recognition moderation, AI-executed writes, and administrative updates, though there is no hash chaining.
+
+## Record Access Password Gate (Blur & Unlock Overlay)
+
+Confidential employee, credential, and user-account tables render blurred in place (`.hims-record-blurred`) behind an inline password overlay (`partials/record-access-overlay.blade.php`) until the user enters the administrator-configured **Record Access Password** (`POST /record-access/unlock`, verified against `system_settings.record_access_password_hash`). A valid unlock grants a **5-minute (`300s`) session window** (`RecordAccess::TTL_SECONDS`) across sensitive views and can be manually re-locked at any time (`POST /record-access/lock`). Unlock and lock events are recorded in `audit_trails`.
+
+## AI Assistant Employee Data Prohibition
+
+To enforce strict employee data privacy under GDPR and RA 10173, `App\Services\Ai\AiAccessPolicy` sets `TOPICS['employees']['roles'] = []` and `AiEntityResolver` disables employee lookups. **No role — including Admin and HR Manager — may query or resolve employee personal records through the conversational AI assistant.**
+
+## GDPR & RA 10173 Data Subject Rights
+
+- **Explicit Consent (Art. 7 & 13):** All authenticated users are presented with a persistent Privacy & GDPR Consent banner until acknowledged (`POST /profile/gdpr-consent`, stored in `system_settings` as `gdpr_consent_user_{id}` and logged in `audit_trails`).
+- **Right of Access & Data Portability (Art. 15 & 20):** Every authenticated user can download a complete, machine-readable JSON archive of their personal data (`GET /profile/export-data`), with their own encrypted `phone` and `credential_number` fields decrypted for the export.
+- **Right to Erasure (Art. 17):** Authenticated users can delete their own login account (`DELETE /profile`), and HR/Admin can anonymize PII for separated (`resigned` / `terminated`) employees (`POST /employees/{id}/anonymize`).
+- **Storage Limitation (Art. 5(1)(e)):** `php artisan hims:prune-expired-data` runs daily to prune expired tokens, old read notifications, and stale AI chat history.
