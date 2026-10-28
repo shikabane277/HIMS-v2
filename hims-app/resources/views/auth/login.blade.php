@@ -75,13 +75,9 @@
                     <button type="button" class="toggle-pw" onclick="togglePw()"><i class="bi bi-eye" id="pwEye"></i></button>
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-                    <label for="remember_device" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-size:12.5px;color:#475569;margin:0">
-                        <input type="checkbox" id="remember_device" name="remember_device" value="1" {{ old('remember_device') ? 'checked' : '' }} style="width:15px;height:15px;accent-color:var(--hims-primary);cursor:pointer;border-radius:4px">
-                        <span>Remember this PC for 30 days</span>
-                    </label>
-                    @if(Route::has('password.request'))
-                    <a href="{{ route('password.request') }}" style="font-size:12px;color:var(--hims-primary);text-decoration:none;font-weight:500">Forgot password?</a>
-                    @endif
+                    <span style="font-size:11.5px;color:#94a3b8">
+                        <i class="bi bi-clock"></i> Sessions end after 5 minutes idle
+                    </span>
                 </div>
             </div>
 
@@ -95,7 +91,7 @@
         <div style="text-align:center">
             <p style="font-size:12px;color:#9ca3af;margin:0">
                 <i class="bi bi-shield-check" style="color:var(--hims-primary)"></i>
-                Session-based authentication · AES-256 encrypted data · SHA-256 audit chain
+                Session-based authentication · AES-256 encrypted data · Audit trail
             </p>
         </div>
     </div>

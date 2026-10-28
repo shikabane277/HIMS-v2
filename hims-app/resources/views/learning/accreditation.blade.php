@@ -81,8 +81,10 @@
         <h5><i class="bi bi-clipboard-data"></i> Staff Standing</h5>
         <span style="font-size:12px;color:#6b7280">Active employment only</span>
     </div>
-    <div class="card-body" style="padding:0;overflow-x:auto">
-        <table class="hims-table">
+    <div class="hims-sensitive-wrapper">
+        <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+            <div class="card-body" style="padding:0;overflow-x:auto">
+                <table class="hims-table">
             <thead>
                 <tr>
                     <th>Employee</th><th>Department</th><th>Role / Position</th>
@@ -155,6 +157,11 @@
                 @endforelse
             </tbody>
         </table>
+    </div>
+    </div>
+    @if(! \App\Support\RecordAccess::isUnlocked())
+        @include('partials.record-access-overlay', ['slot' => 'Staff accreditation reports and individual competency ratings are protected. Enter the Record Access Password to unblur.'])
+    @endif
     </div>
 </div>
 

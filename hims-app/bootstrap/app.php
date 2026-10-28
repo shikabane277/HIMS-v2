@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnforceSessionTimeout;
 use App\Http\Middleware\EnsurePasswordIsChanged;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,7 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->trustProxies(at: '*');
+        $trustedProxies = env('APP_TRUSTED_PROXIES');
+        if (! empty($trustedProxies)) {
+            $middleware->trustProxies(at: array_map('trim', explode(',', (string) $trustedProxies)));
+        }
 
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
@@ -25,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             EnsurePasswordIsChanged::class,
             EnforceSessionTimeout::class,
+            SecurityHeaders::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

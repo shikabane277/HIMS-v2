@@ -29,6 +29,36 @@
 </div>
 @endif
 
+{{-- Succession Analytics & Trends --}}
+<div class="row g-3 mb-4">
+    <div class="col-lg-7">
+        <div class="hims-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 style="margin:0"><i class="bi bi-bar-chart-steps text-primary-hims"></i> Talent Pipeline Bench Strength</h5>
+                <span class="badge" style="background:var(--hims-primary-xlight);color:var(--hims-primary-dark);font-size:11px;font-weight:600">By Readiness Horizon</span>
+            </div>
+            <div class="card-body" style="padding:16px">
+                <div style="position:relative;height:220px">
+                    <canvas id="pipelineReadinessChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="hims-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 style="margin:0"><i class="bi bi-shield-exclamation text-primary-hims"></i> Critical Role Vacancy Risk</h5>
+                <span class="badge" style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:600">Vulnerability Profile</span>
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center" style="padding:16px">
+                <div style="position:relative;height:220px;width:100%">
+                    <canvas id="vacancyRiskChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="hims-card mb-4">
     <div class="card-header">
         <h5><i class="bi bi-exclamation-triangle-fill"></i> Critical Positions & Coverage</h5>
@@ -240,4 +270,110 @@
 </div>
 @endpush
 @endcan
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof Chart === 'undefined') return;
+
+    // Pipeline Readiness Horizon Chart
+    const readinessCtx = document.getElementById('pipelineReadinessChart');
+    if (readinessCtx) {
+        new Chart(readinessCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: @json($readinessChartData['labels'] ?? []),
+                datasets: [{
+                    label: 'Nominated Candidates',
+                    data: @json($readinessChartData['counts'] ?? []),
+                    backgroundColor: [
+                        'rgba(5, 150, 105, 0.85)',
+                        'rgba(2, 132, 199, 0.85)',
+                        'rgba(139, 92, 246, 0.85)',
+                        'rgba(217, 119, 6, 0.85)'
+                    ],
+                    borderColor: [
+                        '#059669',
+                        '#0284c7',
+                        '#8b5cf6',
+                        '#d97706'
+                    ],
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ' ' + ctx.raw + ' candidate(s)';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, precision: 0 },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    // Critical Role Vacancy Risk Profile
+    const riskCtx = document.getElementById('vacancyRiskChart');
+    if (riskCtx) {
+        new Chart(riskCtx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: @json($vacancyRiskChartData['labels'] ?? []),
+                datasets: [{
+                    data: @json($vacancyRiskChartData['counts'] ?? []),
+                    backgroundColor: [
+                        '#ef4444',
+                        '#f97316',
+                        '#f59e0b',
+                        '#10b981'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 10,
+                            font: { size: 11.5, family: 'Inter, system-ui, sans-serif' }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ' ' + ctx.label + ': ' + ctx.raw + ' position(s)';
+                            }
+                        }
+                    }
+                },
+                cutout: '62%'
+            }
+        });
+    }
+});
+</script>
+@endpush
 @endsection

@@ -10,3 +10,5 @@
 /hims-app/storage/framework/cache/*
 /hims-app/storage/framework/sessions/*
 /hims-app/storage/framework/views/*
+dist
+/dist

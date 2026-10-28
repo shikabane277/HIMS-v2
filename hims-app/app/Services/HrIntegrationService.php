@@ -47,13 +47,24 @@ class HrIntegrationService
             ];
         }
 
+        $rawDbKey = $record->api_key ?? null;
+        $apiKey = $envApiKey;
+        if (! empty($rawDbKey)) {
+            try {
+                $apiKey = Crypt::decryptString($rawDbKey);
+            } catch (\Throwable) {
+                // Read-shim for legacy plaintext keys
+                $apiKey = $rawDbKey;
+            }
+        }
+
         return [
             'integration_id' => $record->integration_id,
             'system_code' => $record->system_code,
             'system_name' => $record->system_name,
             'description' => $record->description,
             'base_url' => ! empty($record->base_url) ? $record->base_url : $envBaseUrl,
-            'api_key' => ! empty($record->api_key) ? $record->api_key : $envApiKey,
+            'api_key' => $apiKey,
             'timeout' => (int) ($record->timeout ?? $envTimeout ?: 30),
             'is_active' => (bool) ($record->is_active ?? true),
             'last_synced_at' => $record->last_synced_at,
@@ -61,6 +72,40 @@ class HrIntegrationService
             'last_sync_message' => $record->last_sync_message,
             'synced_records_count' => (int) ($record->synced_records_count ?? 0),
         ];
+    }
+
+    /**
+     * Anti-SSRF safety check. Only allow public HTTPS URLs, rejecting
+     * private, loopback, and link-local ranges.
+     */
+    public static function isSafeUrl(?string $url): bool
+    {
+        if (empty($url)) {
+            return true;
+        }
+
+        $parts = parse_url($url);
+        if (! $parts || empty($parts['scheme']) || empty($parts['host'])) {
+            return false;
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        if ($scheme !== 'https') {
+            return false;
+        }
+
+        $host = strtolower($parts['host']);
+        if (in_array($host, ['localhost', '127.0.0.1', '0.0.0.0', '::1'], true)
+            || str_ends_with($host, '.local')
+            || str_ends_with($host, '.lan')) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return (bool) filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+        }
+
+        return true;
     }
 
     /**
@@ -80,7 +125,8 @@ class HrIntegrationService
         }
 
         if (array_key_exists('api_key', $data)) {
-            $updates['api_key'] = ! empty($data['api_key']) ? trim($data['api_key']) : null;
+            $rawKey = ! empty($data['api_key']) ? trim($data['api_key']) : null;
+            $updates['api_key'] = $rawKey !== null ? Crypt::encryptString($rawKey) : null;
         }
 
         if (array_key_exists('timeout', $data)) {
@@ -173,6 +219,13 @@ class HrIntegrationService
 
         if (empty($config['base_url'])) {
             $msg = 'HR1 API Base URL is not configured in .env or the database. Set HR1_API_BASE_URL in .env or save API settings.';
+            $this->logSyncStatus('hr1', 'failed', $msg, 0);
+
+            return ['success' => false, 'message' => $msg];
+        }
+
+        if (! self::isSafeUrl($config['base_url'])) {
+            $msg = 'HR1 API Base URL failed SSRF security checks. Only public HTTPS URLs are allowed.';
             $this->logSyncStatus('hr1', 'failed', $msg, 0);
 
             return ['success' => false, 'message' => $msg];
@@ -353,6 +406,13 @@ class HrIntegrationService
 
         if (empty($config['base_url'])) {
             $msg = 'HR2 API Base URL is not configured in .env or the database. Set HR2_API_BASE_URL in .env or save API settings.';
+            $this->logSyncStatus('hr2', 'failed', $msg, 0);
+
+            return ['success' => false, 'message' => $msg];
+        }
+
+        if (! self::isSafeUrl($config['base_url'])) {
+            $msg = 'HR2 API Base URL failed SSRF security checks. Only public HTTPS URLs are allowed.';
             $this->logSyncStatus('hr2', 'failed', $msg, 0);
 
             return ['success' => false, 'message' => $msg];

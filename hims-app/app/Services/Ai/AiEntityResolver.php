@@ -108,47 +108,10 @@ final class AiEntityResolver
 
     private function resolveEmployee(string $value, User $user): array
     {
-        $query = DB::table('employees as e')
-            ->select('e.employee_id', 'e.employee_code', 'e.first_name', 'e.last_name');
-
-        // Row-level visibility: the same rule the employee list uses.
-        $this->scopeEmployees($query, $user);
-
-        if ($this->looksLikeUuid($value)) {
-            $query->where('e.employee_id', $value);
-        } else {
-            $query->where(function ($q) use ($value) {
-                $q->where('e.employee_code', $value)
-                    ->orWhere('e.email', $value)
-                    ->orWhereRaw("CONCAT(COALESCE(e.first_name,''),' ',COALESCE(e.last_name,'')) LIKE ?", ['%'.$value.'%'])
-                    ->orWhere('e.last_name', 'like', '%'.$value.'%')
-                    ->orWhere('e.first_name', 'like', '%'.$value.'%');
-            });
-        }
-
-        // One extra row is enough to know the match was ambiguous.
-        $rows = $query->limit(6)->get();
-
-        if ($rows->isEmpty()) {
-            return [
-                'ok' => false,
-                'error' => "no employee matching \"{$value}\" that you have access to"
-                    .$this->employeeSuggestion($value, $user),
-            ];
-        }
-
-        if ($rows->count() > 1) {
-            $names = $rows->take(5)->map(fn ($r) => trim("{$r->first_name} {$r->last_name}")." ({$r->employee_code})");
-
-            return ['ok' => false, 'error' => "\"{$value}\" matches more than one employee: ".$names->implode('; ').'. Which one?'];
-        }
-
-        $row = $rows->first();
-
+        // The AI chatbot is strictly prohibited from accessing or querying any kind of employee data.
         return [
-            'ok' => true,
-            'id' => $row->employee_id,
-            'label' => trim("{$row->first_name} {$row->last_name}")." ({$row->employee_code})",
+            'ok' => false,
+            'error' => 'the AI assistant is strictly prohibited from accessing any kind of data from employees',
         ];
     }
 
@@ -245,38 +208,7 @@ final class AiEntityResolver
      */
     private function employeeSuggestion(string $value, User $user): string
     {
-        if ($this->looksLikeUuid($value)) {
-            return '';
-        }
-
-        $query = DB::table('employees as e')
-            ->select('e.employee_code', 'e.first_name', 'e.last_name');
-
-        // The same scope the failed lookup used, so a suggestion cannot name
-        // someone this caller was never allowed to find.
-        $this->scopeEmployees($query, $user);
-
-        $labelled = [];
-
-        foreach ($query->limit(self::SUGGEST_POOL)->get() as $row) {
-            $name = trim("{$row->first_name} {$row->last_name}");
-
-            if ($name === '') {
-                continue;
-            }
-
-            $label = $name.($row->employee_code ? " ({$row->employee_code})" : '');
-
-            // Every way a person might have typed this employee points at the
-            // one label, so three aliases of one person are not a tie.
-            foreach ([$name, (string) $row->last_name, (string) $row->first_name, (string) $row->employee_code] as $alias) {
-                if (trim($alias) !== '') {
-                    $labelled[$alias] = $label;
-                }
-            }
-        }
-
-        return $this->phrase(FuzzyMatch::closestOf($value, $labelled));
+        return '';
     }
 
     /** "did you mean" for a login account. */

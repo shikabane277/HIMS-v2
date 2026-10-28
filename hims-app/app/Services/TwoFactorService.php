@@ -14,7 +14,9 @@ use Symfony\Component\HttpFoundation\Cookie;
 class TwoFactorService
 {
     public const TRUSTED_DEVICE_COOKIE = 'hims_trusted_device';
+
     public const TRUSTED_DEVICE_DAYS = 30;
+
     /**
      * Generate a 6-character code guaranteed to contain both uppercase
      * and lowercase characters (case-sensitive).
@@ -69,13 +71,6 @@ class TwoFactorService
                 'mailer' => config('mail.default'),
                 'exception' => $e->getMessage(),
             ]);
-
-            if (app()->environment('local')) {
-                session()->flash(
-                    'dev_code_notice',
-                    "Notice: Email delivery failed ({$e->getMessage()}). For local testing, your verification code is: {$code}"
-                );
-            }
 
             return false;
         }
@@ -187,4 +182,3 @@ class TwoFactorService
         return cookie()->forget(self::TRUSTED_DEVICE_COOKIE);
     }
 }
-

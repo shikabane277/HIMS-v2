@@ -12,6 +12,9 @@
     <a href="{{ route('learning.assignments.index') }}"
        class="hims-tab {{ request()->routeIs('learning.assignments.*') || request()->routeIs('compliance.assignments.*') || request()->routeIs('compliance.index') ? 'active' : '' }}">
         <i class="bi bi-clipboard-check"></i> Required Training
+        @if(! \App\Support\RecordAccess::isUnlocked())
+            <i class="bi bi-lock-fill ms-1" style="font-size:11px;opacity:0.65" title="Protected hospital compliance roster — password required to unblur"></i>
+        @endif
     </a>
     @endcan
 

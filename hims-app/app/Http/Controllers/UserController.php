@@ -62,7 +62,10 @@ class UserController extends Controller
             ]);
         }
 
-        return view('users.index', compact('users', 'total', 'employees'));
+        $aiIncludeComments = DB::table('system_settings')->where('key', 'ai_include_comments')->value('value') === '1';
+        $aiRedactNames = DB::table('system_settings')->where('key', 'ai_redact_names')->value('value') !== '0';
+
+        return view('users.index', compact('users', 'total', 'employees', 'aiIncludeComments', 'aiRedactNames'));
     }
 
     public function create()
@@ -151,7 +154,7 @@ class UserController extends Controller
 
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
-                    'message' => 'Database error while creating user: ' . $e->getMessage(),
+                    'message' => 'Database error while creating user: '.$e->getMessage(),
                 ], 500);
             }
 
@@ -159,7 +162,7 @@ class UserController extends Controller
         } catch (\Throwable $e) {
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
-                    'message' => 'Failed to create user: ' . $e->getMessage(),
+                    'message' => 'Failed to create user: '.$e->getMessage(),
                 ], 500);
             }
 
@@ -278,16 +281,45 @@ class UserController extends Controller
 
     public function updateAiSettings(Request $request)
     {
+        $request->validate([
+            'ai_include_comments' => ['nullable', 'in:0,1'],
+            'ai_redact_names' => ['nullable', 'in:0,1'],
+        ]);
+
+        $includeComments = $request->input('ai_include_comments', '0');
+        $redactNames = $request->input('ai_redact_names', '1');
+
         DB::table('system_settings')->updateOrInsert(
             ['key' => 'ai_include_comments'],
-            ['value' => $request->has('ai_include_comments') ? '1' : '0', 'updated_at' => now()]
+            ['value' => $includeComments === '1' ? '1' : '0', 'updated_at' => now()]
         );
         DB::table('system_settings')->updateOrInsert(
             ['key' => 'ai_redact_names'],
-            ['value' => $request->has('ai_redact_names') ? '1' : '0', 'updated_at' => now()]
+            ['value' => $redactNames === '0' ? '0' : '1', 'updated_at' => now()]
         );
 
-        return redirect()->route('users.index')->with('success', 'AI Data-Sharing Settings updated.');
+        AuditTrail::record('ai_privacy_settings_updated', 'system_settings', 'ai_settings');
+
+        return redirect()->route('users.index')->with('success', 'AI Data-Sharing & Privacy Settings updated successfully.');
+    }
+
+    public function updateRecordAccessPassword(Request $request)
+    {
+        $request->validate([
+            'current_admin_password' => ['required', 'current_password'],
+            'record_access_password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $newHash = Hash::make($request->input('record_access_password'));
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'record_access_password_hash'],
+            ['value' => $newHash, 'updated_at' => now()]
+        );
+
+        AuditTrail::record('record_access_password_rotated', 'system_settings', 'record_access_password_hash');
+
+        return redirect()->route('users.index')->with('success', 'Record Access Password successfully updated and rotated.');
     }
 
     public function auditHistory(Request $request)

@@ -23,6 +23,10 @@
     @endcan
 </div>
 
+{{-- Protected Employee Directory & Workforce Analytics --}}
+<div class="hims-sensitive-wrapper">
+    <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+
 {{-- Stats --}}
 <div class="row g-3 mb-4">
     <div class="col-sm-3">
@@ -51,6 +55,36 @@
             <div class="stat-icon"><i class="bi bi-clipboard-data"></i></div>
             <div class="stat-value">{{ $employees->pluck('role_name')->unique()->count() }}</div>
             <div class="stat-label">Roles on This Page</div>
+        </div>
+    </div>
+</div>
+
+{{-- Workforce Analytics & Trends --}}
+<div class="row g-3 mb-4">
+    <div class="col-lg-7">
+        <div class="hims-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 style="margin:0"><i class="bi bi-building text-primary-hims"></i> Department Staffing Distribution</h5>
+                <span class="badge" style="background:var(--hims-primary-xlight);color:var(--hims-primary-dark);font-size:11px;font-weight:600">Top Departments</span>
+            </div>
+            <div class="card-body" style="padding:16px">
+                <div style="position:relative;height:220px">
+                    <canvas id="deptDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="hims-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 style="margin:0"><i class="bi bi-person-badge text-primary-hims"></i> Employment Status</h5>
+                <span class="badge" style="background:rgba(2, 132, 199, 0.1);color:#0284c7;font-size:11px;font-weight:600">Staff Health</span>
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center" style="padding:16px">
+                <div style="position:relative;height:220px;width:100%">
+                    <canvas id="statusDistributionChart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -154,5 +188,110 @@
     @endif
 </div>
 
+    </div>
+    @if(! \App\Support\RecordAccess::isUnlocked())
+        @include('partials.record-access-overlay', ['slot' => 'Hospital personnel and workforce directory records are protected. Enter the Record Access Password to view employees.'])
+    @endif
+</div>
+
 @include('partials.modal-js')
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof Chart === 'undefined') return;
+
+    // Department Headcount Distribution Chart
+    const deptCtx = document.getElementById('deptDistributionChart');
+    if (deptCtx) {
+        new Chart(deptCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: @json($deptChartData['labels'] ?? []),
+                datasets: [{
+                    label: 'Staff Count',
+                    data: @json($deptChartData['counts'] ?? []),
+                    backgroundColor: 'rgba(5, 150, 105, 0.85)',
+                    borderColor: '#059669',
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ' ' + ctx.raw + ' employee(s)';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, precision: 0 },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    y: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    // Employment Status Distribution Chart
+    const statusCtx = document.getElementById('statusDistributionChart');
+    if (statusCtx) {
+        new Chart(statusCtx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: @json($statusChartData['labels'] ?? []),
+                datasets: [{
+                    data: @json($statusChartData['counts'] ?? []),
+                    backgroundColor: [
+                        '#059669',
+                        '#0284c7',
+                        '#f59e0b',
+                        '#8b5cf6',
+                        '#64748b',
+                        '#ef4444'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 10,
+                            font: { size: 11.5, family: 'Inter, system-ui, sans-serif' }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ' ' + ctx.label + ': ' + ctx.raw + ' staff';
+                            }
+                        }
+                    }
+                },
+                cutout: '62%'
+            }
+        });
+    }
+});
+</script>
+@endpush
 @endsection

@@ -10,7 +10,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -50,10 +49,61 @@ class EmployeeController extends Controller
             }
         }
 
+        // Chart & Trends: Workforce distribution by Department and Employment Status
+        $deptHeadcount = $this->scopeToVisibleEmployees(
+            DB::table('employees as e')
+                ->join('departments as d', 'e.department_id', '=', 'd.department_id')
+                ->select('d.name', DB::raw('COUNT(e.employee_id) as total'))
+                ->groupBy('d.department_id', 'd.name')
+                ->orderByDesc('total')
+                ->limit(6)
+        )->pluck('total', 'name')->toArray();
+
+        $deptChartData = [
+            'labels' => ! empty($deptHeadcount) ? array_keys($deptHeadcount) : ['General Care', 'Emergency', 'Surgery', 'Pediatrics'],
+            'counts' => ! empty($deptHeadcount) ? array_values($deptHeadcount) : [0, 0, 0, 0],
+        ];
+
+        $rawStatuses = $this->scopeToVisibleEmployees(
+            DB::table('employees as e')
+                ->select('e.employment_status', DB::raw('COUNT(*) as total'))
+                ->whereNotNull('e.employment_status')
+                ->groupBy('e.employment_status')
+        )->pluck('total', 'employment_status')->toArray();
+
+        $statusMap = [
+            'active' => 'Active Staff',
+            'probationary' => 'Probationary',
+            'on_leave' => 'On Leave',
+            'suspended' => 'Suspended',
+            'resigned' => 'Resigned',
+            'terminated' => 'Terminated',
+        ];
+
+        $statusLabels = [];
+        $statusCounts = [];
+        foreach ($statusMap as $k => $label) {
+            if (isset($rawStatuses[$k])) {
+                $statusLabels[] = $label;
+                $statusCounts[] = (int) $rawStatuses[$k];
+            }
+        }
+        if (empty($statusLabels)) {
+            $statusLabels = ['Active Staff', 'Probationary', 'On Leave'];
+            $statusCounts = [0, 0, 0];
+        }
+
+        $statusChartData = [
+            'labels' => $statusLabels,
+            'counts' => $statusCounts,
+        ];
+
         return view('employees.index', [
             'employees' => $employees,
             'departments' => DB::table('departments')->orderBy('name')->get(),
             'filters' => ['q' => $search, 'department' => $dept],
+            'deptChartData' => $deptChartData,
+            'statusChartData' => $statusChartData,
         ]);
     }
 
@@ -540,6 +590,55 @@ class EmployeeController extends Controller
     {
         return redirect()->route('employees.index')
             ->with('error', 'Employee removal is disabled. Employee records are synchronized from HR1 and HR2.');
+    }
+
+    /**
+     * GDPR Article 17 & Article 89 — Right to Erasure / PII Anonymization for
+     * separated (resigned or terminated) employees while preserving statistical
+     * workforce records.
+     */
+    public function anonymize(Request $request, string $id)
+    {
+        $employee = DB::table('employees')->where('employee_id', $id)->first();
+        abort_if(! $employee, 404);
+
+        if (! in_array($employee->employment_status, ['resigned', 'terminated'], true)) {
+            return back()->with('error', 'GDPR PII anonymization is only permitted for resigned or terminated employee records.');
+        }
+
+        $hash = substr(hash('sha256', $id.config('app.key')), 0, 10);
+        $redactedEmail = "redacted-{$hash}@anonymized.invalid";
+
+        DB::transaction(function () use ($id, $employee, $redactedEmail, $hash) {
+            DB::table('employees')->where('employee_id', $id)->update([
+                'first_name' => 'Redacted',
+                'last_name' => 'Employee '.strtoupper(substr($hash, 0, 4)),
+                'email' => $redactedEmail,
+                'phone' => null,
+                'updated_at' => now(),
+            ]);
+
+            DB::table('users')->where('employee_id', $id)->update([
+                'name' => 'Redacted User '.strtoupper(substr($hash, 0, 4)),
+                'email' => $redactedEmail,
+                'is_active' => false,
+                'totp_secret' => null,
+                'two_factor_code' => null,
+                'updated_at' => now(),
+            ]);
+
+            AuditTrail::record(
+                'gdpr_employee_anonymized',
+                'employees',
+                $id,
+                beforeState: ['employee_code' => $employee->employee_code, 'employment_status' => $employee->employment_status],
+                afterState: ['first_name' => 'Redacted', 'email' => $redactedEmail],
+                metadata: ['gdpr_article' => 'Art. 17 Right to Erasure / Art. 89 Pseudonymisation']
+            );
+        });
+
+        return redirect()->route('employees.show', $id)
+            ->with('success', 'Employee personal identifiable information (PII) has been anonymized in compliance with GDPR Article 17.');
     }
 
     public function downloadTemplate()

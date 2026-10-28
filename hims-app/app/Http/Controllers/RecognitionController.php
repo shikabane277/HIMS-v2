@@ -206,9 +206,44 @@ class RecognitionController extends Controller
                 ->get();
         }
 
+        // Chart Metrics: 6-Month Peer Recognitions & Reactions Trend
+        $months = collect(range(5, 0))->map(fn ($i) => now()->subMonths($i));
+        $recognitionTrendLabels = [];
+        $recognitionPostCounts = [];
+        $recognitionReactionCounts = [];
+
+        foreach ($months as $m) {
+            $recognitionTrendLabels[] = $m->format('M Y');
+            $recognitionPostCounts[] = DB::table('recognition_posts')
+                ->where('moderation_status', 'approved')
+                ->whereYear('created_at', $m->year)
+                ->whereMonth('created_at', $m->month)
+                ->count();
+
+            $recognitionReactionCounts[] = DB::table('recognition_reactions')
+                ->whereYear('created_at', $m->year)
+                ->whereMonth('created_at', $m->month)
+                ->count();
+        }
+
+        // Chart Metrics: Badge / Hospital Values Distribution
+        $badgeCounts = DB::table('recognition_badges as b')
+            ->leftJoin('recognition_posts as p', 'b.badge_id', '=', 'p.badge_id')
+            ->select('b.badge_name', DB::raw('COUNT(p.post_id) as total_awarded'))
+            ->where('b.is_active', true)
+            ->groupBy('b.badge_id', 'b.badge_name')
+            ->orderByDesc('total_awarded')
+            ->limit(5)
+            ->get();
+
+        $badgeLabels = $badgeCounts->pluck('badge_name')->toArray();
+        $badgeData = $badgeCounts->pluck('total_awarded')->toArray();
+
         return view('recognition.index', compact(
             'stats', 'posts', 'comments', 'employees', 'badges', 'view', 'currentEmployeeId',
             'canModerate', 'moderationPosts', 'moderationComments', 'pendingPointsPosts', 'hasGivenToday',
+            'recognitionTrendLabels', 'recognitionPostCounts', 'recognitionReactionCounts',
+            'badgeLabels', 'badgeData'
         ));
     }
 

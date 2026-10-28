@@ -9,6 +9,8 @@ use App\Support\TotpService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -33,7 +35,6 @@ class TwoFactorAuthenticatedSessionController extends Controller
 
         return view('auth.two-factor', [
             'maskedEmail' => TwoFactorService::maskEmail($user->email),
-            'rememberDevice' => (bool) $request->session()->get('login.remember_device'),
         ]);
     }
 
@@ -73,7 +74,18 @@ class TwoFactorAuthenticatedSessionController extends Controller
         $inputCode = trim((string) $request->input('code'));
 
         $totpService = app(TotpService::class);
-        $isTotpValid = ! empty($user->totp_secret) && $totpService->verify($user->totp_secret, $inputCode);
+        $plainTotpSecret = null;
+        if (! empty($user->totp_secret)) {
+            try {
+                $plainTotpSecret = Crypt::decryptString($user->totp_secret);
+            } catch (\Throwable) {
+                $plainTotpSecret = $user->totp_secret;
+            }
+        }
+        $matchedSlice = $plainTotpSecret
+            ? $totpService->verifyWithCounter($plainTotpSecret, $inputCode, $user->totp_consumed_counter)
+            : null;
+        $isTotpValid = $matchedSlice !== null;
         $isEmailValid = ! empty($user->two_factor_code) && $user->two_factor_expires_at && now()->lte($user->two_factor_expires_at) && hash_equals($user->two_factor_code, hash('sha256', $inputCode));
 
         if (! $isTotpValid && ! $isEmailValid) {
@@ -93,9 +105,13 @@ class TwoFactorAuthenticatedSessionController extends Controller
 
         RateLimiter::clear($throttleKey);
         RateLimiter::clear($userThrottleKey);
-        $user->resetTwoFactorCode();
 
-        $rememberDevice = $request->boolean('remember_device') || (bool) $request->session()->get('login.remember_device');
+        if ($isTotpValid && $matchedSlice !== null) {
+            $user->totp_consumed_counter = $matchedSlice;
+            $user->save();
+        }
+
+        $user->resetTwoFactorCode();
 
         $request->session()->forget(['login.id', 'login.remember', 'login.remember_device']);
 
@@ -103,20 +119,13 @@ class TwoFactorAuthenticatedSessionController extends Controller
         $request->session()->regenerate();
         $request->session()->put('hims_last_activity', time());
 
-        $cookie = null;
-        if ($rememberDevice) {
-            $cookie = TwoFactorService::trustDevice($request, $user);
-        }
-
-        $redirect = $user->must_change_password
+        /*
+         * No trusted-device cookie is issued. Every login completes the second
+         * factor; see the note in AuthenticatedSessionController::store().
+         */
+        return $user->must_change_password
             ? redirect()->route('profile.edit')->with('warning', 'Please change your temporary password before proceeding.')
             : redirect()->intended(route('dashboard', absolute: false));
-
-        if ($cookie) {
-            $redirect->withCookie($cookie);
-        }
-
-        return $redirect;
     }
 
     /**
@@ -154,11 +163,18 @@ class TwoFactorAuthenticatedSessionController extends Controller
 
         $sent = TwoFactorService::sendCode($user, $code);
 
-        if (! $sent && ! app()->environment('local')) {
-            $request->session()->flash(
-                'dev_code_notice',
-                "Email delivery is temporarily unavailable. Your verification code is: {$code}"
-            );
+        /*
+         * A failed resend must not become a way to read the code off the screen.
+         * It reports the delivery failure and nothing else — the challenge stays
+         * up and the visitor can try again. The previous version flashed the code
+         * itself whenever mail failed outside local.
+         */
+        if (! $sent) {
+            Log::warning('2FA resend delivery failed — no code shown', ['user_id' => $user->id]);
+
+            return back()->withErrors([
+                'code' => 'We could not send a new code. Check your connection and try again, or contact IT support.',
+            ]);
         }
 
         return back()->with('status', 'A new verification code has been sent to your email.');

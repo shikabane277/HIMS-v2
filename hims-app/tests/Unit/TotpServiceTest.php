@@ -51,4 +51,20 @@ class TotpServiceTest extends TestCase
         $this->assertStringContainsString('digits=6', $uri);
         $this->assertStringContainsString('period=30', $uri);
     }
+
+    public function test_it_prevents_code_replay_with_consumed_counter(): void
+    {
+        $secret = 'JBSWY3DPEHPK3PXP';
+        $currentTime = time();
+        $currentSlice = (int) floor($currentTime / 30);
+        $otp = $this->totp->getOtp($secret, $currentTime);
+
+        // First verification without previous counter succeeds and returns slice
+        $slice = $this->totp->verifyWithCounter($secret, $otp, null);
+        $this->assertSame($currentSlice, $slice);
+
+        // Second verification with the consumed counter rejects replay
+        $replayed = $this->totp->verifyWithCounter($secret, $otp, $slice);
+        $this->assertNull($replayed);
+    }
 }

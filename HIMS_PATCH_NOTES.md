@@ -11,6 +11,108 @@ Entries marked 📋 are specified but not implemented.
 
 ---
 
+## v2.24.0 - 2026-10-28
+
+Strict GDPR (EU 2016/679) & PH Data Privacy Act (RA 10173) compliance suite, Employees directory Record Access Password protection, zero-access AI employee data guardrails, hospital clinical learning modules, and full-system end-to-end Playwright verification & bug fixes.
+
+### Security & Data Privacy (GDPR & RA 10173 Compliance)
+
+*   **Implemented GDPR Data Subject Rights & Privacy Center (`/profile`).**
+    - **Right of Access & Data Portability (GDPR Art. 15 & 20):** Added `GET /profile/export-data` (`ProfileController::exportData()`) allowing any authenticated user to download a complete, machine-readable JSON archive of their account, linked employee profile (with decrypted phone number), performance reviews, competency assessments, credentials, course enrollments, CPD records, training registrations, AI chat history, and security audit trail.
+    - **Right to Erasure & Separated Staff PII Anonymization (GDPR Art. 17):** Enhanced `ProfileController::destroy()` to cascade-purge personal AI chat sessions, chat messages, and active login OTPs upon account deletion, and added `POST /employees/{id}/anonymize` (`EmployeeController::anonymize()`) so HR/Admin can permanently redact PII (`first_name`, `last_name`, `email`, `phone`, `profile_image_url`) for resigned or terminated employees while preserving statistical hospital records.
+    - **Explicit Privacy Notice & Consent Recording (GDPR Art. 7, 13 & 14):** Added the bottom GDPR Data Protection Notice banner (`partials/gdpr-privacy-banner.blade.php`) and Profile Privacy Center (`profile/partials/gdpr-privacy-form.blade.php`) with timestamped consent logging (`POST /profile/gdpr-consent`).
+    - **Automated Storage Limitation & Data Retention (`hims:prune-expired-data`, GDPR Art. 5(1)(e)):** Added scheduled daily pruning of expired login OTPs, stale password reset tokens, AI chat history older than 180 days, and audit logs older than 5 years.
+    - **HTTP Security & Privacy Headers (`SecurityHeaders` Middleware, GDPR Art. 32):** Enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, and `Cache-Control: no-store, no-cache, must-revalidate, private` on authenticated responses.
+
+*   **Protected Employees Module with Record Access Password Gate.**
+    Wrapped the Employees Directory (`employees/index.blade.php`), Employee Profile (`employees/show.blade.php`), Edit Employee (`employees/edit.blade.php`), and Manager Setup (`employees/manager-setup.blade.php`) in `.hims-sensitive-wrapper` / `.hims-sensitive-records` with a sticky top-aligned unlock overlay and sidebar lock indicator. Every unlock, failed attempt, and lock action is recorded in `audit_trails`.
+
+*   **Prohibited AI Assistant from Accessing Any Employee Data.**
+    Hardened `AiAccessPolicy`, `AiEntityResolver`, `AbstractAiProvider`, and `HimsKnowledge` so the AI chatbot is strictly prohibited from querying, resolving, or discussing any employee records, directory profiles, or personal details across all roles (`admin`, `hr_manager`, `supervisor`, `staff`).
+
+### Changed
+
+*   **Replaced Sample IT Modules with Hospital Clinical & Compliance Modules (`/learning/modules`).**
+    Replaced placeholder college IT modules (`Capstone Project 1`, `OJT - PRACTICUM1`, `Big Data Analysis`, `IT ELECTIVE 4`) in `LearningController::modulesIndex()` with 6 hospital clinical and regulatory modules (`MOD-INF-101`, `MOD-BLS-201`, `MOD-MED-301`, `MOD-PAT-401`, `MOD-TRI-501`, `MOD-DPA-601`).
+
+### Fixed
+
+*   **Fixed MySQL Column Mismatches & View Errors Discovered via Live Playwright E2E Testing.**
+    - Fixed `LearningController::index()` querying `cpd_records.credits` instead of `cpd_records.cpd_hours` (resolved HTTP 500 on `/learning`).
+    - Fixed `TrainingController::index()` querying `training_feedback.practical_rating` instead of `training_feedback.venue_rating` (resolved HTTP 500 on `/training`).
+    - Fixed `reports/compliance.blade.php` accessing `$c->license_number` instead of `$c->credential_number` (resolved HTTP 500 on `/reports/compliance`).
+    - Fixed `ProfileController::exportData()` ordering `course_enrollments` and `training_registrations` by `created_at` and querying `cpd_logs` instead of `enrollment_date`, `registration_date`, and `cpd_records` (resolved HTTP 500 on `/profile/export-data`).
+    - Added `@include('partials.modal-js')` to `partials/_audit_history_modal.blade.php` so clicking the **History** button on Employee profiles and other standalone pages opens `#auditHistoryModal` without a JavaScript `TypeError`.
+
+---
+
+## v2.23.0 - 2026-10-17
+
+Comprehensive audit and security remediation covering authentication, session lifecycle, sensitive record access,
+reporting honesty, deployment posture, and external HR integrations.
+
+### Security & Access Control
+
+*   **Enforced 5-Minute Silent Inactivity Session Timeout and Immediate Deactivation Termination.**
+    `SESSION_IDLE_TIMEOUT` is set to 300 seconds and `SESSION_LIFETIME` to 5 minutes across `.env`, `.env.example`,
+    and `config/session.php`. The old 60-second warning popup (`session-timeout-modal.blade.php`) has been deleted.
+    Inactivity is tracked purely through passive client user interactions (`idle-logout.blade.php`), terminating
+    the tab automatically without warning upon reaching the 5-minute threshold. Server-side `EnforceSessionTimeout`
+    strictly enforces the timer against `hims_last_activity` and immediately terminates active sessions for
+    deactivated users (`is_active = false`). `session/ping` was modified to report status without extending session life.
+
+*   **Implemented Record Access Password Gate Across All Authenticated Pages.**
+    Added `RequireRecordAccessPassword` middleware gating all authenticated requests for employee and hospital
+    records. An administrator configures and rotates a master password (`system_settings.record_access_password_hash`).
+    Access is granted for the single intended URL and automatically expires after 60 seconds of inactivity, requiring
+    re-verification to protect unattended shared hospital workstations.
+
+*   **Removed Self-Service Password Reset and Trusted-Device Bypass.**
+    Deleted the `forgot-password` and `reset-password` routes, controllers (`PasswordResetLinkController`,
+    `NewPasswordController`), and views. The 30-day "Remember this PC" cookie bypass (`remember_device`) has been
+    completely removed from the login and 2FA flows. All users on all machines must authenticate with 2FA on every login.
+
+*   **Hardened Two-Factor Authentication (2FA) and TOTP.**
+    - Eliminated on-screen OTP code leaks: SMTP delivery failures no longer flash verification codes to the session
+      under any environment.
+    - TOTP secrets in `users.totp_secret` are encrypted at rest with `Crypt::encryptString` and backward-compatible
+      read-shims.
+    - Replay attacks inside the ±1 TOTP window are prevented by recording and checking `totp_consumed_counter`.
+    - TOTP confirmation now requires the user's current password.
+
+*   **Eliminated Stored XSS in Audit Trail Modal.**
+    Rewrote `_audit_history_modal.blade.php` to build DOM nodes using `textContent` for actor names (`users.name`)
+    and before/after JSON dumps rather than raw string interpolation into `innerHTML`.
+
+*   **Mitigated SSRF and Credential Exposure in External HR Integrations.**
+    - `CompetencyController::updateIntegration` is restricted strictly to `admin` and `hr_manager` roles.
+    - `HrIntegrationService::isSafeUrl` enforces HTTPS, rejects localhost, loopback, link-local, and private IP ranges.
+    - `system_integrations.api_key` is encrypted at rest using `Crypt::encryptString` with fallback read shims.
+
+*   **Fixed Client-Rotatable Login Rate Limiting.**
+    Replaced `trustProxies(at: '*')` in `bootstrap/app.php` with configurable `APP_TRUSTED_PROXIES`.
+
+*   **Hardened AI Privacy Configuration.**
+    `updateAiSettings()` in `UserController` now uses explicit validated booleans and safe defaults rather than
+    interpreting omitted checkboxes as opting into comment sharing and disabling redaction.
+
+### Fixed
+
+*   **Eliminated Fabricated Appraisal and Competency Scores in Reports.**
+    Removed synthetic `0.95` and `0.9` multipliers and hardcoded `3.25`/`3.80` fallbacks in `ReportController.php`
+    and `appraisal.blade.php`. Missing measurements now display truthfully as `—` ("Not assessed"). Fixed the
+    self-assessment query in `ReportController` to query `assessment_method = 'self_assessment'` (was `'self'`).
+    Removed fabricated fallback employee response prose on appraisal detail tabs.
+
+### Deployment & Configuration
+
+*   **Serverless Hardening & Crons.**
+    Set `APP_DEBUG: "false"`, explicit `APP_URL`, and `CACHE_STORE: "database"` in `vercel.json` and `hims-app/vercel.json`.
+    Added scheduled crons for `hims:sync-hr` and `hims:scan-credential-expiry` across Render and Vercel.
+    Untracked stale committed build artifacts in `dist/` and added `dist/` to `.gitignore` and `.vercelignore`.
+
+---
+
 ## v2.22.1 - 2026-08-17
 
 The AI assistant went dark on every question at once, and the reply it gave named the one thing that was working.

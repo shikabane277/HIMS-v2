@@ -13,9 +13,13 @@ class SuccessionNominationTest extends TestCase
     use RefreshDatabase;
 
     private User $adminUser;
+
     private string $deptId;
+
     private string $emp1Id;
+
     private string $emp2Id;
+
     private string $positionId;
 
     protected function setUp(): void

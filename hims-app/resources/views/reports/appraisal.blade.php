@@ -179,8 +179,10 @@
                 </nav>
             </div>
 
-            {{-- TAB 1: KRAs (Primary View in Reference Image 1) --}}
-            <div class="card-body appraisal-tab-pane" id="pane-kras" style="padding:28px">
+            <div class="hims-sensitive-wrapper">
+                <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+                    {{-- TAB 1: KRAs (Primary View in Reference Image 1) --}}
+                    <div class="card-body appraisal-tab-pane" id="pane-kras" style="padding:28px">
                 {{-- Chart Section: Maximum Score vs Score Obtained --}}
                 <div class="mb-4">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -344,17 +346,28 @@
                 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:16px">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <strong style="font-size:14px;color:var(--hims-text-dark)">Self-Assessed Score</strong>
-                        <span class="hims-badge green" style="font-size:13px;font-weight:800">
-                            {{ number_format(($review->overall_score ? $review->overall_score * 0.9 : 3.80), 2) }} / 5.0
-                        </span>
+                        @if(!empty($selfAssessmentScore))
+                            <span class="hims-badge green" style="font-size:13px;font-weight:800">
+                                {{ number_format($selfAssessmentScore, 2) }} / 5.0
+                            </span>
+                        @else
+                            <span class="hims-badge" style="font-size:12.5px;font-weight:600;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0">
+                                Not assessed
+                            </span>
+                        @endif
                     </div>
                     <p style="color:#4b5563;font-size:13.5px;line-height:1.6;margin:0">
-                        {{ $review->employee_response ?: 'Completed all assigned mandatory competencies, met clinical KPI quality thresholds, and participated in hospital ward training sessions.' }}
+                        {{ $review->employee_response ?: 'No self-evaluation comments submitted by employee.' }}
                     </p>
                 </div>
             </div>
         </div>
+        @if(! \App\Support\RecordAccess::isUnlocked())
+            @include('partials.record-access-overlay', ['slot' => 'Confidential appraisal evaluation metrics, scores, and self-evaluation records are protected. Enter the Record Access Password to unblur.'])
+        @endif
     </div>
+</div>
+</div>
 </div>
 
 @push('scripts')

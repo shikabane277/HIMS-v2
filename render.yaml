@@ -126,3 +126,16 @@ services:
     dockerCommand: php artisan hims:scan-credential-expiry
     envVars:
       - fromGroup: hims-shared
+
+  - type: cron
+    name: hims-hr-sync
+    runtime: docker
+    plan: starter
+    region: singapore
+    rootDir: hims-app
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "0 * * * *"
+    dockerCommand: php artisan hims:sync-hr --system=all
+    envVars:
+      - fromGroup: hims-shared

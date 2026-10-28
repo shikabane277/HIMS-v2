@@ -11,12 +11,14 @@ use App\Http\Controllers\LearningController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecognitionController;
+use App\Http\Controllers\RecordAccessController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SuccessionController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\UserController;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -164,7 +166,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/modules', [LearningController::class, 'modulesIndex'])->name('modules.index');
         Route::get('/pathways', [LearningController::class, 'pathwaysIndex'])->name('pathways.index');
         Route::get('/cpd', [LearningController::class, 'cpdIndex'])->name('cpd.index');
-        Route::get('/certificates', fn() => redirect()->route('recognition.certificates.index'))->name('certificates.index');
+        Route::get('/certificates', fn () => redirect()->route('recognition.certificates.index'))->name('certificates.index');
         Route::get('/certificates/{code}', [LearningController::class, 'showCertificate'])->name('certificates.show');
 
         // Authoring the catalogue is HR/admin only. Courses and pathways are
@@ -352,6 +354,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::post('/', [EmployeeController::class, 'store'])->name('store');
                 Route::get('/{id}/edit', [EmployeeController::class, 'edit'])->name('edit');
                 Route::put('/{id}', [EmployeeController::class, 'update'])->name('update');
+                Route::post('/{id}/anonymize', [EmployeeController::class, 'anonymize'])->name('anonymize');
                 Route::delete('/{id}', [EmployeeController::class, 'destroy'])->name('destroy');
             });
 
@@ -508,18 +511,68 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/users/{id}/unlock', [UserController::class, 'unlockAccount'])->name('users.unlock')->middleware('role:admin');
     Route::post('/users/{id}/toggle-active', [UserController::class, 'toggleActive'])->name('users.toggle-active')->middleware('role:admin');
     Route::post('/settings/ai-data-sharing', [UserController::class, 'updateAiSettings'])->name('settings.ai-data-sharing')->middleware('role:admin');
+    Route::post('/settings/record-access-password', [UserController::class, 'updateRecordAccessPassword'])->name('settings.record-access-password')->middleware('role:admin');
+    Route::get('/record-access/prompt', [RecordAccessController::class, 'show'])->name('record-access.prompt');
+    Route::post('/record-access/verify', [RecordAccessController::class, 'verify'])->name('record-access.verify');
+    Route::post('/record-access/unlock', [RecordAccessController::class, 'unlock'])->name('record-access.unlock');
+    Route::post('/record-access/lock', [RecordAccessController::class, 'lock'])->name('record-access.lock');
     Route::get('/audit/history', [UserController::class, 'auditHistory'])
         ->middleware('role:admin,hr_manager')->name('audit.history');
     Route::get('/audit/export', [UserController::class, 'exportAuditTrail'])
         ->middleware('role:admin,hr_manager')->name('audit.export');
 
-    // ── Profile ──────────────────────────────────────────────
+    // ── Profile & GDPR Data Subject Rights ───────────────────
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/profile/export-data', [ProfileController::class, 'exportData'])->name('profile.export-data');
+    Route::post('/profile/gdpr-consent', [ProfileController::class, 'acknowledgeGdprConsent'])->name('profile.gdpr-consent');
     Route::get('/profile/totp/setup', [ProfileController::class, 'setupTotp'])->name('profile.totp.setup');
     Route::post('/profile/totp/confirm', [ProfileController::class, 'confirmTotp'])->name('profile.totp.confirm');
     Route::post('/profile/totp/disable', [ProfileController::class, 'disableTotp'])->name('profile.totp.disable');
 });
 
 require __DIR__.'/auth.php';
+
+// ── Automated Scheduled Tasks (Vercel Cron / External Cron) ─
+Route::get('/api/cron/{action}', function (string $action, Request $request) {
+    $cronKey = config('hims.cron_secret', env('CRON_SECRET', ''));
+    $hasHeader = $request->header('x-vercel-cron') !== null;
+    $hasKey = ! empty($cronKey) && $request->query('key') === $cronKey;
+
+    if (! $hasHeader && ! $hasKey && ! app()->environment('local')) {
+        abort(403, 'Unauthorized cron execution.');
+    }
+
+    if ($action === 'sync') {
+        Artisan::call('hims:sync-hr', ['--system' => 'all']);
+
+        return response()->json([
+            'status' => 'success',
+            'action' => 'hims:sync-hr',
+            'output' => trim(Artisan::output()),
+        ]);
+    }
+
+    if ($action === 'scan') {
+        Artisan::call('hims:scan-credential-expiry');
+
+        return response()->json([
+            'status' => 'success',
+            'action' => 'hims:scan-credential-expiry',
+            'output' => trim(Artisan::output()),
+        ]);
+    }
+
+    if ($action === 'prune') {
+        Artisan::call('hims:prune-expired-data');
+
+        return response()->json([
+            'status' => 'success',
+            'action' => 'hims:prune-expired-data',
+            'output' => trim(Artisan::output()),
+        ]);
+    }
+
+    abort(404);
+})->name('cron.execute');

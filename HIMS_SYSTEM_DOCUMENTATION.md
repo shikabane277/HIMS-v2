@@ -1466,13 +1466,14 @@ Public self-registration is **disabled**; accounts are provisioned by an admin t
 
 ### 7.2 Security Settings
 
-*   **Laravel Breeze & Sessions** ✅ — session cookies are `HttpOnly` with `SameSite=Lax` by framework default. `SESSION_DRIVER=database`, `SESSION_ENCRYPT=false`. The `Secure` flag applies only over HTTPS; local dev runs plain HTTP on `http://localhost:8000`. `bootstrap/app.php` sets `trustProxies(at: '*')` for correct scheme detection behind a TLS-terminating proxy.
+*   **Laravel Breeze & Sessions** ✅ — session cookies are `HttpOnly` with `SameSite=Lax` by framework default. Strict 5-minute inactivity session timeout (`SESSION_IDLE_TIMEOUT=300`, `SESSION_LIFETIME=5`) with zero warning modals/prompts; inactive tabs end silently and redirect to login. Server-side `EnforceSessionTimeout` kills sessions immediately if an account is deactivated (`is_active = false`). Reverse-proxy IP resolution uses `APP_TRUSTED_PROXIES` rather than wildcard `*`.
 *   **CSRF Protection** ✅ — `VerifyCsrfToken` in the default `web` group; all state-changing forms emit `@csrf`.
-*   **Brute-force throttling and account lockout** ✅ — `LoginRequest` throttles on an email+IP key at **5 failed attempts** and increments `failed_login_attempts`; the fifth failure sets `locked_until` for 15 minutes. A successful login resets both fields, and Admin can unlock through `UserController::unlockAccount()`. `throttle:6,1` guards password-reset and verification routes.
+*   **Brute-force throttling and account lockout** ✅ — `LoginRequest` throttles on an email+IP key at **5 failed attempts** and increments `failed_login_attempts`; the fifth failure sets `locked_until` for 15 minutes. A successful login resets both fields, and Admin can unlock through `UserController::unlockAccount()`. Self-service "Forgot Password" is removed; resets are administered.
 *   **Role-Based Access Control (RBAC)** ✅ — 20 **Gates** + the `EnsureUserHasRole` middleware, keyed on `users.role`. See §3.1.
+*   **Record Access Password Gate** ✅ — confidential workforce, credential, and performance data is protected by an admin-configured master password (`system_settings.record_access_password_hash`), granting single-URL 60-second access per visit.
 *   **Input validation & SQL safety** ✅ — every write path calls `$request->validate([...])`; all queries use Query Builder parameter binding. `DB::raw` fragments (`CONCAT`, `DATE_FORMAT`, `FIELD`) contain no user-supplied interpolation.
-*   **Encryption at rest** ⚠️ — Laravel `Crypt::encryptString()` protects `employees.phone` and `employee_credentials.credential_number`, with controller decryption on authorized reads and a migration that encrypted existing rows. Other fields, including most performance and succession data, remain database plaintext.
-*   **TOTP MFA** ❌ — no 2FA package installed, no `totp` / `two_factor` code.
+*   **Encryption at rest** ⚠️ — Laravel `Crypt::encryptString()` protects `employees.phone`, `employee_credentials.credential_number`, `system_integrations.api_key`, and `users.totp_secret`, with controller decryption on authorized reads and migrations encrypting existing rows. Other fields, including most performance and succession data, remain database plaintext.
+*   **Two-Factor Authentication (2FA / TOTP)** ✅ — mandatory 2FA via Email OTP (2-min expiry, SHA-256 hashed) and RFC 6238 TOTP MFA. OTP codes are never displayed on screen during SMTP delivery failures. TOTP secrets are encrypted at rest, require password verification on enrollment, and prevent replay attacks via `totp_consumed_counter`. Trusted-device 30-day bypasses have been removed.
 *   **Audit trail** ⚠️ — selective. Covered paths include AI writes, training assignments, renewal administration, course completion/reopen, employee and user creation/updates, competency assessments/credentials, recognition creation/moderation, performance cycle/review/score/response/acknowledgement changes, and all succession mutations. There are no Observers, no comprehensive read logging, and hash-chain columns remain null.
 
 ### 7.3 Compliance Control Summary
@@ -1480,19 +1481,18 @@ Public self-registration is **disabled**; accounts are provisioned by an admin t
 | Control | Required for | Status |
 |---|---|---|
 | Session auth, CSRF, password hashing | Baseline | ✅ Implemented |
+| 5-Minute silent idle timeout & deactivation | Hospital policy | ✅ Implemented (no prompts, auto-terminate) |
 | Login rate-limiting | Baseline | ✅ Implemented (5 attempts, email+IP) |
 | Role-based access enforcement | Baseline | ✅ Implemented (20 Gates + `role` middleware) |
+| Record Access Password Gate | Hospital policy | ✅ Implemented (admin master password, single-URL 60s grant) |
 | Input validation / SQL-injection defence | Baseline | ✅ Implemented (validation + bound params) |
 | HTTPS in deployment | HIPAA · RA 10173 | ⚠️ Proxy-terminated; no app-level HSTS or TLS-1.3-only enforcement |
-| Field-level encryption at rest | HIPAA · RA 10173 | ⚠️ Partial — employee phone and credential number only |
-| Multi-factor authentication | HIPAA | ❌ Not implemented |
+| Field-level encryption at rest | HIPAA · RA 10173 | ⚠️ Partial — phone, credentials, API keys, TOTP secrets |
+| Multi-factor authentication | HIPAA | ✅ Implemented (Email OTP & RFC 6238 TOTP MFA; encrypted secrets, replay counter, zero display leak) |
 | Audit trail of PHI access/modification | HIPAA · RA 10173 | ⚠️ Selective write logging; no comprehensive read logging, Observers, or hash chaining |
 | Account lockout policy | Hospital policy | ✅ Five failures; 15-minute lock; Admin unlock |
 
-**Net position:** everyday web controls, limited field encryption, account lockout, and attributable writes on
-sensitive workflows are implemented. MFA, comprehensive encryption, read/access logging, and tamper-evident
-audit chaining remain absent, so the application must still be treated as **pre-compliance** rather than as a
-HIPAA or RA 10173 compliant system.
+**Net position:** everyday web controls, multi-factor authentication, 5-minute silent timeouts, secondary record-access gating, limited field encryption, account lockout, and attributable writes on sensitive workflows are implemented. Comprehensive full-database encryption, read/access logging, and tamper-evident audit chaining remain absent, so the application must still be treated as **pre-compliance** rather than as a fully certified HIPAA or RA 10173 system.
 
 ---
 
@@ -2039,8 +2039,7 @@ Notes:
 *   **Authorisation**: 20 Laravel Gates + `EnsureUserHasRole` middleware over `users.role` (`admin`/`hr_manager`/`supervisor`/`staff`). No Policies.
 *   **AI Integration**: provider-agnostic `App\Contracts\AiProvider` resolved by `AiManager` — Gemini (default), OpenAI, Anthropic, or any OpenAI-compatible host, selected by `AI_PROVIDER`. Raw `Http::` calls via Guzzle; no vendor SDKs.
 *   **Build tooling**: Vite 8 + `laravel-vite-plugin` 3.1, Tailwind (v3 core + v4 Vite plugin), Alpine.js 3 — present but largely bypassed by the domain UI. Pint for formatting, PHPUnit 12 for tests, Pail for log tailing.
-*   **Local Setup & DevOps**: Laragon (Apache/Nginx + PHP + MySQL) on Windows, Git & GitHub. Deployed behind a **Railway** TLS-terminating proxy — `bootstrap/app.php` calls `trustProxies(at: '*')` so HTTPS asset URLs resolve correctly.
-*   **Not present**: Redis, TOTP MFA, comprehensive field encryption, a tamper-proof (hash-chained) audit trail, and any REST API (no Sanctum/Passport). Laravel `Crypt` protects employee phone and credential numbers only. Audit logging covers selected sensitive workflows and administrative writes, not all reads or every edit. The former unused `ZapierService` has been removed.
+*   **Not present**: Redis, comprehensive full-database encryption, a tamper-proof (hash-chained) audit trail, and any REST API (no Sanctum/Passport). Laravel `Crypt` protects employee phone, credential numbers, API integration keys, and TOTP secrets. Audit logging covers selected sensitive workflows and administrative writes, not all reads or every edit. The former unused `ZapierService` has been removed.
 
 ---
 

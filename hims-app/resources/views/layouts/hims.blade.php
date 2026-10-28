@@ -87,6 +87,9 @@
         {{-- Excludes employees.progression*, which has its own entry above. --}}
         <a href="{{ route('employees.index') }}" class="sidebar-link {{ request()->routeIs('employees.*') && ! request()->routeIs('employees.progression*') ? 'active' : '' }}">
             <span class="nav-icon"><i class="bi bi-people"></i></span> Employees
+            @if(! \App\Support\RecordAccess::isUnlocked())
+                <i class="bi bi-lock-fill ms-auto hims-sidebar-lock-icon" style="font-size:11px;opacity:0.65" title="Protected employee records — password required to view"></i>
+            @endif
         </a>
         @endcan
         @can('manage-departments')
@@ -134,6 +137,15 @@
         </div>
     </div>
     <div class="topbar-right">
+        @if(\App\Support\RecordAccess::isUnlocked())
+            <button type="button" id="himsRecordLockToggle" onclick="himsLockSensitiveRecords()" class="btn-hims btn-hims-ghost btn-sm text-success" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:20px;padding:4px 10px;text-decoration:none" title="Sensitive records are unlocked. Click to re-lock.">
+                <i class="bi bi-unlock-fill"></i> Records Unlocked
+            </button>
+        @else
+            <button type="button" id="himsRecordLockToggle" class="btn-hims btn-hims-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:4px 10px;cursor:default;text-decoration:none" title="Sensitive workforce records are blurred until unlocked with admin password.">
+                <i class="bi bi-lock-fill"></i> Records Protected
+            </button>
+        @endif
         <div class="topbar-menu-wrap">
             <button class="topbar-btn" id="notif-btn" title="Notifications" aria-haspopup="true" aria-expanded="false">
                 <i class="bi bi-bell"></i>
@@ -211,6 +223,10 @@
                     <details class="help-faq">
                         <summary>Who do I contact for support?</summary>
                         <p>Reach out to your HIMS administrator or the hospital IT helpdesk. Include the page you were on and what you expected to happen.</p>
+                    </details>
+                    <details class="help-faq">
+                        <summary>GDPR &amp; Data Privacy Rights (RA 10173)</summary>
+                        <p>Open your <strong>Profile</strong> (bottom-left of the sidebar) to review our Data Processing Notice, download a full JSON copy of your personal data (GDPR Art. 15 &amp; 20), or exercise your Right to Erasure (Art. 17). The AI assistant has zero access to employee personal data.</p>
                     </details>
                 </div>
             </div>
@@ -1032,7 +1048,10 @@
     }, true);
 </script>
 <script src="{{ asset('js/hims-select.js') }}?v={{ file_exists(public_path('js/hims-select.js')) ? filemtime(public_path('js/hims-select.js')) : 1 }}"></script>
-@include('partials.session-timeout-modal')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+@include('partials.record-access-gate')
+@include('partials.gdpr-privacy-banner')
+@include('partials.idle-logout')
 @stack('scripts')
 </body>
 </html>

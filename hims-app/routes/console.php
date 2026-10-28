@@ -35,3 +35,11 @@ Schedule::command('hims:sync-hr --system=all')
     ->hourly()
     ->withoutOverlapping()
     ->onOneServer();
+
+/*
+| GDPR Article 5(1)(e) — Automated Data Retention & Storage Limitation Purge.
+*/
+Schedule::command('hims:prune-expired-data')
+    ->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->onOneServer();

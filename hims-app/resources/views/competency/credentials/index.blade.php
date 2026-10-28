@@ -33,8 +33,10 @@
     <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-exclamation-circle"></i></div><div class="stat-value">{{ $stats['expired'] ?? 0 }}</div><div class="stat-label">Expired</div></div></div>
 </div>
 <div class="hims-card">
-    <div class="card-body" style="padding:0">
-        <table class="hims-table">
+    <div class="hims-sensitive-wrapper">
+        <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+            <div class="card-body" style="padding:0">
+                <table class="hims-table">
             <thead><tr><th>Employee</th><th>Type</th><th>Number</th><th>Issued By</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
                 @forelse($credentials ?? [] as $cred)
@@ -77,6 +79,11 @@
             </tbody>
         </table>
     </div>
+    </div>
+    @if(! \App\Support\RecordAccess::isUnlocked())
+        @include('partials.record-access-overlay', ['slot' => 'Clinical credentials, board license numbers, and practitioner records are protected. Enter the Record Access Password to unblur.'])
+    @endif
+</div>
     @if(isset($credentials) && method_exists($credentials,'hasPages') && $credentials->hasPages())
     <div style="padding:16px 22px;border-top:1px solid var(--hims-border)">{{ $credentials->links() }}</div>
     @endif

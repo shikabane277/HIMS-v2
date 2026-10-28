@@ -91,7 +91,7 @@ return new class extends Migration
                         SET NEW.gap = NEW.current_proficiency - req_prof;
                     END
                 ');
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // Engines like TiDB Serverless do not support procedural triggers; gap is maintained in application logic.
             }
         }
@@ -131,7 +131,7 @@ return new class extends Migration
             try {
                 DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_update');
                 DB::unprepared('DROP TRIGGER IF EXISTS trg_compute_gap_insert');
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // Ignore if triggers not supported
             }
         }

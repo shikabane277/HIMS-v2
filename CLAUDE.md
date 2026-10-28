@@ -19,7 +19,7 @@ Seeded login: `admin@hospital.ph` / `password`.
 
 ## Two rules that always apply
 
-**Never run `php artisan test --env=testing`.** There is no `.env.testing`, so Laravel falls back to `.env` — `DB_DATABASE=hims_v2`, the development database — and `RefreshDatabase` runs `migrate:fresh`. It has destroyed that database once. Plain `php artisan test` is safe (`phpunit.xml` pins sqlite `:memory:`). To use MySQL deliberately, name a scratch database: `DB_CONNECTION=mysql DB_DATABASE=hims_align_check php artisan test`.
+**Never run `php artisan test --env=testing`.** While a local gitignored `.env.testing` exists on this checkout, on any fresh clone or deployment lacking it, `--env=testing` falls back to `.env` — `DB_DATABASE=hims_v2`, the development database — and `RefreshDatabase` runs `migrate:fresh`. It has destroyed that database once. Plain `php artisan test` is safe (`phpunit.xml` pins sqlite `:memory:`). To use MySQL deliberately, name a scratch database: `DB_CONNECTION=mysql DB_DATABASE=hims_align_check php artisan test`.
 
 **This app barely uses Eloquent.** `App\Models\User` is the only model; everything else is raw Query Builder in controllers. PKs are PHP-generated `Str::uuid()`; `created_at`/`updated_at` are set by hand. Match this style — do not introduce Eloquent models piecemeal.
 

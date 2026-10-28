@@ -14,8 +14,10 @@
     <a href="{{ route('performance.index') }}" class="btn-hims btn-hims-ghost"><i class="bi bi-arrow-left"></i> Back</a>
 </div>
 <div class="hims-card">
-    <div class="card-body" style="padding:0">
-        <table class="hims-table">
+    <div class="hims-sensitive-wrapper">
+        <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+            <div class="card-body" style="padding:0">
+                <table class="hims-table">
             <thead>
                 <tr><th>Employee</th><th>Reviewer</th><th>Cycle</th><th>Type</th><th>Status</th><th>Score</th><th>Updated</th><th>Actions</th></tr>
             </thead>
@@ -67,6 +69,11 @@
             </tbody>
         </table>
     </div>
+    </div>
+    @if(! \App\Support\RecordAccess::isUnlocked())
+        @include('partials.record-access-overlay', ['slot' => 'Confidential employee evaluation records and reviewer scores are protected. Enter the Record Access Password to unblur.'])
+    @endif
+</div>
     @if($reviews->hasPages())
     <div style="padding:16px 22px;border-top:1px solid var(--hims-border)">{{ $reviews->links() }}</div>
     @endif

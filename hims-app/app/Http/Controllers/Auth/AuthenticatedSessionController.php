@@ -23,32 +23,20 @@ class AuthenticatedSessionController extends Controller
 
     /**
      * Handle an incoming authentication request.
+     *
+     * THERE IS NO TRUSTED-DEVICE BYPASS.
+     *
+     * This method used to start with a 30-day "remember this PC" branch that
+     * called Auth::login() directly and skipped the second factor entirely. It is
+     * gone, along with the checkbox and the cookie, and the branch is not to be
+     * reintroduced here: a durable cookie that stands in for a second factor is a
+     * single secret an attacker can copy off a workstation, and it survives the
+     * password change that is supposed to invalidate access. Everyone completes
+     * two-factor on every login, on every machine.
      */
     public function store(LoginRequest $request): RedirectResponse
     {
         $user = $request->authenticate();
-
-        // If this PC is remembered for 30 days, bypass 2FA and sign in directly
-        if (TwoFactorService::isDeviceTrusted($request, $user)) {
-            $request->session()->forget(['login.id', 'login.remember', 'login.remember_device']);
-
-            Auth::login($user, false);
-            $request->session()->regenerate();
-            $request->session()->put('hims_last_activity', time());
-
-            if ($user->must_change_password) {
-                return redirect()->route('profile.edit')->with('warning', 'Please change your temporary password before proceeding.');
-            }
-
-            return redirect()->intended(route('dashboard', absolute: false));
-        }
-
-        // Store remember device preference from login form for the 2FA step
-        if ($request->boolean('remember_device')) {
-            $request->session()->put('login.remember_device', true);
-        } else {
-            $request->session()->forget('login.remember_device');
-        }
 
         $code = TwoFactorService::generateCode();
 
@@ -61,20 +49,29 @@ class AuthenticatedSessionController extends Controller
 
         $sent = TwoFactorService::sendCode($user, $code);
 
+        /*
+         * A FAILED DELIVERY IS NOT A REASON TO SHOW THE CODE.
+         *
+         * This used to flash "Your verification code is: {$code}" onto the
+         * challenge page whenever mail failed — outside local, deliberately, so a
+         * misconfigured SMTP would not lock everyone out. That made the mail
+         * server the second factor's weakest link in the worst possible
+         * direction: anyone holding a password but not the mailbox could read the
+         * code straight off the screen, and could reach that state at will by
+         * inducing a delivery failure. The lockout it was protecting against is a
+         * support call; the bypass it created is an account takeover.
+         *
+         * So the code is never rendered anywhere. The visitor is told plainly that
+         * delivery failed and is left on the challenge page, where resend is
+         * available. The code itself only ever exists in the user's mailbox.
+         */
         if (! $sent) {
-            // Mail failed — flash the code so the 2FA page can display it as a
-            // fallback. This prevents complete lockout when SMTP is misconfigured.
-            // The TwoFactorService already logged the error and flashed a notice
-            // in local env. For production, we flash a generic notice.
-            if (! app()->environment('local')) {
-                $request->session()->flash(
-                    'dev_code_notice',
-                    "Email delivery is temporarily unavailable. Your verification code is: {$code}"
-                );
-            }
-            Log::critical('2FA email delivery failed — code displayed on screen as fallback', [
+            Log::critical('2FA email delivery failed — no code shown, challenge page held', [
                 'user_id' => $user->id,
             ]);
+
+            return redirect()->route('two-factor.show')
+                ->with('error', 'We could not send your verification code. Check your connection and try resending, or contact IT support.');
         }
 
         return redirect()->route('two-factor.show');

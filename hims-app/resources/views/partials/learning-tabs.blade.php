@@ -35,6 +35,9 @@
     <a href="{{ route('learning.renewals.index') }}"
        class="hims-tab {{ request()->routeIs('learning.renewals.*') ? 'active' : '' }}">
         <i class="bi bi-arrow-repeat"></i> Renewals
+        @if(! \App\Support\RecordAccess::isUnlocked())
+            <i class="bi bi-lock-fill ms-1" style="font-size:11px;opacity:0.65" title="Protected employee records — password required to unblur"></i>
+        @endif
     </a>
     @endcan
 
@@ -52,6 +55,9 @@
     <a href="{{ route('learning.accreditation') }}"
        class="hims-tab {{ request()->routeIs('learning.accreditation') || request()->routeIs('learning.accounts') ? 'active' : '' }}">
         <i class="bi bi-file-earmark-text"></i> Reports
+        @if(! \App\Support\RecordAccess::isUnlocked())
+            <i class="bi bi-lock-fill ms-1" style="font-size:11px;opacity:0.65" title="Protected workforce compliance reports — password required to unblur"></i>
+        @endif
     </a>
     @endcan
 </nav>

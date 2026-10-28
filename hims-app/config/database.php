@@ -76,6 +76,7 @@ return [
                             return $file;
                         }
                     }
+
                     return null;
                 })(),
                 PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('MYSQL_ATTR_SSL_VERIFY_SERVER_CERT', null),

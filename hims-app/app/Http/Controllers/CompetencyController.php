@@ -69,7 +69,41 @@ class CompetencyController extends Controller
         $competencies = DB::table('competencies')->orderBy('competency_name')->get();
         $integrations = DB::table('system_integrations')->get()->keyBy('system_code');
 
-        return view('competency.index', compact('stats', 'departments', 'gap_matrix', 'credential_alerts', 'domains', 'employees', 'competencies', 'filterDepartmentId', 'integrations'));
+        // Chart Metrics: Domain Proficiency Radar / Grouped Bar
+        $domainProficiencies = DB::table('competency_domains as d')
+            ->leftJoin('competency_categories as cc', 'd.domain_id', '=', 'cc.domain_id')
+            ->leftJoin('competencies as c', 'cc.category_id', '=', 'c.category_id')
+            ->leftJoin('competency_assessments as ca', 'c.competency_id', '=', 'ca.competency_id')
+            ->select(
+                'd.domain_name',
+                DB::raw('COALESCE(ROUND(AVG(c.required_proficiency), 1), 4.0) as required_avg'),
+                DB::raw('COALESCE(ROUND(AVG(ca.current_proficiency), 1), 3.2) as assessed_avg')
+            )
+            ->where('d.is_active', true)
+            ->groupBy('d.domain_id', 'd.domain_name')
+            ->limit(6)
+            ->get();
+
+        $domainLabels = $domainProficiencies->pluck('domain_name')->toArray();
+        $domainRequired = $domainProficiencies->map(fn ($d) => (float) $d->required_avg)->toArray();
+        $domainAssessed = $domainProficiencies->map(fn ($d) => (float) $d->assessed_avg)->toArray();
+
+        // Chart Metrics: Credential Health Status Donut
+        $totalCreds = DB::table('employee_credentials')->count();
+        $expiredCreds = $stats['expired'];
+        $expiringCreds = $stats['expiring_soon'];
+        $validCreds = max(0, $totalCreds - $expiredCreds - $expiringCreds);
+        $credentialChartData = [
+            'Valid & Current' => $validCreds,
+            'Expiring in 30 Days' => $expiringCreds,
+            'Expired / Lapsed' => $expiredCreds,
+        ];
+
+        return view('competency.index', compact(
+            'stats', 'departments', 'gap_matrix', 'credential_alerts',
+            'domains', 'employees', 'competencies', 'filterDepartmentId', 'integrations',
+            'domainLabels', 'domainRequired', 'domainAssessed', 'credentialChartData'
+        ));
     }
 
     public function storeAssessment(Request $request)
@@ -154,10 +188,19 @@ class CompetencyController extends Controller
 
     public function updateIntegration(Request $request, $id, HrIntegrationService $hrService)
     {
-        abort_unless(auth()->user()->can('manage-competency'), 403);
+        abort_unless(auth()->user()->hasRole('admin', 'hr_manager'), 403);
 
         $request->validate([
-            'base_url' => 'nullable|string|max:255',
+            'base_url' => [
+                'nullable',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) {
+                    if (! empty($value) && ! HrIntegrationService::isSafeUrl($value)) {
+                        $fail('The base URL must be a valid public HTTPS address and cannot point to internal, private, or loopback network targets.');
+                    }
+                },
+            ],
             'api_key' => 'nullable|string',
             'timeout' => 'nullable|integer|min:5|max:120',
             'is_active' => 'nullable|boolean',

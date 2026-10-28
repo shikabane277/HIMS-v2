@@ -4,9 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
-use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
-use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\TwoFactorAuthenticatedSessionController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Http\Request;
@@ -50,17 +48,20 @@ Route::middleware('guest')->group(function () {
     Route::get('2fa', [TwoFactorAuthenticatedSessionController::class, 'create']);
     Route::post('2fa', [TwoFactorAuthenticatedSessionController::class, 'store']);
 
-    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
-        ->name('password.request');
-
-    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
-        ->name('password.email');
-
-    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
-        ->name('password.reset');
-
-    Route::post('reset-password', [NewPasswordController::class, 'store'])
-        ->name('password.store');
+    /*
+     * PASSWORD RESET IS DELIBERATELY ABSENT.
+     *
+     * There is no forgot-password form, no reset link mail and no password.reset
+     * route. A reset link is a self-service path into an account that holds staff
+     * records, and its delivery depends on SMTP — the same dependency that was
+     * failing open in the 2FA challenge. Recovery is instead an admin action:
+     * an administrator sets a temporary password from /users and the account is
+     * forced to change it at next login (EnsurePasswordIsChanged).
+     *
+     * The Breeze controllers (PasswordResetLinkController, NewPasswordController)
+     * and their views were deleted with these routes; there is nothing left to
+     * re-point at them.
+     */
 });
 
 Route::middleware('auth')->group(function () {
@@ -82,11 +83,21 @@ Route::middleware('auth')->group(function () {
 
     Route::put('password', [PasswordController::class, 'update'])->name('password.update');
 
+    /*
+     * Reports whether the session is still inside the idle window. It does NOT
+     * refresh hims_last_activity: the old version did, which made this endpoint a
+     * way to hold a forgotten session open indefinitely by pinging it. Whether a
+     * request counts as activity is EnforceSessionTimeout's call, and it is based
+     * on the request arriving, not on anyone asking.
+     */
     Route::post('session/ping', function (Request $request) {
-        $request->session()->put('hims_last_activity', time());
+        $lastActivity = (int) $request->session()->get('hims_last_activity', 0);
+        $timeoutSeconds = max(60, (int) (env('SESSION_IDLE_TIMEOUT') ?: config('session.idle_timeout', 300)) * 60);
+        $expired = $lastActivity > 0 && (time() - $lastActivity > $timeoutSeconds);
 
         return response()->json([
-            'status' => 'active',
+            'status' => $expired ? 'expired' : 'active',
+            'expires_in' => $expired ? 0 : max(0, $timeoutSeconds - (time() - $lastActivity)),
             'timestamp' => time(),
         ]);
     })->name('session.ping');

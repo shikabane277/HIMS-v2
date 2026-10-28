@@ -73,6 +73,11 @@
                 <form method="POST" action="{{ route('profile.totp.confirm') }}">
                     @csrf
                     <input type="hidden" name="totp_secret" id="totpSecretInput">
+                    <div class="max-w-xs mb-3">
+                        <x-input-label for="totp_confirm_password" :value="__('Confirm Current Password')" />
+                        <x-text-input id="totp_confirm_password" name="password" type="password" class="mt-1 block w-full text-sm" placeholder="Your account password" required />
+                        <x-input-error :messages="$errors->get('password')" class="mt-1" />
+                    </div>
                     <div class="max-w-xs">
                         <x-input-label for="totp_code" :value="__('6-Digit Authenticator Code')" />
                         <x-text-input id="totp_code" name="totp_code" type="text" maxlength="6" class="mt-1 block w-full text-center text-xl font-mono font-bold tracking-widest" placeholder="123456" required />

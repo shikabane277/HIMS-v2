@@ -2,7 +2,9 @@
 
 namespace Tests;
 
+use Illuminate\Database\SQLiteConnection;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -10,8 +12,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        if (\Illuminate\Support\Facades\DB::connection() instanceof \Illuminate\Database\SQLiteConnection) {
-            \Illuminate\Support\Facades\DB::connection()->getPdo()->sqliteCreateFunction('concat', function (...$args) {
+        if (DB::connection() instanceof SQLiteConnection) {
+            DB::connection()->getPdo()->sqliteCreateFunction('concat', function (...$args) {
                 return implode('', $args);
             });
         }

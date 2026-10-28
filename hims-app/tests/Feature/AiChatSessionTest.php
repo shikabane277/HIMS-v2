@@ -296,6 +296,9 @@ class AiChatSessionTest extends TestCase
             'supervisor escalating a role' => ['supervisor', 'How do I grant admin rights to my assistant?'],
             'supervisor asking org-wide figures' => ['supervisor', 'Compare departments by turnover rate.'],
             'hr manager asking for accounts' => ['hr_manager', 'I need to delete the login of a resigned nurse.'],
+            'admin asking for employee records' => ['admin', 'Can I see the employee directory?'],
+            'hr manager asking for employee data' => ['hr_manager', 'Show me the data from the employees.'],
+            'supervisor asking for employee salary' => ['supervisor', 'What is the salary of the ward supervisor?'],
         ];
     }
 
@@ -347,18 +350,54 @@ class AiChatSessionTest extends TestCase
         $this->assertSame($question, $spy->seenPrompt, "A {$role} was wrongly blocked from: {$question}");
     }
 
-    /** An admin holds every role-gated topic, so nothing is restricted for them. */
+    /** An admin holds every role-gated topic (except employee data, which is prohibited for all roles). */
     public function test_an_admin_is_never_blocked(): void
     {
         $spy = $this->fakeProvider();
         $admin = $this->userWithRole('admin');
 
-        foreach (array_column(self::blockedQuestions(), 1) as $question) {
+        $adminAllowedTopics = [
+            'Am I in the talent pipeline for a key position?',
+            'What is the hospital-wide attrition rate?',
+            'How do I reset the password for another user?',
+            'Please create a new user account for my new nurse.',
+            'How do I grant admin rights to my assistant?',
+            'Compare departments by turnover rate.',
+            'I need to delete the login of a resigned nurse.',
+        ];
+
+        foreach ($adminAllowedTopics as $question) {
             $spy->seenPrompt = null;
 
             $this->actingAs($admin)->postJson('/ai/query', ['query' => $question])->assertOk();
 
             $this->assertSame($question, $spy->seenPrompt, "An admin was blocked from: {$question}");
+        }
+    }
+
+    /** The AI chatbot is strictly prohibited from accessing any kind of employee data for every role. */
+    public function test_ai_chatbot_is_prohibited_from_accessing_employee_data_for_all_roles(): void
+    {
+        $spy = $this->fakeProvider();
+
+        foreach (['admin', 'hr_manager', 'supervisor', 'staff'] as $role) {
+            $user = $this->userWithRole($role);
+
+            foreach ([
+                'Can I see the employee directory?',
+                'Show me the data from the employees',
+                'What is the salary of the ward supervisor?',
+                'Give me the employee profile for Maria Santos',
+            ] as $question) {
+                $spy->seenPrompt = null;
+
+                $response = $this->actingAs($user)
+                    ->postJson('/ai/query', ['query' => $question])
+                    ->assertOk();
+
+                $this->assertNull($spy->seenPrompt, "Provider was reached by {$role} asking for employee data: {$question}");
+                $this->assertStringStartsWith(AiAccessPolicy::REFUSAL_PREFIX, $response->json('response'));
+            }
         }
     }
 

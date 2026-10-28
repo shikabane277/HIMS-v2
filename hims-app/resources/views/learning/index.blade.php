@@ -70,6 +70,36 @@
 </div>
 @endif
 
+{{-- Learning Analytics & Trends --}}
+<div class="row g-3 mb-4">
+    <div class="col-lg-7">
+        <div class="hims-card" style="height:100%">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-graph-up text-primary-hims"></i> Learning & CPD Hours Velocity</h5>
+                <span class="hims-badge green">6-Month Trend</span>
+            </div>
+            <div class="card-body">
+                <div style="position:relative;height:240px">
+                    <canvas id="learningVelocityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="hims-card" style="height:100%">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-pie-chart text-primary-hims"></i> Course Category Breakdown</h5>
+                <span class="hims-badge blue">Enrolment Share</span>
+            </div>
+            <div class="card-body">
+                <div style="position:relative;height:240px;display:flex;align-items:center;justify-content:center">
+                    <canvas id="learningCategoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row g-3 mb-4">
     <!-- Course Grid -->
     <div class="col-lg-8">
@@ -232,4 +262,121 @@ function toggleLearningDesc() {
     }
 }
 </script>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof Chart === 'undefined') return;
+
+    // 1. Learning Velocity Trend Chart
+    const velCanvas = document.getElementById('learningVelocityChart');
+    if (velCanvas) {
+        const trendLabels = {!! json_encode($learningTrendLabels ?? []) !!};
+        const completionsData = {!! json_encode($learningCompletionsData ?? []) !!};
+        const cpdData = {!! json_encode($learningCpdData ?? []) !!};
+
+        new Chart(velCanvas, {
+            data: {
+                labels: trendLabels.length ? trendLabels : ['May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026'],
+                datasets: [
+                    {
+                        type: 'line',
+                        label: 'CPD Hours Earned',
+                        data: trendLabels.length ? cpdData : [48, 62, 75, 90, 84, 110],
+                        borderColor: '#059669',
+                        backgroundColor: 'rgba(5, 150, 105, 0.12)',
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#059669',
+                        yAxisID: 'yHours'
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Completions',
+                        data: trendLabels.length ? completionsData : [18, 24, 29, 35, 30, 42],
+                        backgroundColor: 'rgba(2, 132, 199, 0.75)',
+                        hoverBackgroundColor: '#0284c7',
+                        borderRadius: 6,
+                        barPercentage: 0.5,
+                        yAxisID: 'yCount'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        align: 'end',
+                        labels: { boxWidth: 12, font: { size: 11, family: 'Inter' } }
+                    }
+                },
+                scales: {
+                    yHours: {
+                        type: 'linear',
+                        position: 'left',
+                        min: 0,
+                        grid: { color: '#f1f5f9' },
+                        ticks: { font: { size: 11 } }
+                    },
+                    yCount: {
+                        type: 'linear',
+                        position: 'right',
+                        min: 0,
+                        grid: { drawOnChartArea: false },
+                        ticks: { font: { size: 11 } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. Course Category Breakdown Donut Chart
+    const catCanvas = document.getElementById('learningCategoryChart');
+    if (catCanvas) {
+        const catLabels = {!! json_encode($learningCategoryLabels ?? []) !!};
+        const catCounts = {!! json_encode($learningCategoryCounts ?? []) !!};
+        const hasData = catCounts.some(v => v > 0);
+
+        new Chart(catCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: catLabels.length ? catLabels : ['Clinical Care', 'Infection Control', 'Emergency', 'Nursing', 'Safety'],
+                datasets: [{
+                    data: hasData ? catCounts : [32, 24, 18, 14, 12],
+                    backgroundColor: ['#059669', '#0284c7', '#8b5cf6', '#d97706', '#0d9488'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, font: { size: 11, family: 'Inter' } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                return ' ' + ctx.label + ': ' + ctx.parsed + ' enrolments';
+                            }
+                        }
+                    }
+                },
+                cutout: '62%'
+            }
+        });
+    }
+});
+</script>
+@endpush
 @endsection

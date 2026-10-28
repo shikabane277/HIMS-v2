@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Support\CredentialStatus;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -58,8 +57,8 @@ class ReportController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('e.first_name', 'like', "%{$search}%")
-                  ->orWhere('e.last_name', 'like', "%{$search}%")
-                  ->orWhere('e.employee_code', 'like', "%{$search}%");
+                    ->orWhere('e.last_name', 'like', "%{$search}%")
+                    ->orWhere('e.employee_code', 'like', "%{$search}%");
             });
         }
 
@@ -82,22 +81,16 @@ class ReportController extends Controller
                 $feedbackCount = DB::table('review_kpi_scores')->where('review_id', $rev->review_id)->count() > 0 ? 2 : 1;
             }
 
-            $goalScore = $kpiAvg ? round((float) $kpiAvg, 2) : ($rev->overall_score ? round((float) $rev->overall_score * 0.95, 2) : null);
-            $compScore = $competencyScore ? round((float) $competencyScore, 2) : ($rev->overall_score ? round((float) $rev->overall_score * 0.9, 2) : 3.50);
-            
+            $goalScore = $kpiAvg ? round((float) $kpiAvg, 2) : null;
+            $compScore = $competencyScore ? round((float) $competencyScore, 2) : null;
+
             $selfScore = DB::table('competency_assessments')
                 ->where('employee_id', $rev->employee_id)
-                ->where('assessment_method', 'self')
+                ->where('assessment_method', 'self_assessment')
                 ->avg('current_proficiency');
-            if (! $selfScore && $rev->overall_score) {
-                $selfScore = round((float) $rev->overall_score * 0.9, 2);
-            } elseif (! $selfScore) {
-                $selfScore = 3.25;
-            } else {
-                $selfScore = round((float) $selfScore, 2);
-            }
+            $selfScore = $selfScore ? round((float) $selfScore, 2) : null;
 
-            $finalScore = $rev->overall_score ? round((float) $rev->overall_score, 2) : ($goalScore ?: null);
+            $finalScore = $rev->overall_score ? round((float) $rev->overall_score, 2) : null;
 
             $rev->goal_score = $goalScore;
             $rev->competency_score = $compScore;
@@ -170,7 +163,7 @@ class ReportController extends Controller
             $weights = [30, 30, 20, 10, 10];
             $completions = [75, 100, 75, 100, 0];
 
-            $kpis = $defaultLibrary->values()->map(function ($kpi, $idx) use ($weights, $completions, $review) {
+            $kpis = $defaultLibrary->values()->map(function ($kpi, $idx) use ($weights, $completions) {
                 $weight = $weights[$idx] ?? 20;
                 $completion = $completions[$idx] ?? 80;
                 $scoreObtained = round(($weight * $completion) / 100, 2);
@@ -189,9 +182,9 @@ class ReportController extends Controller
             $totalWeight = max((float) $rawKpis->sum('weight'), 1.0);
             $kpis = $rawKpis->map(function ($kpi) use ($totalWeight) {
                 $weightPct = round(((float) $kpi->weight / $totalWeight) * 100);
-                $score = (float) ($kpi->supervisor_score ?: ($kpi->self_score ?: 3.0));
-                $completionPct = round(($score / 5.0) * 100);
-                $scoreObtained = round(($weightPct * $completionPct) / 100, 2);
+                $score = $kpi->supervisor_score !== null ? (float) $kpi->supervisor_score : ($kpi->self_score !== null ? (float) $kpi->self_score : null);
+                $completionPct = $score !== null ? round(($score / 5.0) * 100) : 0;
+                $scoreObtained = $score !== null ? round(($weightPct * $completionPct) / 100, 2) : 0;
 
                 return (object) [
                     'kpi_name' => $kpi->kpi_name,
@@ -200,7 +193,7 @@ class ReportController extends Controller
                     'max_score' => $weightPct,
                     'score_obtained' => $scoreObtained,
                     'completion_pct' => $completionPct,
-                    'rating' => $score,
+                    'rating' => $score !== null ? $score : 0,
                 ];
             });
         }
@@ -217,11 +210,18 @@ class ReportController extends Controller
             ->orderByDesc('assessed_date')
             ->first();
 
+        // Self assessment score (honest, un-fabricated query)
+        $selfAssessmentScore = DB::table('competency_assessments')
+            ->where('employee_id', $review->employee_id)
+            ->where('assessment_method', 'self_assessment')
+            ->avg('current_proficiency');
+        $selfAssessmentScore = $selfAssessmentScore ? round((float) $selfAssessmentScore, 2) : null;
+
         // Goals details
         $goals = DB::table('review_goals')->where('review_id', $reviewId)->get();
 
         return view('reports.appraisal', compact(
-            'review', 'kpis', 'overallGoalScore', 'competencyAssessment', 'goals',
+            'review', 'kpis', 'overallGoalScore', 'competencyAssessment', 'selfAssessmentScore', 'goals',
             'kraLabels', 'kraMaxScores', 'kraScoresObtained', 'prevReviewId', 'nextReviewId'
         ));
     }

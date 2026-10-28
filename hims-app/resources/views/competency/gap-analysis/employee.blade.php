@@ -274,8 +274,10 @@
             {{ $openGaps->count() }} open item{{ $openGaps->count() === 1 ? '' : 's' }}
         </span>
     </div>
-    <div class="card-body" style="padding:0">
-        <table class="hims-table">
+    <div class="hims-sensitive-wrapper">
+        <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+            <div class="card-body" style="padding:0">
+                <table class="hims-table">
             <thead>
                 <tr><th>Competency</th><th>Domain</th><th>Required</th><th>Current</th><th>Gap</th><th>Status</th><th>Notes</th></tr>
             </thead>
@@ -320,6 +322,10 @@
             </tbody>
         </table>
     </div>
+    </div>
+    @if(! \App\Support\RecordAccess::isUnlocked())
+        @include('partials.record-access-overlay', ['slot' => 'Individual staff competency assessment ratings and measured gap scores are protected. Enter the Record Access Password to unblur.'])
+    @endif
 </div>
 
 {{-- ── Written feedback on record (deterministic — this is what the AI summarised) ── --}}

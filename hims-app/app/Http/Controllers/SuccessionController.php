@@ -149,8 +149,60 @@ class SuccessionController extends Controller
 
         $employees = $canSeeConfidential ? DB::table('employees')->orderBy('first_name')->get() : collect();
 
+        // Chart & Trends: Readiness distribution and Vacancy risk profile
+        $rawReadiness = (clone $candidateStats)
+            ->select('sc.readiness_level', DB::raw('COUNT(*) as cnt'))
+            ->whereNotNull('sc.readiness_level')
+            ->groupBy('sc.readiness_level')
+            ->pluck('cnt', 'sc.readiness_level')
+            ->toArray();
+
+        $readinessStages = [
+            'ready_now' => 'Ready Now (<6m)',
+            '1_2_years' => 'Ready in 1–2 Years',
+            '2_5_years' => 'Ready in 2–5 Years',
+            'long_term' => 'Long Term (>5y)',
+        ];
+
+        $readinessLabels = array_values($readinessStages);
+        $readinessCounts = [];
+        foreach (array_keys($readinessStages) as $key) {
+            $readinessCounts[] = (int) ($rawReadiness[$key] ?? 0);
+        }
+
+        $rawRisks = (clone $positionStats)
+            ->select('cp.vacancy_risk', DB::raw('COUNT(*) as cnt'))
+            ->whereNotNull('cp.vacancy_risk')
+            ->groupBy('cp.vacancy_risk')
+            ->pluck('cnt', 'cp.vacancy_risk')
+            ->toArray();
+
+        $riskTiers = [
+            'critical' => 'Critical Risk',
+            'high' => 'High Risk',
+            'medium' => 'Medium Risk',
+            'low' => 'Low / Stable',
+        ];
+
+        $riskLabels = array_values($riskTiers);
+        $riskCounts = [];
+        foreach (array_keys($riskTiers) as $key) {
+            $riskCounts[] = (int) ($rawRisks[$key] ?? 0);
+        }
+
+        $readinessChartData = [
+            'labels' => $readinessLabels,
+            'counts' => $readinessCounts,
+        ];
+
+        $vacancyRiskChartData = [
+            'labels' => $riskLabels,
+            'counts' => $riskCounts,
+        ];
+
         return view('succession.index', compact(
-            'stats', 'positions', 'box_counts', 'candidates', 'filterPositionId', 'employees', 'canSeeConfidential'
+            'stats', 'positions', 'box_counts', 'candidates', 'filterPositionId', 'employees', 'canSeeConfidential',
+            'readinessChartData', 'vacancyRiskChartData'
         ));
     }
 

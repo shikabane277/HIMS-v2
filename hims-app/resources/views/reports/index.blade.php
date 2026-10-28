@@ -196,8 +196,10 @@
             <span style="font-size:12px;color:#6b7280;font-weight:500">{{ $reviews->count() }} Staff Record(s)</span>
         </div>
 
-        <div class="table-responsive">
-            <table class="hims-table" style="font-size:13px">
+        <div class="hims-sensitive-wrapper">
+            <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+                <div class="table-responsive">
+                    <table class="hims-table" style="font-size:13px">
                 <thead>
                     <tr style="background:#f8fafc">
                         <th class="text-center" style="width:45px">#</th>
@@ -253,21 +255,21 @@
                             @if($rev->competency_score)
                                 <span style="font-weight:700;color:#10b981">{{ number_format($rev->competency_score, 2) }}</span>
                             @else
-                                <span style="color:#9ca3af">0.00</span>
+                                <span style="color:#9ca3af">—</span>
                             @endif
                         </td>
                         <td class="text-center" data-label="Goal Score">
                             @if($rev->goal_score)
                                 <span style="font-weight:700;color:#f43f5e">{{ number_format($rev->goal_score, 2) }}</span>
                             @else
-                                <span style="color:#9ca3af">0.00</span>
+                                <span style="color:#9ca3af">—</span>
                             @endif
                         </td>
                         <td class="text-center" data-label="Self Score">
                             @if($rev->self_score)
                                 <span style="font-weight:700;color:#0284c7">{{ number_format($rev->self_score, 2) }}</span>
                             @else
-                                <span style="color:#9ca3af">0.00</span>
+                                <span style="color:#9ca3af">—</span>
                             @endif
                         </td>
                         <td class="text-center" data-label="Final Score">
@@ -293,8 +295,13 @@
                         </td>
                     </tr>
                     @endforelse
-                </tbody>
-            </table>
+                    </tbody>
+                    </table>
+                </div>
+            </div>
+            @if(! \App\Support\RecordAccess::isUnlocked())
+                @include('partials.record-access-overlay', ['slot' => 'Personnel appraisal scores and staff performance evaluations are protected. Enter the Record Access Password to unblur.'])
+            @endif
         </div>
     </div>
 </div>

@@ -49,8 +49,10 @@
         <h5><i class="bi bi-hourglass-split"></i> At Risk &amp; Short</h5>
         <span style="font-size:12px;color:#6b7280">{{ $cycles->count() }} cycle(s)</span>
     </div>
-    <div class="card-body" style="padding:0">
-        <table class="hims-table">
+    <div class="hims-sensitive-wrapper">
+        <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+            <div class="card-body" style="padding:0">
+                <table class="hims-table">
             <thead>
                 <tr>
                     <th>Employee</th><th>Department</th><th>Requirement</th>
@@ -121,6 +123,11 @@
                 @endforelse
             </tbody>
         </table>
+    </div>
+    </div>
+    @if(! \App\Support\RecordAccess::isUnlocked())
+        @include('partials.record-access-overlay', ['slot' => 'Confidential employee renewal standings and shortfalls are protected. Enter the Record Access Password to unblur.'])
+    @endif
     </div>
 </div>
 

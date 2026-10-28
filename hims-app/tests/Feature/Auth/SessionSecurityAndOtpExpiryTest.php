@@ -116,17 +116,16 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
         $this->assertLessThanOrEqual(120, $diffInSeconds);
     }
 
-    public function test_session_ping_endpoint_refreshes_activity_timestamp(): void
+    public function test_session_ping_endpoint_reports_status(): void
     {
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)
-            ->withSession(['hims_last_activity' => time() - 300])
+            ->withSession(['hims_last_activity' => time() - 30])
             ->postJson('/session/ping');
 
         $response->assertOk();
         $response->assertJson(['status' => 'active']);
-        $this->assertGreaterThanOrEqual(time() - 2, session('hims_last_activity'));
     }
 
     public function test_session_timeout_logs_out_inactive_user_and_redirects_to_login(): void
@@ -150,5 +149,35 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Your session has expired due to inactivity');
+    }
+
+    public function test_deactivated_user_session_is_terminated_immediately_on_next_request(): void
+    {
+        $user = User::factory()->create([
+            'is_active' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $this->assertGuest();
+        $response->assertRedirect(route('login', ['timeout' => 1]));
+    }
+
+    public function test_2fa_email_delivery_failure_does_not_reveal_code_on_screen(): void
+    {
+        Mail::shouldReceive('to->send')->andThrow(new \Exception('SMTP Server Down'));
+
+        $user = User::factory()->create();
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect(route('two-factor.show'));
+        $challengePage = $this->get(route('two-factor.show'));
+
+        $challengePage->assertDontSee('Your verification code is:');
+        $challengePage->assertDontSee('dev_code_notice');
     }
 }

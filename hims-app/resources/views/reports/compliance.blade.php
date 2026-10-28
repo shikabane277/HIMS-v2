@@ -120,8 +120,8 @@
                     <td data-label="Department">{{ $c->department_name }}</td>
                     <td data-label="Credential / License">
                         <strong>{{ $c->credential_type }}</strong>
-                        @if($c->license_number)
-                            <div style="font-size:11.5px;color:#6b7280">Lic #: {{ $c->license_number }}</div>
+                        @if($c->credential_number ?? $c->license_number ?? null)
+                            <div style="font-size:11.5px;color:#6b7280">Lic #: {{ $c->credential_number ?? $c->license_number }}</div>
                         @endif
                     </td>
                     <td data-label="Issuing Body">{{ $c->issuing_body }}</td>

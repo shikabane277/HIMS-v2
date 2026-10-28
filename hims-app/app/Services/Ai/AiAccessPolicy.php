@@ -56,6 +56,22 @@ class AiAccessPolicy
      * @var array<string, array{roles: list<string>, label: string, match: list<string>}>
      */
     private const TOPICS = [
+        'employees' => [
+            'roles' => [],
+            'label' => 'employee data and personnel records',
+            'match' => [
+                '\bemployee (record|records|data|info|information|details|directory|list|roster|file|files|profile|profiles)\b',
+                '\bemployees\'? (record|records|data|info|information|details|directory|list|roster|file|files|profile|profiles)\b',
+                '\bdata (from|of|about|on) (the )?employees?\b',
+                '\b(show|view|get|fetch|find|search|lookup|list|give me|tell me about)\b[^.?!]{0,30}\b(employee|employees|staff member|personnel)\b',
+                '\bstaff (list|roster|directory|data|records|profiles)\b',
+                '\bpersonnel (record|records|file|files|data)\b',
+                '\bsalary\b', '\bsalaries\b', '\bcompensation\b', '\bpayroll\b', '\bsweldo\b',
+                '\bhome address\b', '\b(contact|phone) number of\b', '\bemail (address )?of\b', '\bcivil status\b',
+                '\bdisciplinary (record|action|case)', '\bmedical (record|history) of\b',
+                '\bwho (else )?(reports to|works under)\b',
+            ],
+        ],
         'users' => [
             'roles' => ['admin'],
             'label' => 'user accounts and system roles',
@@ -75,18 +91,6 @@ class AiAccessPolicy
                 '\bkey position', '\bcritical position', '\breadiness (level|score|rating)\b',
                 '\bhigh[- ]potential\b', '\bhipo\b', '\bnominee', '\bnominated (for|to)\b',
                 '\bwho (is|are) (next in line|being groomed)\b',
-            ],
-        ],
-        'employees' => [
-            'roles' => ['admin', 'hr_manager', 'supervisor'],
-            'label' => 'other employees\' records',
-            'match' => [
-                '\bemployee (record|directory|list|roster|file|profile)',
-                '\bstaff (list|roster|directory)\b', '\bpersonnel (record|file)',
-                '\bsalary\b', '\bsalaries\b', '\bcompensation\b', '\bpayroll\b', '\bsweldo\b',
-                '\bhome address\b', '\bcontact number of\b', '\bcivil status\b',
-                '\bdisciplinary (record|action|case)', '\bmedical (record|history) of\b',
-                '\bwho (else )?(reports to|works under)\b',
             ],
         ],
         'departments' => [
@@ -154,6 +158,13 @@ class AiAccessPolicy
     {
         $label = self::TOPICS[$topic]['label'] ?? 'that area of HIMS';
 
+        if ($topic === 'employees') {
+            return self::REFUSAL_PREFIX." I can't help with {$label} — the AI chatbot is strictly prohibited "
+                ."from accessing, retrieving, or discussing any kind of data from employees.\n\n"
+                .'I can still help with general HIMS navigation and guidance on performance reviews, '
+                .'competency assessments, learning pathways, and training schedules.';
+        }
+
         return self::REFUSAL_PREFIX." I can't help with {$label} — your HIMS role doesn't have access "
             ."to it, so I'm not able to discuss it here.\n\n"
             .'I can still help with your own performance reviews and goals, competency '
@@ -179,17 +190,21 @@ class AiAccessPolicy
         $role = (string) ($user->role ?? 'staff');
 
         $restricted = [];
-        foreach (self::TOPICS as $spec) {
+        foreach (self::TOPICS as $topic => $spec) {
+            if ($topic === 'employees') {
+                continue;
+            }
             if (! $this->roleAllows($user, $spec['roles'])) {
                 $restricted[] = $spec['label'];
             }
         }
 
         $scope = 'ACCESS SCOPE: the person asking has the HIMS role "'.$role.'" ('
-            .$this->roleDescription($role).'). ';
+            .$this->roleDescription($role).'). '
+            .'STRICT PRIVACY RULE: You are strictly prohibited from accessing, retrieving, or disclosing any kind of data from the employees regardless of who is asking. ';
 
         if ($restricted === []) {
-            return $scope.'They have full access, so answer any HIMS question they raise.';
+            return $scope.'They have full access, so answer any general HIMS question they raise outside of employee records.';
         }
 
         return $scope

@@ -125,25 +125,123 @@
 </div>
 
 <div class="hims-card">
-    <div class="card-body" style="padding:0">
-        <table class="hims-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Linked Employee</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="usersTableBody">
-                @include('users._table_rows', ['users' => $users])
-            </tbody>
-        </table>
+    <div class="hims-sensitive-wrapper">
+        <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+            <div class="card-body" style="padding:0">
+                <table class="hims-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Linked Employee</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        @include('users._table_rows', ['users' => $users])
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @if(! \App\Support\RecordAccess::isUnlocked())
+            @include('partials.record-access-overlay', ['slot' => 'Hospital user accounts and linked employee identities are protected. Enter the Record Access Password to unblur.'])
+        @endif
     </div>
     <div id="usersPaginationContainer" style="{{ $users->hasPages() ? '' : 'display:none;' }}padding:16px 22px;border-top:1px solid var(--hims-border)">
         {{ $users->links() }}
+    </div>
+</div>
+
+{{-- System Security & Privacy Settings --}}
+<div class="row g-3 mb-4">
+    {{-- Record Access Password Card --}}
+    <div class="col-lg-6">
+        <div class="hims-card" style="padding:22px;height:100%">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#0d9488,#0284c7);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:18px">
+                    <i class="bi bi-file-earmark-lock2-fill"></i>
+                </div>
+                <div>
+                    <h3 style="font-size:16px;font-weight:700;margin:0">Record Access Security Gate</h3>
+                    <span style="font-size:12px;color:#64748b">Single-visit password required to view employee records</span>
+                </div>
+            </div>
+
+            <p style="font-size:12.5px;color:#475569;line-height:1.5;margin-bottom:16px">
+                For clinical terminal safety, staff viewing employee performance, credentials, and workforce records must authorize each visit using this administrator-set password.
+            </p>
+
+            <form method="POST" action="{{ route('settings.record-access-password') }}">
+                @csrf
+                <div class="mb-2">
+                    <label class="hims-label" style="font-size:12px">Your Admin Password *</label>
+                    <input type="password" name="current_admin_password" class="hims-input" placeholder="Confirm your login password" required style="font-size:13px">
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-sm-6">
+                        <label class="hims-label" style="font-size:12px">New Record Password *</label>
+                        <input type="password" name="record_access_password" class="hims-input" minlength="8" placeholder="Min. 8 characters" required style="font-size:13px">
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="hims-label" style="font-size:12px">Confirm New Password *</label>
+                        <input type="password" name="record_access_password_confirmation" class="hims-input" minlength="8" placeholder="Repeat password" required style="font-size:13px">
+                    </div>
+                </div>
+                <button type="submit" class="btn-hims btn-hims-primary" style="font-size:13px;padding:8px 16px">
+                    <i class="bi bi-shield-lock-fill"></i> Update Record Password
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {{-- AI Privacy Settings Card --}}
+    <div class="col-lg-6">
+        <div class="hims-card" style="padding:22px;height:100%">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:18px">
+                    <i class="bi bi-robot"></i>
+                </div>
+                <div>
+                    <h3 style="font-size:16px;font-weight:700;margin:0">AI Privacy & Data Sharing</h3>
+                    <span style="font-size:12px;color:#64748b">Control workforce privacy with external AI models</span>
+                </div>
+            </div>
+
+            <p style="font-size:12.5px;color:#475569;line-height:1.5;margin-bottom:16px">
+                Configure data redaction when generating automated review feedback or AI summaries. Patient and clinical privacy are strictly enforced.
+            </p>
+
+            <form method="POST" action="{{ route('settings.ai-data-sharing') }}">
+                @csrf
+                <div class="mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
+                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:0">
+                        <input type="hidden" name="ai_include_comments" value="0">
+                        <input type="checkbox" name="ai_include_comments" value="1" {{ !empty($aiIncludeComments) ? 'checked' : '' }} style="width:16px;height:16px;accent-color:var(--hims-primary);margin-top:2px">
+                        <div>
+                            <strong style="font-size:13px;color:#0f172a;display:block">Share Review Feedback Comments</strong>
+                            <span style="font-size:12px;color:#64748b">Allow narrative evaluator comments to be processed by AI model for summaries.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
+                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:0">
+                        <input type="hidden" name="ai_redact_names" value="0">
+                        <input type="checkbox" name="ai_redact_names" value="1" {{ !empty($aiRedactNames) ? 'checked' : '' }} style="width:16px;height:16px;accent-color:var(--hims-primary);margin-top:2px">
+                        <div>
+                            <strong style="font-size:13px;color:#0f172a;display:block">Redact Staff & Patient Names</strong>
+                            <span style="font-size:12px;color:#64748b">Replace employee and patient names with pseudonyms before sending to AI (Recommended).</span>
+                        </div>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-hims btn-hims-ghost" style="font-size:13px;padding:8px 16px;border:1px solid var(--hims-border)">
+                    <i class="bi bi-save"></i> Save AI Privacy Settings
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 

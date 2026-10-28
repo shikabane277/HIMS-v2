@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -19,6 +20,7 @@ return new class extends Migration
             DB::table('system_settings')->insert([
                 ['key' => 'ai_include_comments', 'value' => '1', 'created_at' => now(), 'updated_at' => now()],
                 ['key' => 'ai_redact_names', 'value' => '1', 'created_at' => now(), 'updated_at' => now()],
+                ['key' => 'record_access_password_hash', 'value' => Hash::make('Hospital@2026!'), 'created_at' => now(), 'updated_at' => now()],
             ]);
         }
     }

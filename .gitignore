@@ -5,3 +5,7 @@
 
 # Browser-automation scratch output (snapshots, console logs, screenshots)
 .playwright-mcp/
+
+# Build artifacts
+/dist/
+dist/

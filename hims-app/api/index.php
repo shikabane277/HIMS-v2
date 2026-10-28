@@ -10,7 +10,6 @@
  * This wrapper automatically ensures that Laravel's compiled view, cache,
  * and session directories exist in `/tmp` before handling HTTP requests.
  */
-
 $ephemeralStorage = '/tmp/storage';
 $requiredDirectories = [
     '/app',
@@ -24,19 +23,19 @@ $requiredDirectories = [
 ];
 
 foreach ($requiredDirectories as $dir) {
-    $fullPath = $ephemeralStorage . $dir;
-    if (!is_dir($fullPath)) {
+    $fullPath = $ephemeralStorage.$dir;
+    if (! is_dir($fullPath)) {
         @mkdir($fullPath, 0755, true);
     }
 }
 
 // Ensure runtime environment variables are set for ephemeral paths
-putenv('APP_STORAGE=' . $ephemeralStorage);
-putenv('VIEW_COMPILED_PATH=' . $ephemeralStorage . '/framework/views');
+putenv('APP_STORAGE='.$ephemeralStorage);
+putenv('VIEW_COMPILED_PATH='.$ephemeralStorage.'/framework/views');
 putenv('APP_CONFIG_CACHE=/tmp/config.php');
 putenv('APP_ROUTES_CACHE=/tmp/routes.php');
 putenv('APP_EVENTS_CACHE=/tmp/events.php');
 putenv('APP_PACKAGES_CACHE=/tmp/packages.php');
 
 // Forward execution to Laravel's public front controller
-require __DIR__ . '/../public/index.php';
+require __DIR__.'/../public/index.php';

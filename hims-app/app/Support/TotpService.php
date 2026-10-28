@@ -47,21 +47,39 @@ class TotpService
      */
     public function verify(string $secret, string $code, int $window = 1): bool
     {
+        return $this->verifyWithCounter($secret, $code, null, $window) !== null;
+    }
+
+    /**
+     * Verify whether a 6-digit user input matches the TOTP secret within window,
+     * ensuring the matched time slice has not already been consumed (anti-replay).
+     *
+     * Returns the matched timeSlice integer if valid and unconsumed, or null.
+     */
+    public function verifyWithCounter(string $secret, string $code, ?int $lastConsumedCounter = null, int $window = 1): ?int
+    {
         $code = trim($code);
         if (strlen($code) !== 6 || ! ctype_digit($code)) {
-            return false;
+            return null;
         }
 
         $currentTime = time();
+        $currentSlice = (int) floor($currentTime / 30);
 
         for ($slice = -$window; $slice <= $window; $slice++) {
-            $checkTime = $currentTime + ($slice * 30);
+            $checkSlice = $currentSlice + $slice;
+
+            if ($lastConsumedCounter !== null && $checkSlice <= $lastConsumedCounter) {
+                continue;
+            }
+
+            $checkTime = $checkSlice * 30;
             if (hash_equals($this->getOtp($secret, $checkTime), $code)) {
-                return true;
+                return $checkSlice;
             }
         }
 
-        return false;
+        return null;
     }
 
     /**

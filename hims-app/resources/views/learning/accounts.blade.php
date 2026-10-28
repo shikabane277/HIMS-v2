@@ -45,8 +45,10 @@
             @endforeach
         </div>
     </div>
-    <div class="card-body" style="padding:0">
-        <table class="hims-table">
+    <div class="hims-sensitive-wrapper">
+        <div class="hims-sensitive-records {{ ! \App\Support\RecordAccess::isUnlocked() ? 'is-blurred' : '' }}">
+            <div class="card-body" style="padding:0">
+                <table class="hims-table">
             <thead>
                 <tr><th>Employee</th><th>Department</th><th>Employment</th><th>Account</th><th>Role</th><th>Reachable At</th></tr>
             </thead>
@@ -95,6 +97,11 @@
                 @endforelse
             </tbody>
         </table>
+    </div>
+    </div>
+    @if(! \App\Support\RecordAccess::isUnlocked())
+        @include('partials.record-access-overlay', ['slot' => 'Hospital employee records and linked account information are protected. Enter the Record Access Password to unblur.'])
+    @endif
     </div>
 </div>
 

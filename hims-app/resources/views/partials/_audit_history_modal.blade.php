@@ -19,6 +19,8 @@
 </div>
 @endpush
 
+@include('partials.modal-js')
+
 @push('scripts')
 <script>
 document.addEventListener('click', function(e) {
@@ -42,50 +44,78 @@ document.addEventListener('click', function(e) {
             loading.style.display = 'none';
             content.style.display = 'block';
 
+            content.innerHTML = '';
             if (!res.data || res.data.length === 0) {
-                content.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:40px">No changes recorded yet.</div>';
+                const empty = document.createElement('div');
+                empty.style.cssText = 'text-align:center;color:#9ca3af;padding:40px';
+                empty.textContent = 'No changes recorded yet.';
+                content.appendChild(empty);
                 return;
             }
 
-            let html = '<div style="display:flex;flex-direction:column;gap:12px">';
+            const list = document.createElement('div');
+            list.style.cssText = 'display:flex;flex-direction:column;gap:12px';
+
             res.data.forEach(item => {
-                let actionLabel = item.action.replace('_', ' ').toUpperCase();
-                let dateStr = new Date(item.timestamp).toLocaleString();
-                let actorStr = item.actor_name || 'System';
+                const card = document.createElement('div');
+                card.style.cssText = 'border:1px solid var(--hims-border);border-radius:8px;padding:12px;background:#fff';
 
-                let before = item.before_state ? JSON.parse(item.before_state) : null;
-                let after = item.after_state ? JSON.parse(item.after_state) : null;
+                const header = document.createElement('div');
+                header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px';
 
-                html += `
-                    <div style="border:1px solid var(--hims-border);border-radius:8px;padding:12px;background:#fff">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                            <span class="hims-badge blue" style="font-size:11px">${actionLabel}</span>
-                            <span style="font-size:11.5px;color:#6b7280">${dateStr}</span>
-                        </div>
-                        <div style="font-size:12.5px;font-weight:600;margin-bottom:6px">By: ${actorStr}</div>
-                `;
+                const badge = document.createElement('span');
+                badge.className = 'hims-badge blue';
+                badge.style.fontSize = '11px';
+                badge.textContent = (item.action || '').replace(/_/g, ' ').toUpperCase();
+
+                const time = document.createElement('span');
+                time.style.cssText = 'font-size:11.5px;color:#6b7280';
+                time.textContent = item.timestamp ? new Date(item.timestamp).toLocaleString() : '';
+
+                header.appendChild(badge);
+                header.appendChild(time);
+                card.appendChild(header);
+
+                const actor = document.createElement('div');
+                actor.style.cssText = 'font-size:12.5px;font-weight:600;margin-bottom:6px';
+                actor.textContent = 'By: ' + (item.actor_name || 'System');
+                card.appendChild(actor);
+
+                let before = null;
+                let after = null;
+                try { if (item.before_state) before = JSON.parse(item.before_state); } catch (_) {}
+                try { if (item.after_state) after = JSON.parse(item.after_state); } catch (_) {}
 
                 if (before || after) {
-                    // `overflow-wrap:anywhere` is load-bearing, not cosmetic. A
-                    // JSON.stringify dump has no spaces in it, so it is one
-                    // unbreakable token — 714px of it inside a 198px box on a
-                    // 320px phone. And `overflow-y:auto` alone does not leave
-                    // overflow-x at `visible`: CSS computes the other axis to
-                    // `auto` as soon as one axis is not visible, so the box
-                    // silently became the sideways swipe the mobile rules exist
-                    // to remove, hiding the changed values themselves. Wrapping
-                    // it puts them under the max-height's vertical scroll, which
-                    // is the direction a reader can find.
-                    html += '<div style="font-size:12px;background:#f8fafc;padding:8px;border-radius:6px;font-family:monospace;max-height:140px;overflow-y:auto;overflow-wrap:anywhere">';
-                    if (after) html += `<div><strong>After:</strong> ${JSON.stringify(after)}</div>`;
-                    if (before) html += `<div style="color:#6b7280;margin-top:4px"><strong>Before:</strong> ${JSON.stringify(before)}</div>`;
-                    html += '</div>';
+                    const diffBox = document.createElement('div');
+                    diffBox.style.cssText = 'font-size:12px;background:#f8fafc;padding:8px;border-radius:6px;font-family:monospace;max-height:140px;overflow-y:auto;overflow-wrap:anywhere';
+
+                    if (after) {
+                        const afterDiv = document.createElement('div');
+                        const strong = document.createElement('strong');
+                        strong.textContent = 'After: ';
+                        afterDiv.appendChild(strong);
+                        afterDiv.appendChild(document.createTextNode(JSON.stringify(after)));
+                        diffBox.appendChild(afterDiv);
+                    }
+
+                    if (before) {
+                        const beforeDiv = document.createElement('div');
+                        beforeDiv.style.cssText = 'color:#6b7280;margin-top:4px';
+                        const strong = document.createElement('strong');
+                        strong.textContent = 'Before: ';
+                        beforeDiv.appendChild(strong);
+                        beforeDiv.appendChild(document.createTextNode(JSON.stringify(before)));
+                        diffBox.appendChild(beforeDiv);
+                    }
+
+                    card.appendChild(diffBox);
                 }
 
-                html += '</div>';
+                list.appendChild(card);
             });
-            html += '</div>';
-            content.innerHTML = html;
+
+            content.appendChild(list);
         })
         .catch(err => {
             loading.style.display = 'none';

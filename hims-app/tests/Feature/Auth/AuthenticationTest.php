@@ -18,7 +18,7 @@ class AuthenticationTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Password');
-        $response->assertSee('Forgot password?');
+        $response->assertDontSee('Forgot password?');
     }
 
     public function test_submitting_valid_credentials_initiates_2fa_and_sends_email(): void

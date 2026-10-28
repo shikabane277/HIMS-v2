@@ -46,8 +46,6 @@ class AssetCacheBustingContractTest extends TestCase
         'resources/views/layouts/hims.blade.php',
         'resources/views/auth/login.blade.php',
         'resources/views/auth/two-factor.blade.php',
-        'resources/views/auth/forgot-password.blade.php',
-        'resources/views/auth/reset-password.blade.php',
     ];
 
     /** The rendered link must carry the running file's own hash, not just any query. */

@@ -67,16 +67,6 @@
             flex-shrink: 0;
             margin-top: 1px;
         }
-        .dev-badge {
-            background: #ecfdf5;
-            border: 1px solid #6ee7b7;
-            border-radius: 8px;
-            padding: 10px 14px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            color: #065f46;
-            word-break: break-all;
-        }
         .divider { display:flex;align-items:center;gap:12px;margin:22px 0;color:#d1d5db;font-size:12px; }
         .divider::before,.divider::after { content:'';flex:1;height:1px;background:#e5e7eb; }
     </style>
@@ -115,11 +105,15 @@
             </div>
         @endif
 
-        @if(session('dev_code_notice'))
-            <div class="dev-badge">
-                <i class="bi bi-info-circle-fill"></i> {{ session('dev_code_notice') }}
-            </div>
-        @endif
+        {{--
+            There is deliberately no `dev_code_notice` block here.
+
+            The challenge page used to be able to render the verification code on
+            screen when mail delivery failed, which turned a misconfigured SMTP
+            server into a way past the second factor. The code only ever appears in
+            the user's mailbox now, and a delivery failure is reported as a delivery
+            failure.
+        --}}
 
         @if($errors->any())
             <div class="hims-alert error" style="margin-bottom:16px">
@@ -147,13 +141,6 @@
                     spellcheck="false"
                     autocapitalize="none"
                 >
-            </div>
-
-            <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:18px">
-                <label for="remember_device" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none;font-size:13px;color:#475569;margin:0">
-                    <input type="checkbox" id="remember_device" name="remember_device" value="1" {{ !empty($rememberDevice) || old('remember_device') ? 'checked' : '' }} style="width:16px;height:16px;accent-color:var(--hims-primary);cursor:pointer;border-radius:4px">
-                    <span>Remember this PC for 30 days</span>
-                </label>
             </div>
 
             <button type="submit" class="btn-hims btn-hims-primary" style="width:100%;justify-content:center;padding:12px;font-size:15px">

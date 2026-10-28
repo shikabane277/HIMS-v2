@@ -68,9 +68,44 @@ class LearningController extends Controller
             ->groupBy('course_id')
             ->map(fn ($rows) => $rows->pluck('competency_id')->implode(','));
 
+        // Chart Metrics: 6-Month Completions & CPD Hours Trend
+        $months = collect(range(5, 0))->map(fn ($i) => now()->subMonths($i));
+        $learningTrendLabels = [];
+        $learningCompletionsData = [];
+        $learningCpdData = [];
+
+        foreach ($months as $m) {
+            $learningTrendLabels[] = $m->format('M Y');
+            $learningCompletionsData[] = DB::table('course_enrollments')
+                ->where('status', 'completed')
+                ->whereYear('completed_at', $m->year)
+                ->whereMonth('completed_at', $m->month)
+                ->count();
+
+            $learningCpdData[] = round((float) (DB::table('cpd_records')
+                ->whereYear('date_earned', $m->year)
+                ->whereMonth('date_earned', $m->month)
+                ->sum('cpd_hours') ?? 0), 1);
+        }
+
+        // Chart Metrics: Category Distribution
+        $catData = DB::table('courses as c')
+            ->leftJoin('course_enrollments as ce', 'c.course_id', '=', 'ce.course_id')
+            ->select('c.category', DB::raw('COUNT(ce.enrollment_id) as total_enrollments'))
+            ->whereNotNull('c.category')
+            ->groupBy('c.category')
+            ->orderByDesc('total_enrollments')
+            ->limit(5)
+            ->get();
+
+        $learningCategoryLabels = $catData->pluck('category')->map(fn ($c) => ucfirst(str_replace('_', ' ', $c)))->toArray();
+        $learningCategoryCounts = $catData->pluck('total_enrollments')->toArray();
+
         return view('learning.index', compact(
             'stats', 'courses', 'pathways', 'cpd_records',
             'competencies', 'roles', 'categories', 'category', 'courseTags',
+            'learningTrendLabels', 'learningCompletionsData', 'learningCpdData',
+            'learningCategoryLabels', 'learningCategoryCounts'
         ) + ['institutional' => $this->institutionalHeadline()]);
     }
 
@@ -696,11 +731,35 @@ class LearningController extends Controller
 
         $allModules = collect([
             [
-                'id' => 'mod-capstone-1',
-                'module_code' => 'IT-CAP-101',
-                'title' => 'Capstone Project 1',
-                'subtitle' => 'Bachelor of Science in Information Technology',
-                'category' => 'Information Technology',
+                'id' => 'mod-inf-101',
+                'module_code' => 'MOD-INF-101',
+                'title' => 'Hospital Infection Control & Hand Hygiene Protocols',
+                'subtitle' => 'Hospital Infection Prevention & Patient Safety Unit',
+                'category' => 'Infection Control',
+                'theme' => 'teal',
+                'progress' => 0,
+                'format' => 'PDF Module',
+                'cpd_hours' => 1.5,
+                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
+            ],
+            [
+                'id' => 'mod-bls-201',
+                'module_code' => 'MOD-BLS-201',
+                'title' => 'Basic Life Support (BLS) & Code Blue Resuscitation',
+                'subtitle' => 'Emergency Medicine & Critical Care Directorate',
+                'category' => 'Emergency & Critical Care',
+                'theme' => 'crimson',
+                'progress' => 0,
+                'format' => 'PDF Module',
+                'cpd_hours' => 3.0,
+                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
+            ],
+            [
+                'id' => 'mod-med-301',
+                'module_code' => 'MOD-MED-301',
+                'title' => 'High-Alert Medication Safety & IV Infusion Standards',
+                'subtitle' => 'Hospital Pharmacy & Clinical Therapeutics Committee',
+                'category' => 'Medication Safety',
                 'theme' => 'slate',
                 'progress' => 0,
                 'format' => 'PDF Module',
@@ -708,48 +767,36 @@ class LearningController extends Controller
                 'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
             ],
             [
-                'id' => 'mod-ojt-prac-1',
-                'module_code' => 'IT-OJT-201',
-                'title' => 'OJT - PRACTICUM1',
-                'subtitle' => 'Bachelor of Science in Information Technology',
-                'category' => 'Practicum & Training',
-                'theme' => 'teal',
-                'progress' => 0,
-                'format' => 'PDF Module',
-                'cpd_hours' => 3.0,
-                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
-            ],
-            [
-                'id' => 'mod-big-data',
-                'module_code' => 'IT-DATA-301',
-                'title' => 'Big Data Analysis',
-                'subtitle' => 'Bachelor of Science in Information Technology',
-                'category' => 'Analytics & Data',
+                'id' => 'mod-pat-401',
+                'module_code' => 'MOD-PAT-401',
+                'title' => 'International Patient Safety Goals (IPSG) & Fall Prevention',
+                'subtitle' => 'Quality Assurance & Hospital Accreditation Office',
+                'category' => 'Patient Safety & Quality',
                 'theme' => 'amber',
-                'progress' => 0,
-                'format' => 'PDF Module',
-                'cpd_hours' => 2.0,
-                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
-            ],
-            [
-                'id' => 'mod-it-elec-4',
-                'module_code' => 'IT-ELEC-401',
-                'title' => 'IT ELECTIVE 4 (System Integration and Architecture 2)',
-                'subtitle' => 'Bachelor of Science in Information Technology',
-                'category' => 'System Architecture',
-                'theme' => 'crimson',
                 'progress' => 0,
                 'format' => 'PDF Module',
                 'cpd_hours' => 2.5,
                 'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
             ],
             [
-                'id' => 'mod-inf-101',
-                'module_code' => 'MOD-INF-101',
-                'title' => 'Hospital Infection Control & Hand Hygiene Protocols',
-                'subtitle' => 'Hospital Infection Prevention & Patient Safety Unit',
-                'category' => 'Clinical Safety',
+                'id' => 'mod-tri-501',
+                'module_code' => 'MOD-TRI-501',
+                'title' => 'Emergency Department Triage & Mass Casualty Response',
+                'subtitle' => 'Disaster Preparedness & Trauma Care Unit',
+                'category' => 'Emergency & Critical Care',
                 'theme' => 'teal',
+                'progress' => 0,
+                'format' => 'PDF Module',
+                'cpd_hours' => 2.0,
+                'pdf_url' => asset('modules/infection-control-hand-hygiene.pdf'),
+            ],
+            [
+                'id' => 'mod-dp-601',
+                'module_code' => 'MOD-DPA-601',
+                'title' => 'Patient Data Privacy (RA 10173 / GDPR) & Clinical Confidentiality',
+                'subtitle' => 'Hospital Data Protection & Medical Records Office',
+                'category' => 'Compliance & Ethics',
+                'theme' => 'slate',
                 'progress' => 0,
                 'format' => 'PDF Module',
                 'cpd_hours' => 1.5,
@@ -769,7 +816,8 @@ class LearningController extends Controller
             $modules = $modules->filter(function ($m) use ($searchLower) {
                 return str_contains(strtolower($m['title']), $searchLower)
                     || str_contains(strtolower($m['module_code']), $searchLower)
-                    || str_contains(strtolower($m['description']), $searchLower);
+                    || str_contains(strtolower($m['subtitle'] ?? ''), $searchLower)
+                    || str_contains(strtolower($m['category'] ?? ''), $searchLower);
             });
         }
 

@@ -297,10 +297,12 @@ class HrIntegrationTest extends TestCase
         $this->assertDatabaseHas('system_integrations', [
             'integration_id' => $integration->integration_id,
             'base_url' => 'https://new-hr1-api.hospital.ph/v2',
-            'api_key' => 'new-secret-key-1234',
             'timeout' => 45,
             'is_active' => 1,
         ]);
+
+        $updated = DB::table('system_integrations')->where('integration_id', $integration->integration_id)->first();
+        $this->assertEquals('new-secret-key-1234', Crypt::decryptString($updated->api_key));
     }
 
     public function test_artisan_command_syncs_hr_integrations(): void

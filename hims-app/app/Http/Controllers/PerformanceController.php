@@ -88,7 +88,7 @@ class PerformanceController extends Controller
         $statusFilter = request('status');
         $rawCycles = DB::table('review_cycles as rc')
             ->leftJoin('performance_reviews as pr', 'rc.cycle_id', '=', 'pr.cycle_id')
-            ->select('rc.*', DB::raw('COUNT(pr.review_id) as reviews_count'))
+            ->select('rc.*', DB::raw('COUNT(pr.review_id) as reviews_count'), DB::raw('ROUND(AVG(pr.overall_score), 2) as avg_score'))
             ->groupBy('rc.cycle_id')
             ->orderByDesc('rc.start_date')->get();
 
@@ -115,7 +115,40 @@ class PerformanceController extends Controller
             $this->scopeToVisibleReviews($reviews)->orderByDesc('pr.updated_at')->limit(20)->get()
         );
 
-        return view('performance.index', compact('stats', 'cycles', 'reviews'));
+        // Chart Metrics: Rating Distribution
+        $allScores = DB::table('performance_reviews')
+            ->whereNotNull('overall_score')
+            ->pluck('overall_score');
+
+        $ratingTiers = [
+            'Exceptional (4.50 - 5.00)' => 0,
+            'Exceeds (3.75 - 4.49)' => 0,
+            'Meets (3.00 - 3.74)' => 0,
+            'Needs Dev (< 3.00)' => 0,
+        ];
+        foreach ($allScores as $scoreVal) {
+            $num = (float) $scoreVal;
+            if ($num >= 4.50) {
+                $ratingTiers['Exceptional (4.50 - 5.00)']++;
+            } elseif ($num >= 3.75) {
+                $ratingTiers['Exceeds (3.75 - 4.49)']++;
+            } elseif ($num >= 3.00) {
+                $ratingTiers['Meets (3.00 - 3.74)']++;
+            } else {
+                $ratingTiers['Needs Dev (< 3.00)']++;
+            }
+        }
+
+        // Chart Metrics: Cycle Trends (scoped to filtered cycles)
+        $trendCycles = $cycles->take(6)->values();
+        $cycleTrendLabels = $trendCycles->pluck('cycle_name')->toArray();
+        $cycleTrendReviews = $trendCycles->pluck('reviews_count')->map(fn ($v) => (int) $v)->toArray();
+        $cycleTrendAvgScores = $trendCycles->pluck('avg_score')->map(fn ($v) => (float) ($v ?? 0))->toArray();
+
+        return view('performance.index', compact(
+            'stats', 'cycles', 'reviews', 'ratingTiers',
+            'cycleTrendLabels', 'cycleTrendReviews', 'cycleTrendAvgScores'
+        ));
     }
 
     /* ── SHOW REVIEW ── */
