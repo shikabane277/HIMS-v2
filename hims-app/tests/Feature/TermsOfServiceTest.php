@@ -29,3 +29,4 @@ class TermsOfServiceTest extends TestCase
         $response->assertSee('Sessions end after 3 minutes idle');
     }
 }
+

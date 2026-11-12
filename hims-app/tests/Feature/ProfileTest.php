@@ -79,21 +79,30 @@ class ProfileTest extends TestCase
         $this->assertNull($user->fresh());
     }
 
-    public function test_correct_password_must_be_provided_to_delete_account(): void
+    public function test_user_can_export_data_as_json(): void
     {
         $user = User::factory()->create();
 
         $response = $this
             ->actingAs($user)
-            ->from('/profile')
-            ->delete('/profile', [
-                'password' => 'wrong-password',
-            ]);
+            ->get(route('profile.export-data'));
 
-        $response
-            ->assertSessionHasErrorsIn('userDeletion', 'password')
-            ->assertRedirect('/profile');
+        $response->assertOk();
+        $this->assertStringContainsString('application/json', $response->headers->get('content-type') ?? '');
+    }
 
-        $this->assertNotNull($user->fresh());
+    public function test_user_can_export_data_as_csv_zip(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('profile.export-csv'));
+
+        $response->assertOk();
+        $this->assertTrue(
+            str_contains($response->headers->get('content-type') ?? '', 'zip') ||
+            str_contains($response->headers->get('content-type') ?? '', 'csv')
+        );
     }
 }

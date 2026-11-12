@@ -526,6 +526,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/profile/export-data', [ProfileController::class, 'exportData'])->name('profile.export-data');
+    Route::get('/profile/export-csv', [ProfileController::class, 'exportCsv'])->name('profile.export-csv');
     Route::post('/profile/gdpr-consent', [ProfileController::class, 'acknowledgeGdprConsent'])->name('profile.gdpr-consent');
     Route::get('/profile/totp/setup', [ProfileController::class, 'setupTotp'])->name('profile.totp.setup');
     Route::post('/profile/totp/confirm', [ProfileController::class, 'confirmTotp'])->name('profile.totp.confirm');

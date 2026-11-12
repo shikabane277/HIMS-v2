@@ -14,7 +14,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use ZipArchive;
 
 class ProfileController extends Controller
 {
@@ -233,6 +235,290 @@ class ProfileController extends Controller
         }, $filename, [
             'Content-Type' => 'application/json; charset=UTF-8',
         ]);
+    }
+
+    /**
+     * Download personal data as a CSV archive (ZIP containing structured CSV files).
+     * Supports individual tabular CSV analysis in spreadsheet tools (Excel, Calc).
+     */
+    public function exportCsv(Request $request): BinaryFileResponse|StreamedResponse
+    {
+        $user = $request->user();
+        $employeeId = $user->employee_id;
+
+        $employeeProfile = null;
+        $reviews = [];
+        $competencyAssessments = [];
+        $credentials = [];
+        $courseEnrollments = [];
+        $cpdLogs = [];
+        $trainingRegistrations = [];
+
+        if ($employeeId && Schema::hasTable('employees')) {
+            $employeeProfile = DB::table('employees')->where('employee_id', $employeeId)->first();
+            if ($employeeProfile && ! empty($employeeProfile->phone)) {
+                try {
+                    $employeeProfile->phone = Crypt::decryptString($employeeProfile->phone);
+                } catch (\Throwable) {
+                }
+            }
+
+            if (Schema::hasTable('performance_reviews')) {
+                $reviews = DB::table('performance_reviews')
+                    ->where('employee_id', $employeeId)
+                    ->orderByDesc('created_at')
+                    ->get()
+                    ->all();
+            }
+
+            if (Schema::hasTable('competency_assessments')) {
+                $competencyAssessments = DB::table('competency_assessments')
+                    ->where('employee_id', $employeeId)
+                    ->orderByDesc('assessed_date')
+                    ->get()
+                    ->all();
+            }
+
+            if (Schema::hasTable('employee_credentials')) {
+                $credentials = DB::table('employee_credentials')
+                    ->where('employee_id', $employeeId)
+                    ->orderByDesc('created_at')
+                    ->get()
+                    ->all();
+            }
+
+            if (Schema::hasTable('course_enrollments')) {
+                $courseEnrollments = DB::table('course_enrollments')
+                    ->where('employee_id', $employeeId)
+                    ->orderByDesc('enrollment_date')
+                    ->get()
+                    ->all();
+            }
+
+            if (Schema::hasTable('cpd_records')) {
+                $cpdLogs = DB::table('cpd_records')
+                    ->where('employee_id', $employeeId)
+                    ->orderByDesc('date_earned')
+                    ->get()
+                    ->all();
+            }
+
+            if (Schema::hasTable('training_registrations')) {
+                $trainingRegistrations = DB::table('training_registrations')
+                    ->where('employee_id', $employeeId)
+                    ->orderByDesc('registration_date')
+                    ->get()
+                    ->all();
+            }
+        }
+
+        $auditHistory = Schema::hasTable('audit_trails')
+            ? DB::table('audit_trails')
+                ->where('user_id', (string) $user->id)
+                ->orderByDesc('timestamp')
+                ->limit(250)
+                ->get(['audit_id', 'timestamp', 'action', 'resource_type', 'resource_id', 'ip_address', 'request_path'])
+                ->all()
+            : [];
+
+        if (Schema::hasTable('audit_trails')) {
+            AuditTrail::record('gdpr_csv_export', 'users', (string) $user->id, metadata: [
+                'format' => 'CSV/ZIP',
+                'gdpr_articles' => 'Art. 15 (Right of Access) & Art. 20 (Data Portability)',
+            ]);
+        }
+
+        // Generate CSV buffers for each data entity
+        $csvFiles = [];
+
+        // 1. Account Summary CSV
+        $accountRows = [
+            ['Field', 'Value'],
+            ['User ID', $user->id],
+            ['Name', $user->name],
+            ['Email', $user->email],
+            ['Role', $user->role],
+            ['Active', ($user->is_active ?? true) ? 'Yes' : 'No'],
+            ['2FA TOTP Enabled', ! empty($user->totp_secret) ? 'Yes' : 'No'],
+            ['Account Created', (string) $user->created_at],
+            ['Last Updated', (string) $user->updated_at],
+        ];
+        if ($employeeProfile) {
+            $accountRows[] = ['Employee Code', $employeeProfile->employee_code ?? ''];
+            $accountRows[] = ['Job Title', $employeeProfile->position_title ?? ''];
+            $accountRows[] = ['Department ID', $employeeProfile->department_id ?? ''];
+            $accountRows[] = ['Contact Phone', $employeeProfile->phone ?? ''];
+            $accountRows[] = ['Date of Birth', $employeeProfile->date_of_birth ?? ''];
+            $accountRows[] = ['Hire Date', $employeeProfile->hire_date ?? ''];
+            $accountRows[] = ['Employment Status', $employeeProfile->employment_status ?? ''];
+        }
+        $csvFiles['account_details.csv'] = $this->buildCsvString($accountRows);
+
+        // 2. Performance Reviews CSV
+        if (! empty($reviews)) {
+            $reviewHeaders = ['Review ID', 'Period Start', 'Period End', 'Overall Score', 'Status', 'Created At'];
+            $reviewRows = [$reviewHeaders];
+            foreach ($reviews as $rev) {
+                $reviewRows[] = [
+                    $rev->review_id ?? '',
+                    $rev->review_period_start ?? '',
+                    $rev->review_period_end ?? '',
+                    $rev->overall_rating ?? $rev->overall_score ?? '',
+                    $rev->status ?? '',
+                    $rev->created_at ?? '',
+                ];
+            }
+            $csvFiles['performance_reviews.csv'] = $this->buildCsvString($reviewRows);
+        }
+
+        // 3. Competency Assessments CSV
+        if (! empty($competencyAssessments)) {
+            $compHeaders = ['Assessment ID', 'Competency ID', 'Proficiency Level', 'Assessed Date', 'Created At'];
+            $compRows = [$compHeaders];
+            foreach ($competencyAssessments as $comp) {
+                $compRows[] = [
+                    $comp->assessment_id ?? $comp->id ?? '',
+                    $comp->competency_id ?? '',
+                    $comp->proficiency_level ?? $comp->rating ?? '',
+                    $comp->assessed_date ?? '',
+                    $comp->created_at ?? '',
+                ];
+            }
+            $csvFiles['competency_assessments.csv'] = $this->buildCsvString($compRows);
+        }
+
+        // 4. Credentials & Licenses CSV
+        if (! empty($credentials)) {
+            $credHeaders = ['Credential ID', 'Type', 'Issuing Body', 'Issue Date', 'Expiry Date', 'Status'];
+            $credRows = [$credHeaders];
+            foreach ($credentials as $cred) {
+                $credRows[] = [
+                    $cred->credential_id ?? $cred->id ?? '',
+                    $cred->credential_type ?? $cred->type ?? '',
+                    $cred->issuing_body ?? '',
+                    $cred->issue_date ?? '',
+                    $cred->expiry_date ?? '',
+                    $cred->status ?? '',
+                ];
+            }
+            $csvFiles['credentials_and_licenses.csv'] = $this->buildCsvString($credRows);
+        }
+
+        // 5. Course Enrollments CSV
+        if (! empty($courseEnrollments)) {
+            $enrollHeaders = ['Enrollment ID', 'Course ID', 'Status', 'Progress %', 'CPD Hours Earned', 'Enrollment Date', 'Completed At'];
+            $enrollRows = [$enrollHeaders];
+            foreach ($courseEnrollments as $enr) {
+                $enrollRows[] = [
+                    $enr->enrollment_id ?? '',
+                    $enr->course_id ?? '',
+                    $enr->status ?? '',
+                    $enr->progress_pct ?? '0',
+                    $enr->cpd_hours_earned ?? '0',
+                    $enr->enrollment_date ?? '',
+                    $enr->completed_at ?? '',
+                ];
+            }
+            $csvFiles['course_enrollments.csv'] = $this->buildCsvString($enrollRows);
+        }
+
+        // 6. CPD Records CSV
+        if (! empty($cpdLogs)) {
+            $cpdHeaders = ['CPD ID', 'Activity Name', 'CPD Hours', 'Source Type', 'Date Earned', 'Verified'];
+            $cpdRows = [$cpdHeaders];
+            foreach ($cpdLogs as $cpd) {
+                $cpdRows[] = [
+                    $cpd->cpd_id ?? '',
+                    $cpd->activity_name ?? '',
+                    $cpd->cpd_hours ?? '',
+                    $cpd->source_type ?? '',
+                    $cpd->date_earned ?? '',
+                    ($cpd->verified ?? false) ? 'Yes' : 'No',
+                ];
+            }
+            $csvFiles['cpd_hours_log.csv'] = $this->buildCsvString($cpdRows);
+        }
+
+        // 7. Training Registrations CSV
+        if (! empty($trainingRegistrations)) {
+            $trainHeaders = ['Registration ID', 'Session ID', 'Registration Date', 'Status', 'Check-In Time'];
+            $trainRows = [$trainHeaders];
+            foreach ($trainingRegistrations as $tr) {
+                $trainRows[] = [
+                    $tr->registration_id ?? '',
+                    $tr->session_id ?? '',
+                    $tr->registration_date ?? '',
+                    $tr->status ?? '',
+                    $tr->check_in_time ?? '',
+                ];
+            }
+            $csvFiles['training_registrations.csv'] = $this->buildCsvString($trainRows);
+        }
+
+        // 8. Security Audit History CSV
+        if (! empty($auditHistory)) {
+            $auditHeaders = ['Audit ID', 'Timestamp', 'Action', 'Resource Type', 'Resource ID', 'IP Address', 'Request Path'];
+            $auditRows = [$auditHeaders];
+            foreach ($auditHistory as $aud) {
+                $auditRows[] = [
+                    $aud->audit_id ?? '',
+                    $aud->timestamp ?? '',
+                    $aud->action ?? '',
+                    $aud->resource_type ?? '',
+                    $aud->resource_id ?? '',
+                    $aud->ip_address ?? '',
+                    $aud->request_path ?? '',
+                ];
+            }
+            $csvFiles['security_audit_log.csv'] = $this->buildCsvString($auditRows);
+        }
+
+        // If ZipArchive is available, bundle all CSV files into a single zip archive
+        if (class_exists('ZipArchive')) {
+            $zipTempPath = tempnam(sys_get_temp_dir(), 'hims_csv_');
+            $zip = new ZipArchive();
+            if ($zip->open($zipTempPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
+                foreach ($csvFiles as $filename => $csvContent) {
+                    $zip->addFromString($filename, $csvContent);
+                }
+                $zip->close();
+
+                $downloadName = 'hims-my-data-csv-'.now()->format('Y-m-d').'.zip';
+
+                return response()->download($zipTempPath, $downloadName, [
+                    'Content-Type' => 'application/zip',
+                ])->deleteFileAfterSend(true);
+            }
+        }
+
+        // Fallback: If ZipArchive fails, stream the primary account_details.csv directly
+        $filename = 'hims-my-data-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($csvFiles) {
+            echo $csvFiles['account_details.csv'] ?? '';
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Convert an array of rows into a UTF-8 CSV string with BOM for Excel compatibility.
+     *
+     * @param  array<int, array<int, mixed>>  $rows
+     */
+    private function buildCsvString(array $rows): string
+    {
+        $handle = fopen('php://memory', 'r+');
+        // UTF-8 BOM so Excel opens accents and symbols cleanly
+        fputs($handle, "\xEF\xBB\xBF");
+        foreach ($rows as $row) {
+            fputcsv($handle, $row);
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        return $csv;
     }
 
     /**

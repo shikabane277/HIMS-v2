@@ -288,7 +288,7 @@
                 Every hospital employee and system user maintains sovereign rights over their personal data:
             </p>
             <ul>
-                <li><strong>Right of Access &amp; Portability (Art. 15 &amp; Art. 20):</strong> Users can directly download a complete, machine-readable JSON archive of all personal records, evaluations, CPD logs, and certifications via the <a href="{{ route('profile.edit') }}" style="color:#059669;font-weight:600">Profile &amp; Privacy</a> dashboard.</li>
+                <li><strong>Right of Access &amp; Portability (Art. 15 &amp; Art. 20):</strong> Users can directly download their complete personal records, evaluations, CPD logs, and certifications as <strong>structured CSV spreadsheets</strong> or a machine-readable JSON archive via the <a href="{{ route('profile.edit') }}" style="color:#059669;font-weight:600">Profile &amp; Privacy</a> dashboard.</li>
                 <li><strong>Right to Rectification (Art. 16):</strong> Users can request corrections to inaccurate personal records or license details through their designated Department Administrator or HR Manager.</li>
                 <li><strong>Right to Erasure / Anonymization (Art. 17):</strong> Upon termination of employment or formal request, personal data is irreversibly anonymized while preserving institutional audit logs required by health regulations.</li>
                 <li><strong>Right to Withdraw Consent:</strong> Users may review and manage data processing consents at any time.</li>
@@ -339,3 +339,4 @@
 
 </body>
 </html>
+
