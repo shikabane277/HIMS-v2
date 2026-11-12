@@ -76,7 +76,7 @@
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
                     <span style="font-size:11.5px;color:#94a3b8">
-                        <i class="bi bi-clock"></i> Sessions end after 5 minutes idle
+                        <i class="bi bi-clock"></i> Sessions end after 3 minutes idle
                     </span>
                 </div>
             </div>
@@ -89,9 +89,14 @@
         <div class="divider">Secure Hospital System</div>
 
         <div style="text-align:center">
-            <p style="font-size:12px;color:#9ca3af;margin:0">
+            <p style="font-size:12px;color:#9ca3af;margin:0 0 8px 0">
                 <i class="bi bi-shield-check" style="color:var(--hims-primary)"></i>
                 Session-based authentication · AES-256 encrypted data · Audit trail
+            </p>
+            <p style="font-size:11.5px;margin:0">
+                <a href="{{ route('terms-of-service') }}" style="color:#059669;text-decoration:none;font-weight:500">
+                    <i class="bi bi-file-earmark-medical"></i> Terms of Service &amp; Data Protection Notice
+                </a>
             </p>
         </div>
     </div>

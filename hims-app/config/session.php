@@ -30,7 +30,7 @@ return [
     | to expire immediately when the browser is closed then you may
     | indicate that via the expire_on_close configuration option.
     |
-    | The HIMS default is 5 minutes, not Laravel's 120: this app is used from
+    | The HIMS default is 3 minutes, not Laravel's 120: this app is used from
     | shared ward terminals, so an untouched tab has to stop being a way into
     | patient-adjacent staff records. `idle_timeout` is what EnforceSessionTimeout
     | actually reads, and it is the authoritative timer — the client-side script
@@ -40,9 +40,9 @@ return [
     |
     */
 
-    'lifetime' => (int) env('SESSION_LIFETIME', 5),
+    'lifetime' => (int) env('SESSION_LIFETIME', 3),
 
-    'idle_timeout' => (int) env('SESSION_IDLE_TIMEOUT', 300),
+    'idle_timeout' => (int) env('SESSION_IDLE_TIMEOUT', 180),
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 

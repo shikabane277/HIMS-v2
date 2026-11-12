@@ -35,7 +35,7 @@ Welcome to the **HIMS Performance & Development Module**! This guide describes w
 2. Enter your **email address** and **password**, then click **Log In**.
 3. Complete the **Two-Factor Verification** step:
    - **If you have enabled an Authenticator App (TOTP)** on your profile, enter the 6-digit code from your authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.).
-   - **Otherwise (Email OTP)**, HIMS sends a 6-digit verification code to your email address (valid for 2 minutes). Enter the code and click **Verify**.
+   - **Otherwise (Email OTP)**, HIMS sends a 6-digit verification code to your email address (valid for 5 minutes). Enter the code and click **Verify**.
 4. If an Administrator recently created your account or reset your password, you will be prompted to set a new password before reaching the dashboard.
 5. On your first login, a **Data Privacy & GDPR Notice** banner appears at the bottom of the screen. Click **I Understand & Consent** to record your acknowledgement.
 
@@ -946,8 +946,8 @@ Sensitive tables and records (such as the Employees directory, Credentials regis
 
 ### How the System Protects Your Account
 
-- **Mandatory 2FA** on every login (Email OTP with 2-minute expiry or RFC 6238 Authenticator App with replay protection).
-- **5-Minute Silent Inactivity Timeout:** If you leave HIMS idle for 5 minutes, your session ends automatically and redirects to the login page on your next click.
+- **Mandatory 2FA** on every login (Email OTP with 5-minute expiry or RFC 6238 Authenticator App with replay protection).
+- **3-Minute Silent Inactivity Timeout:** If you leave HIMS idle for 3 minutes, your session ends automatically and redirects to the login page on your next click.
 - **Account Lockout:** After 5 failed login attempts, your account is locked for 15 minutes (or until an Administrator unlocks it).
 - **Field-Level Encryption at Rest:** Employee phone numbers, credential licence numbers, external HR API keys, and TOTP secrets are encrypted in the database using AES-256-CBC (`Crypt`).
 - **Audit Logging:** Logins, 2FA events, Record Access unlocks, GDPR data exports/deletions, and sensitive administrative writes are recorded in `audit_trails`.

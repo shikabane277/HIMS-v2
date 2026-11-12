@@ -10,6 +10,6 @@ A sign-in attempt requires two-factor authentication. Please enter the following
 IMPORTANT: This verification code is CASE-SENSITIVE.
 Please ensure you enter uppercase and lowercase characters exactly as shown.
 
-This code will expire in 10 minutes.
+This code will expire in 5 minutes.
 
 If you did not request this verification code, please contact your HIMS system administrator immediately.

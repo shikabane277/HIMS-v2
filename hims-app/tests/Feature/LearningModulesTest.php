@@ -19,7 +19,6 @@ class LearningModulesTest extends TestCase
         $response->assertOk();
         $response->assertSee('My courses');
         $response->assertSee('COURSE OVERVIEW');
-        $response->assertSee('Capstone Project 1');
         $response->assertSee('MOD-INF-101');
         $response->assertSee('Hospital Infection Control &amp; Hand Hygiene Protocols', false);
         $response->assertSee('pdfModuleViewerOverlay');

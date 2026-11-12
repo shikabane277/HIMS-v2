@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * The authoritative idle timer, and the live-session activity check.
  *
- * HOSPITAL POLICY: five minutes of no activity ends the session, with no warning
+ * HOSPITAL POLICY: three minutes of no activity ends the session, with no warning
  * of any kind. There is deliberately no "your session expires in 60 seconds"
  * modal and no "Stay signed in" button — an untouched tab on a shared ward
  * terminal has to stop being a way into staff records, and a prompt is a way of
@@ -75,10 +75,10 @@ class EnforceSessionTimeout
      */
     private function idleTimeoutSeconds(): int
     {
-        $minutes = (int) (env('SESSION_IDLE_TIMEOUT') ?: (env('SESSION_LIFETIME') ?: config('session.lifetime', 5)));
+        $minutes = (int) (env('SESSION_IDLE_TIMEOUT') ?: (env('SESSION_LIFETIME') ?: config('session.lifetime', 3)));
 
         // A zero or negative value would expire every request instantly; fall
-        // back to the hospital's 5 minutes rather than locking everyone out.
+        // back to the hospital's 3 minutes rather than locking everyone out.
         return max(60, $minutes * 60);
     }
 

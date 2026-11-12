@@ -532,6 +532,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/profile/totp/disable', [ProfileController::class, 'disableTotp'])->name('profile.totp.disable');
 });
 
+// ── Public Legal & Privacy Documents ─────────────────────────
+Route::get('/terms-of-service', function () {
+    return view('legal.terms-of-service');
+})->name('terms-of-service');
+
 require __DIR__.'/auth.php';
 
 // ── Automated Scheduled Tasks (Vercel Cron / External Cron) ─

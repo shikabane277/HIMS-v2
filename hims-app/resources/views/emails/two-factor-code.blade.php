@@ -47,7 +47,7 @@
                 </div>
 
                 <p style="font-size: 13px; line-height: 1.5; color: #64748b; margin: 0 0 8px;">
-                    • This code expires in <strong>10 minutes</strong>.
+                    • This code expires in <strong>5 minutes</strong>.
                 </p>
                 <p style="font-size: 13px; line-height: 1.5; color: #64748b; margin: 0;">
                     • If you did not initiate this request, someone else may have entered your password. Please notify your HIMS system administrator immediately.

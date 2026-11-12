@@ -1,7 +1,7 @@
 {{--
     Idle tab terminator. Replaces the old session-timeout warning modal.
 
-    HOSPITAL POLICY: no warning, no countdown, no "Stay signed in". Five minutes
+    HOSPITAL POLICY: no warning, no countdown, no "Stay signed in". Three minutes
     of no interaction and the tab ends itself.
 
     This script is not the security boundary — app/Http/Middleware/

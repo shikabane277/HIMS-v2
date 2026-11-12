@@ -158,7 +158,7 @@ class TwoFactorAuthenticatedSessionController extends Controller
         $code = TwoFactorService::generateCode();
         $user->update([
             'two_factor_code' => hash('sha256', $code),
-            'two_factor_expires_at' => now()->addMinutes(2),
+            'two_factor_expires_at' => now()->addMinutes(5),
         ]);
 
         $sent = TwoFactorService::sendCode($user, $code);

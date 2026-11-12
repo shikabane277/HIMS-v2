@@ -166,7 +166,7 @@
         <div style="text-align:center">
             <p style="font-size:12px;color:#94a3b8;margin:0">
                 <i class="bi bi-shield-shaded" style="color:var(--hims-primary)"></i>
-                Codes expire after 2 minutes · Attempt-limited protection
+                Codes expire after 5 minutes · Attempt-limited protection
             </p>
         </div>
     </div>

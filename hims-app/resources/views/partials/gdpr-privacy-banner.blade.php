@@ -31,6 +31,9 @@
         </span>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <a href="{{ route('terms-of-service') }}" class="btn-hims btn-hims-ghost btn-sm" style="color:#e2e8f0;border:1px solid #475569;font-size:12px">
+            Terms of Service
+        </a>
         <a href="{{ route('profile.edit') }}" class="btn-hims btn-hims-ghost btn-sm" style="color:#e2e8f0;border:1px solid #475569;font-size:12px">
             Privacy Rights
         </a>

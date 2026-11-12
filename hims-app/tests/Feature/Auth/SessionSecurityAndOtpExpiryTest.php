@@ -22,7 +22,7 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
         $response->assertDontSee('name="remember"', false);
     }
 
-    public function test_two_factor_screen_reflects_two_minute_code_expiration(): void
+    public function test_two_factor_screen_reflects_five_minute_code_expiration(): void
     {
         Mail::fake();
 
@@ -35,10 +35,10 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
 
         $response = $this->get(route('two-factor.show'));
         $response->assertStatus(200);
-        $response->assertSee('Codes expire after 2 minutes');
+        $response->assertSee('Codes expire after 5 minutes');
     }
 
-    public function test_otp_code_is_valid_within_two_minutes(): void
+    public function test_otp_code_is_valid_within_five_minutes(): void
     {
         Mail::fake();
 
@@ -56,8 +56,8 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
             return true;
         });
 
-        // Fast-forward 1 minute (within the 2-minute window)
-        $this->travel(1)->minutes();
+        // Fast-forward 3 minutes (within the 5-minute window)
+        $this->travel(3)->minutes();
 
         $verifyResponse = $this->post('/two-factor-challenge', [
             'code' => $sentCode,
@@ -67,7 +67,7 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
         $verifyResponse->assertRedirect(route('dashboard', absolute: false));
     }
 
-    public function test_otp_code_expires_after_two_minutes(): void
+    public function test_otp_code_expires_after_five_minutes(): void
     {
         Mail::fake();
 
@@ -85,8 +85,8 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
             return true;
         });
 
-        // Fast-forward 2 minutes and 10 seconds (exceeded 2-minute window)
-        $this->travel(130)->seconds();
+        // Fast-forward 5 minutes and 10 seconds (exceeded 5-minute window)
+        $this->travel(310)->seconds();
 
         $verifyResponse = $this->post('/two-factor-challenge', [
             'code' => $sentCode,
@@ -96,7 +96,7 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
         $verifyResponse->assertSessionHasErrors('code');
     }
 
-    public function test_resending_otp_also_sets_two_minute_expiry(): void
+    public function test_resending_otp_also_sets_five_minute_expiry(): void
     {
         Mail::fake();
 
@@ -112,8 +112,8 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
         $user->refresh();
         $this->assertNotNull($user->two_factor_expires_at);
         $diffInSeconds = now()->diffInSeconds($user->two_factor_expires_at, false);
-        $this->assertGreaterThan(100, $diffInSeconds);
-        $this->assertLessThanOrEqual(120, $diffInSeconds);
+        $this->assertGreaterThan(280, $diffInSeconds);
+        $this->assertLessThanOrEqual(300, $diffInSeconds);
     }
 
     public function test_session_ping_endpoint_reports_status(): void

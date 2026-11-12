@@ -66,7 +66,7 @@ graph TB
 |---|---|
 | Styling | Hand-authored `public/css/hims.css`; Bootstrap **Icons** font only — no Bootstrap CSS framework, so no reboot layer: element defaults are declared in the stylesheet itself. Served outside the Vite build, so its URL carries the file's own content hash — see §14 |
 | Data access | Raw `DB::table()` Query Builder; `App\Models\User` is the only Eloquent model |
-| Authentication & 2FA | Laravel Breeze session auth + **Mandatory 2FA** (Email OTP 2-min TTL / RFC 6238 TOTP with replay counter), **5-minute silent idle timeout** (`EnforceSessionTimeout`), forced password change (`EnsurePasswordIsChanged`), and `SecurityHeaders` |
+| Authentication & 2FA | Laravel Breeze session auth + **Mandatory 2FA** (Email OTP 5-min TTL / RFC 6238 TOTP with replay counter), **3-minute silent idle timeout** (`EnforceSessionTimeout`), forced password change (`EnsurePasswordIsChanged`), and `SecurityHeaders` |
 | Authorisation | 20 Gates + `EnsureUserHasRole` middleware over four roles (`admin` \| `hr_manager` \| `supervisor` \| `staff`) + **Record Access Password Gate** (`App\Support\RecordAccess`) blurring sensitive workforce/credential pages until unlocked |
 | Privacy & GDPR | GDPR / PH RA 10173 consent banner (`POST /profile/gdpr-consent`), self-service JSON data export (`GET /profile/export-data`), cascading account erasure (`DELETE /profile`), separated employee PII anonymization (`POST /employees/{id}/anonymize`), and daily data retention pruning (`hims:prune-expired-data`) |
 | Cache / queue / session | `CACHE_STORE=database`, `SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`; the app makes no cache calls |
@@ -1457,7 +1457,7 @@ those strings directly.
 
 > **Controls and limitations.** Field-level encryption (`Crypt::encryptString()`) protects `employees.phone`,
 > `employee_credentials.credential_number`, `system_integrations.api_key`, and `users.totp_secret`. Mandatory
-> multi-factor authentication (Email OTP & RFC 6238 TOTP), a 5-minute silent session inactivity timeout, a
+> multi-factor authentication (Email OTP & RFC 6238 TOTP), a 3-minute silent session inactivity timeout, a
 > secondary Record Access Password blur/unlock gate (`RecordAccess`), HTTP security headers (`SecurityHeaders`),
 > and GDPR / Philippine Data Privacy Act RA 10173 data subject rights (consent banner, JSON portability export,
 > self-service erasure, separated employee PII anonymization, and automated data retention pruning) are all
@@ -1490,7 +1490,7 @@ Public self-registration and self-service password reset (`/forgot-password`) ar
 
 ### 7.2 Security Settings
 
-*   **Laravel Breeze & Sessions** ✅ — session cookies are `HttpOnly` with `SameSite=Lax` by framework default. Strict 5-minute inactivity session timeout (`SESSION_IDLE_TIMEOUT=300`, `SESSION_LIFETIME=5`) with zero warning modals/prompts; inactive tabs end silently and redirect to login. Server-side `EnforceSessionTimeout` kills sessions immediately if an account is deactivated (`is_active = false`). Reverse-proxy IP resolution uses `APP_TRUSTED_PROXIES` rather than wildcard `*`.
+*   **Laravel Breeze & Sessions** ✅ — session cookies are `HttpOnly` with `SameSite=Lax` by framework default. Strict 3-minute inactivity session timeout (`SESSION_IDLE_TIMEOUT=180`, `SESSION_LIFETIME=3`) with zero warning modals/prompts; inactive tabs end silently and redirect to login. Server-side `EnforceSessionTimeout` kills sessions immediately if an account is deactivated (`is_active = false`). Reverse-proxy IP resolution uses `APP_TRUSTED_PROXIES` rather than wildcard `*`.
 *   **HTTP Security Headers (`SecurityHeaders`)** ✅ — `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, HSTS on HTTPS, and `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` on authenticated responses.
 *   **CSRF Protection** ✅ — `VerifyCsrfToken` in the default `web` group; all state-changing forms emit `@csrf`.
 *   **Brute-force throttling and account lockout** ✅ — `LoginRequest` throttles on an email+IP key at **5 failed attempts** and increments `failed_login_attempts`; the fifth failure sets `locked_until` for 15 minutes. A successful login resets both fields, and Admin can unlock through `UserController::unlockAccount()`. Self-service "Forgot Password" is removed; resets are administered (`must_change_password` enforced by `EnsurePasswordIsChanged`).
@@ -1508,7 +1508,7 @@ Public self-registration and self-service password reset (`/forgot-password`) ar
 |---|---|---|
 | Session auth, CSRF, password hashing | Baseline | ✅ Implemented |
 | HTTP Security Headers & no-store cache control | GDPR · HIPAA · RA 10173 | ✅ Implemented (`SecurityHeaders` middleware) |
-| 5-Minute silent idle timeout & deactivation | Hospital policy · HIPAA | ✅ Implemented (no prompts, auto-terminate) |
+| 3-Minute silent idle timeout & deactivation | Hospital policy · HIPAA | ✅ Implemented (no prompts, auto-terminate) |
 | Login rate-limiting & 5-attempt lockout | Baseline · Hospital policy | ✅ Implemented (5 attempts, 15-min lock, Admin unlock) |
 | Role-based access enforcement | Baseline | ✅ Implemented (20 Gates + `role` middleware) |
 | Record Access Password Gate | Hospital policy · RA 10173 | ✅ Implemented (in-place blur overlay, 5-min session grant, manual lock, audited) |
@@ -1519,7 +1519,7 @@ Public self-registration and self-service password reset (`/forgot-password`) ar
 | Multi-factor authentication | HIPAA · RA 10173 | ✅ Implemented (Email OTP & RFC 6238 TOTP MFA; encrypted secrets, replay counter, zero display leak) |
 | Audit trail of sensitive access/modification | GDPR · HIPAA · RA 10173 | ⚠️ Selective write + Record Access unlock + GDPR event logging; no hash chaining |
 
-**Net position:** everyday web controls, multi-factor authentication, 5-minute silent timeouts, secondary record-access gating, limited field encryption, account lockout, and attributable writes on sensitive workflows are implemented. Comprehensive full-database encryption, read/access logging, and tamper-evident audit chaining remain absent, so the application must still be treated as **pre-compliance** rather than as a fully certified HIPAA or RA 10173 system.
+**Net position:** everyday web controls, multi-factor authentication, 3-minute silent timeouts, secondary record-access gating, limited field encryption, account lockout, and attributable writes on sensitive workflows are implemented. Comprehensive full-database encryption, read/access logging, and tamper-evident audit chaining remain absent, so the application must still be treated as **pre-compliance** rather than as a fully certified HIPAA or RA 10173 system.
 
 ---
 
@@ -2078,7 +2078,7 @@ Notes:
 *   **Database**: MySQL 8 — `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`, two `BEFORE INSERT`/`BEFORE UPDATE` triggers for competency gap, and one view (`v_recognition_leaderboard`). That is the whole of the database-enforced logic: there are **no generated columns and no `CHECK` constraints**, and the only true `ENUM` is `ai_chat_messages.role`. Credential status, review status, cycle status and the 9-box label are all computed in PHP, not by the database.
 *   **Clock**: `APP_TIMEZONE=Asia/Manila`. Three statuses — credential expiry, review freeze, cycle close — are decided by comparing today's date against a stored one, so the application timezone is part of the authorisation surface rather than a formatting preference. Under Laravel's stock UTC default an ended cycle stayed writable until 8am Philippine time.
 *   **Caching / Queue / Session**: `CACHE_STORE=database`, `QUEUE_CONNECTION=database`, `SESSION_DRIVER=database`. **Redis is not used** — its config is framework scaffolding only, no `predis` package, and the app makes no `Cache::` calls at all.
-*   **Authentication & Security**: Laravel Breeze v2.4, session-based, bcrypt (12 rounds), Mandatory 2FA (Email OTP + RFC 6238 TOTP MFA), 5-minute silent idle timeout (`EnforceSessionTimeout`), `EnsurePasswordIsChanged`, `SecurityHeaders`, and `RecordAccess` blur/unlock gate. Public registration and self-service password reset disabled; admin-provisioned accounts.
+*   **Authentication & Security**: Laravel Breeze v2.4, session-based, bcrypt (12 rounds), Mandatory 2FA (Email OTP + RFC 6238 TOTP MFA), 3-minute silent idle timeout (`EnforceSessionTimeout`), `EnsurePasswordIsChanged`, `SecurityHeaders`, and `RecordAccess` blur/unlock gate. Public registration and self-service password reset disabled; admin-provisioned accounts.
 *   **Authorisation**: 20 Laravel Gates + `EnsureUserHasRole` middleware over `users.role` (`admin`/`hr_manager`/`supervisor`/`staff`). No Policies.
 *   **AI Integration**: provider-agnostic `App\Contracts\AiProvider` resolved by `AiManager` — Gemini (default), OpenAI, Anthropic, or any OpenAI-compatible host, selected by `AI_PROVIDER`. Raw `Http::` calls via Guzzle; no vendor SDKs. Employee personal data is strictly off-limits (`AiAccessPolicy::TOPICS['employees']['roles'] = []`).
 *   **Build tooling**: Vite 8 + `laravel-vite-plugin` 3.1, Tailwind (v3 core + v4 Vite plugin), Alpine.js 3 — present but largely bypassed by the domain UI. Pint for formatting, PHPUnit 12 and Playwright for testing, Pail for log tailing.

@@ -70,7 +70,7 @@ Data Portability, and the Dashboard and My Development surfaces.
   for all roles).** Destructive actions require an explicit in-chat confirmation.
 - **Security, 2FA, Record Access & GDPR / RA 10173 Compliance** — mandatory Two-Factor
   Authentication on every login (Email OTP or RFC 6238 Authenticator App TOTP),
-  5-minute silent session inactivity timeout, in-place **Record Access Password**
+  3-minute silent session inactivity timeout, in-place **Record Access Password**
   blur/unlock gate (`RecordAccess`), HTTP security headers (`SecurityHeaders`),
   explicit GDPR privacy consent banner, self-service **Download My Data (JSON)**
   (`GET /profile/export-data`), self-service account erasure (`DELETE /profile`),
