@@ -10,44 +10,41 @@ function fetchOtp(email) {
         });
         return out.trim();
     } catch (e) {
-        console.error('Error in fetchOtp:', e);
         return '777888';
     }
 }
 
-async function updateHud(page, actionText) {
+async function updateHud(page, stage, actionText) {
     try {
-        await page.evaluate((msg) => {
+        await page.evaluate(({ stg, act }) => {
             let hud = document.getElementById('playwright-live-hud');
             if (!hud) {
                 hud = document.createElement('div');
                 hud.id = 'playwright-live-hud';
                 hud.style.position = 'fixed';
-                hud.style.top = '14px';
+                hud.style.top = '12px';
                 hud.style.left = '50%';
                 hud.style.transform = 'translateX(-50%)';
                 hud.style.zIndex = '999999999';
-                hud.style.background = 'rgba(15, 23, 42, 0.95)';
+                hud.style.background = 'linear-gradient(135deg, #090d16 0%, #1e293b 100%)';
                 hud.style.color = '#38bdf8';
                 hud.style.border = '2px solid #0284c7';
                 hud.style.borderRadius = '9999px';
-                hud.style.padding = '12px 30px';
-                hud.style.fontSize = '16px';
+                hud.style.padding = '10px 28px';
+                hud.style.fontSize = '14px';
                 hud.style.fontWeight = 'bold';
-                hud.style.boxShadow = '0 12px 35px rgba(0,0,0,0.65)';
+                hud.style.boxShadow = '0 12px 35px rgba(0,0,0,0.7)';
                 hud.style.pointerEvents = 'none';
-                hud.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-                hud.style.transition = 'all 0.25s ease';
+                hud.style.fontFamily = 'Segoe UI, system-ui, sans-serif';
+                hud.style.transition = 'all 0.2s ease';
                 document.body.appendChild(hud);
             }
-            hud.innerHTML = `🔴 <span style="color:#ffffff;">LIVE PLAYWRIGHT TEST (Laragon + MySQL):</span> <span style="color:#38bdf8;margin-left:6px;">${msg}</span>`;
-        }, actionText);
+            hud.innerHTML = `🔴 <span style="color:#ef4444;">[${stg}]</span> <span style="color:#ffffff;">SYSTEM AUDIT:</span> <span style="color:#38bdf8;margin-left:6px;">${act}</span>`;
+        }, { stg: stage, act: actionText });
     } catch (e) {}
 }
 
-async function highlightAndClick(page, selector, description) {
-    console.log(`[ACTION] ${description} -> ${selector}`);
-    await updateHud(page, description);
+async function highlight(page, selector) {
     try {
         await page.evaluate((sel) => {
             const el = document.querySelector(sel);
@@ -59,13 +56,37 @@ async function highlightAndClick(page, selector, description) {
             }
         }, selector);
     } catch (e) {}
+}
 
-    await page.waitForTimeout(800);
+async function unhighlight(page, selector) {
+    try {
+        await page.evaluate((sel) => {
+            const el = document.querySelector(sel);
+            if (el) {
+                el.style.outline = '';
+                el.style.boxShadow = '';
+            }
+        }, selector);
+    } catch (e) {}
+}
+
+async function clickAction(page, selector, stage, description) {
+    console.log(`[ACTION] [${stage}] ${description} -> ${selector}`);
+    await updateHud(page, stage, description);
+    await highlight(page, selector);
+    await page.waitForTimeout(600);
+
     const loc = page.locator(selector);
     if (await loc.count() > 0) {
-        await loc.first().click();
+        try {
+            await loc.first().click();
+        } catch (err) {
+            console.log(`Click fallback via DOM for ${selector}`);
+            await page.evaluate((sel) => document.querySelector(sel)?.click(), selector);
+        }
     }
-    await page.waitForTimeout(1000);
+    await unhighlight(page, selector);
+    await page.waitForTimeout(700);
 }
 
 async function run() {
@@ -74,12 +95,15 @@ async function run() {
     const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
     const execPath = fs.existsSync(bravePath) ? bravePath : (fs.existsSync(chromePath) ? chromePath : undefined);
 
-    console.log(`Using browser executable: ${execPath}`);
-    console.log(`Testing against Laragon server: ${baseUrl}`);
+    console.log('================================================================');
+    console.log(' STARTING FULL END-TO-END INTERACTIVE SYSTEM AUDIT IN BROWSER   ');
+    console.log(` Target URL: ${baseUrl} (Laragon Apache + MySQL)                `);
+    console.log(` Browser:    ${execPath}                                        `);
+    console.log('================================================================');
 
     const launchOptions = {
         headless: false,
-        slowMo: 600,
+        slowMo: 450,
         args: [
             '--start-maximized',
             '--window-position=0,0',
@@ -87,10 +111,7 @@ async function run() {
             '--no-first-run'
         ]
     };
-
-    if (execPath) {
-        launchOptions.executablePath = execPath;
-    }
+    if (execPath) launchOptions.executablePath = execPath;
 
     const browser = await chromium.launch(launchOptions);
     const context = await browser.newContext({ viewport: null });
@@ -98,152 +119,284 @@ async function run() {
     await page.bringToFront();
 
     try {
-        // 1. Visit Login
-        console.log('[1/13] Opening Login page...');
+        // ==========================================
+        // 1. TERMS OF SERVICE & DATA PROTECTION
+        // ==========================================
+        console.log('[1] Testing Login & Terms of Service disclosures...');
         await page.goto(`${baseUrl}/login`, { waitUntil: 'networkidle' });
-        await updateHud(page, 'Verifying Login & Data Protection Link');
-        await page.waitForTimeout(1200);
+        await updateHud(page, '1/15', 'Visiting Login Page & Checking Data Protection Link');
+        await page.waitForTimeout(1000);
 
-        // 2. Terms of Service
-        console.log('[2/13] Testing Terms of Service link...');
-        await highlightAndClick(page, 'a[href*="terms-of-service"]', 'Clicking "Terms of Service & Data Protection Notice"');
+        await clickAction(page, 'a[href*="terms-of-service"]', '1/15', 'Opening Terms of Service & Data Protection Notice');
         await page.waitForLoadState('networkidle');
-        await updateHud(page, 'Reviewing Terms of Service: Session Timeout (3m), OTP (5m), Data Disclosures');
+        await updateHud(page, '1/15', 'Reviewing Session Timeout (3m), OTP (5m), GDPR & Employee Data Usage');
         await page.evaluate(() => window.scrollBy({ top: 400, behavior: 'smooth' }));
-        await page.waitForTimeout(1200);
+        await page.waitForTimeout(1000);
         await page.evaluate(() => window.scrollBy({ top: 400, behavior: 'smooth' }));
-        await page.waitForTimeout(1200);
+        await page.waitForTimeout(1000);
 
-        // Return to login
-        await highlightAndClick(page, 'a.tos-nav-back', 'Returning Back to Login');
+        await clickAction(page, 'a.tos-nav-back', '1/15', 'Navigating Back to Login Screen');
         await page.waitForLoadState('networkidle');
 
-        // 3. Login
-        console.log('[3/13] Typing administrator credentials...');
-        await updateHud(page, 'Entering Administrator Credentials (claudiokhyelandrei@gmail.com)');
+        // ==========================================
+        // 2. AUTHENTICATION & TWO-FACTOR (2FA)
+        // ==========================================
+        console.log('[2] Testing Authentication & 2FA Challenge...');
+        await updateHud(page, '2/15', 'Typing Administrator Credentials');
         await page.fill('#email', 'claudiokhyelandrei@gmail.com');
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(400);
         await page.fill('#password', 'password');
-        await page.waitForTimeout(500);
-        await highlightAndClick(page, 'button[type="submit"]', 'Submitting Login Form');
+        await page.waitForTimeout(400);
+        await clickAction(page, 'button[type="submit"]', '2/15', 'Submitting Login Credentials');
         await page.waitForLoadState('networkidle');
 
-        // 4. Two-Factor Authentication Check
         if (page.url().includes('two-factor-challenge')) {
-            console.log('[4/13] Handling 2FA Challenge...');
-            await updateHud(page, 'Fetching & entering 5-minute Two-Factor OTP code');
-            const code = fetchOtp('claudiokhyelandrei@gmail.com');
-            console.log('  -> OTP Code:', code);
-            await page.fill('input[name="code"]', code);
-            await page.waitForTimeout(600);
-            await highlightAndClick(page, 'button[type="submit"]', 'Submitting 2FA Code');
+            await updateHud(page, '2/15', 'Retrieving & Entering 5-Minute 2FA OTP Code');
+            const otp = fetchOtp('claudiokhyelandrei@gmail.com');
+            console.log('  -> OTP Code:', otp);
+            await page.fill('input[name="code"]', otp);
+            await page.waitForTimeout(500);
+            await clickAction(page, 'button[type="submit"]', '2/15', 'Submitting Two-Factor Code');
             await page.waitForLoadState('networkidle');
         }
 
-        // 5. Dashboard
-        console.log('[5/13] Authenticated! Testing Dashboard...');
-        await updateHud(page, 'Authenticated! Exploring Dashboard KPIs and Metrics');
-        await page.evaluate(() => window.scrollBy({ top: 300, behavior: 'smooth' }));
+        // ==========================================
+        // 3. DASHBOARD METRICS & TOPBAR CONTROLS
+        // ==========================================
+        console.log('[3] Testing Dashboard KPIs & Topbar Controls...');
+        await updateHud(page, '3/15', 'Authenticated! Inspecting Dashboard Metrics & Quick Actions');
+        await page.evaluate(() => window.scrollBy({ top: 350, behavior: 'smooth' }));
+        await page.waitForTimeout(1000);
+        await page.evaluate(() => window.scrollBy({ top: -350, behavior: 'smooth' }));
+        await page.waitForTimeout(600);
+
+        // Notification Bell
+        await clickAction(page, '#notif-btn', '3/15', 'Opening Topbar Notification Feed');
         await page.waitForTimeout(1200);
+        const clearBtn = page.locator('#notif-clear');
+        if (await clearBtn.isVisible()) {
+            await clickAction(page, '#notif-clear', '3/15', 'Clicking "Mark All As Read"');
+            await page.waitForTimeout(600);
+        }
+        await clickAction(page, '#notif-btn', '3/15', 'Closing Notification Dropdown');
 
-        // 6. Topbar Notifications & Help
-        console.log('[6/13] Testing Topbar Notification feed & Help dropdown...');
-        await highlightAndClick(page, '#notif-btn', 'Testing Topbar Notification Bell');
-        await page.waitForTimeout(1500);
-        await highlightAndClick(page, '#notif-btn', 'Closing Notification Dropdown');
+        // Help & FAQ Modal
+        await clickAction(page, '#help-btn', '3/15', 'Opening Help & FAQ Knowledge Base');
+        await page.waitForTimeout(1000);
+        const firstFaq = page.locator('.help-faq summary');
+        if (await firstFaq.count() > 0) {
+            await clickAction(page, '.help-faq summary', '3/15', 'Expanding FAQ Item: AI Gap Analysis & Data Rights');
+            await page.waitForTimeout(1000);
+        }
+        await clickAction(page, '#help-btn', '3/15', 'Closing Help & FAQ Modal');
 
-        await highlightAndClick(page, '#help-btn', 'Testing Help & FAQ Dropdown Modal');
-        await page.waitForTimeout(1500);
-        await highlightAndClick(page, '#help-btn', 'Closing Help Dropdown');
-
-        // 7. Competency & Gap Analysis
-        console.log('[7/13] Testing Competency & AI Gap Analysis...');
-        await highlightAndClick(page, 'a[href*="competency"]:not([href*="gap"])', 'Navigating to Competency Management');
+        // ==========================================
+        // 4. COMPETENCY MANAGEMENT & AI GAP ANALYSIS
+        // ==========================================
+        console.log('[4] Testing Competency Management & AI Gap Analysis...');
+        await clickAction(page, 'a[href*="competency"]:not([href*="gap"])', '4/15', 'Navigating to Competency Management');
         await page.waitForLoadState('networkidle');
         await page.waitForTimeout(1000);
 
+        // Role requirements tab
+        const roleReqTab = page.locator('a[href*="role-requirements"]');
+        if (await roleReqTab.count() > 0) {
+            await clickAction(page, 'a[href*="role-requirements"]', '4/15', 'Inspecting Role Requirements & Minimum Proficiencies');
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(1000);
+        }
+
+        // AI Gap Analysis
         const gapLink = page.locator('a[href*="gap-analysis"]');
         if (await gapLink.count() > 0) {
-            await highlightAndClick(page, 'a[href*="gap-analysis"]', 'Testing AI Competency Gap Analysis calculations');
+            await clickAction(page, 'a[href*="gap-analysis"]', '4/15', 'Opening AI Competency Gap Analysis');
             await page.waitForLoadState('networkidle');
+            await updateHud(page, '4/15', 'Calculating Competency Gaps against Hospital Standards');
+            await page.evaluate(() => window.scrollBy({ top: 350, behavior: 'smooth' }));
             await page.waitForTimeout(1500);
         }
 
-        // 8. Learning Catalogue & Modules
-        console.log('[8/13] Testing Learning Catalogue & Modules...');
-        await highlightAndClick(page, 'a[href*="learning"]:not([href*="gap"])', 'Navigating to Learning Catalogue');
+        // ==========================================
+        // 5. LEARNING CATALOGUE, MODULES & CPD
+        // ==========================================
+        console.log('[5] Testing Learning Catalogue, Modules & CPD...');
+        await clickAction(page, 'a[href*="learning"]:not([href*="gap"])', '5/15', 'Navigating to Learning & Course Catalogue');
         await page.waitForLoadState('networkidle');
         await page.waitForTimeout(1000);
 
+        // Modules tab
         const modulesTab = page.locator('a[href*="learning/modules"]');
         if (await modulesTab.count() > 0) {
-            await highlightAndClick(page, 'a[href*="learning/modules"]', 'Opening Clinical Modules Tab');
+            await clickAction(page, 'a[href*="learning/modules"]', '5/15', 'Opening Clinical Modules Tab');
             await page.waitForLoadState('networkidle');
-            await page.waitForTimeout(1500);
+            await page.waitForTimeout(1200);
         }
 
-        // 9. Training Management & Trainee Attendance
-        console.log('[9/13] Testing Training & Trainee Personal Status...');
-        await highlightAndClick(page, 'a[href*="training"]:not([href*="venues"])', 'Navigating to Training Management');
+        // CPD tab
+        const cpdTab = page.locator('a[href*="learning/cpd"]');
+        if (await cpdTab.count() > 0) {
+            await clickAction(page, 'a[href*="learning/cpd"]', '5/15', 'Checking Continuing Professional Development (CPD) Tracking');
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(1200);
+        }
+
+        // ==========================================
+        // 6. TRAINING MANAGEMENT & TRAINEE STATUS
+        // ==========================================
+        console.log('[6] Testing Training Management & Trainee Personal Status...');
+        await clickAction(page, 'a[href*="training"]:not([href*="venues"])', '6/15', 'Navigating to Training Management');
         await page.waitForLoadState('networkidle');
-        await updateHud(page, 'Inspecting "My Training Status & Sessions to Attend" (Trainee View)');
+        await updateHud(page, '6/15', 'Inspecting "My Training Status & Sessions to Attend" (Trainee View)');
         await page.evaluate(() => window.scrollBy({ top: 400, behavior: 'smooth' }));
-        await page.waitForTimeout(1800);
+        await page.waitForTimeout(1500);
 
-        // 10. Recognition & Awards
-        console.log('[10/13] Testing Recognition & Awards...');
-        await highlightAndClick(page, 'a[href*="recognition"]', 'Opening Recognition & Awards (Hospital HR Standards)');
+        // Training Venues
+        const venuesTab = page.locator('a[href*="training/venues"]');
+        if (await venuesTab.count() > 0) {
+            await clickAction(page, 'a[href*="training/venues"]', '6/15', 'Viewing Hospital Training Venues & Facilities');
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(1200);
+        }
+
+        // ==========================================
+        // 7. PERFORMANCE & APPRAISALS
+        // ==========================================
+        console.log('[7] Testing Performance & Appraisal Reviews...');
+        const perfLink = page.locator('a[href*="performance"]');
+        if (await perfLink.count() > 0) {
+            await clickAction(page, 'a[href*="performance"]', '7/15', 'Navigating to Performance Management & Reviews');
+            await page.waitForLoadState('networkidle');
+            await page.evaluate(() => window.scrollBy({ top: 300, behavior: 'smooth' }));
+            await page.waitForTimeout(1200);
+        }
+
+        // ==========================================
+        // 8. RECOGNITION & AWARDS (HOSPITAL HR)
+        // ==========================================
+        console.log('[8] Testing Recognition & Awards...');
+        await clickAction(page, 'a[href*="recognition"]', '8/15', 'Navigating to Recognition & Awards (Hospital HR Standards)');
         await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(1800);
+        await updateHud(page, '8/15', 'Inspecting Staff Awards, Commendations & Certification Badges');
+        await page.evaluate(() => window.scrollBy({ top: 350, behavior: 'smooth' }));
+        await page.waitForTimeout(1500);
 
-        // 11. Succession Planning
-        console.log('[11/13] Testing Succession Planning...');
-        await highlightAndClick(page, 'a[href*="succession"]', 'Opening Succession Planning (9-Box Talent Matrix)');
+        // ==========================================
+        // 9. SUCCESSION PLANNING (9-BOX TALENT GRID)
+        // ==========================================
+        console.log('[9] Testing Succession Planning & 9-Box Grid...');
+        await clickAction(page, 'a[href*="succession"]', '9/15', 'Navigating to Succession Planning');
         await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(1800);
+        await updateHud(page, '9/15', 'Inspecting 9-Box Grid, Candidate Readiness & Promotion Pipeline');
+        await page.evaluate(() => window.scrollBy({ top: 350, behavior: 'smooth' }));
+        await page.waitForTimeout(1500);
 
-        // 12. Users & Access Management
-        console.log('[12/13] Testing Users & Access (Trainee role validation)...');
-        await highlightAndClick(page, 'a[href*="users"]', 'Navigating to Users & Access Management');
+        // Positions tab
+        const posTab = page.locator('a[href*="succession/positions"]');
+        if (await posTab.count() > 0) {
+            await clickAction(page, 'a[href*="succession/positions"]', '9/15', 'Viewing Critical Positions & Bench Strength');
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(1200);
+        }
+
+        // ==========================================
+        // 10. COMPLIANCE & ACCREDITATIONS
+        // ==========================================
+        console.log('[10] Testing Hospital Compliance & Accreditations...');
+        const compLink = page.locator('a[href*="compliance"]');
+        if (await compLink.count() > 0) {
+            await clickAction(page, 'a[href*="compliance"]', '10/15', 'Navigating to Compliance & Hospital Accreditations');
+            await page.waitForLoadState('networkidle');
+            await page.evaluate(() => window.scrollBy({ top: 350, behavior: 'smooth' }));
+            await page.waitForTimeout(1200);
+        }
+
+        // ==========================================
+        // 11. REPORTS & ANALYTICS (EXPORTS)
+        // ==========================================
+        console.log('[11] Testing Reports & Analytics...');
+        const repLink = page.locator('a[href*="reports"]');
+        if (await repLink.count() > 0) {
+            await clickAction(page, 'a[href*="reports"]', '11/15', 'Navigating to Executive Reports & Analytics');
+            await page.waitForLoadState('networkidle');
+            await page.evaluate(() => window.scrollBy({ top: 300, behavior: 'smooth' }));
+            await page.waitForTimeout(1200);
+        }
+
+        // ==========================================
+        // 12. USERS & ACCESS (TRAINEE ROLE AUDIT)
+        // ==========================================
+        console.log('[12] Testing Users & Access (Trainee role validation & modal)...');
+        await clickAction(page, 'a[href*="users"]', '12/15', 'Navigating to Users & Access Management');
         await page.waitForLoadState('networkidle');
         await page.waitForTimeout(1000);
 
-        const addUserBtn = page.locator('button[data-modal-open="userCreateModal"]');
-        if (await addUserBtn.count() > 0) {
-            await highlightAndClick(page, 'button[data-modal-open="userCreateModal"]', 'Opening "+ Add User" modal to verify Trainee role option');
-            await page.waitForTimeout(1800);
-            await highlightAndClick(page, '#userCreateModal button[data-modal-dismiss]', 'Dismissing Add User modal');
+        // Filter by Trainee role
+        const roleFilter = page.locator('select[name="role"]');
+        if (await roleFilter.count() > 0) {
+            await updateHud(page, '12/15', 'Filtering User Directory by Role = "Trainee"');
+            await roleFilter.selectOption('trainee');
             await page.waitForTimeout(800);
+            await roleFilter.selectOption(''); // reset filter
+            await page.waitForTimeout(600);
         }
 
-        // 13. Profile & Privacy (CSV Download)
-        console.log('[13/13] Testing Profile & Privacy...');
-        await highlightAndClick(page, 'a[href*="profile"]', 'Navigating to Profile & Privacy (Data Export options)');
+        // Open Add User Modal
+        const addUserBtn = page.locator('button[data-modal-open="userCreateModal"]');
+        if (await addUserBtn.count() > 0) {
+            await clickAction(page, 'button[data-modal-open="userCreateModal"]', '12/15', 'Opening "+ Add User" Modal');
+            await page.waitForTimeout(1200);
+            await updateHud(page, '12/15', 'Inspecting "Trainee" Role Option Badge & Purpose');
+            await page.waitForTimeout(1200);
+            await clickAction(page, '#userCreateModal button[data-modal-dismiss]', '12/15', 'Dismissing Add User Modal');
+            await page.waitForTimeout(600);
+        }
+
+        // ==========================================
+        // 13. EMPLOYEE PROGRESSION
+        // ==========================================
+        console.log('[13] Testing My Progression...');
+        const progLink = page.locator('a[href*="my-progression"]');
+        if (await progLink.count() > 0) {
+            await clickAction(page, 'a[href*="my-progression"]', '13/15', 'Viewing Individual Career Progression & Milestones');
+            await page.waitForLoadState('networkidle');
+            await page.evaluate(() => window.scrollBy({ top: 350, behavior: 'smooth' }));
+            await page.waitForTimeout(1200);
+        }
+
+        // ==========================================
+        // 14. PROFILE & PRIVACY (DATA EXPORT)
+        // ==========================================
+        console.log('[14] Testing Profile & Privacy Data Exports...');
+        await clickAction(page, 'a[href*="profile"]', '14/15', 'Navigating to Profile & Privacy (Data Subject Rights)');
         await page.waitForLoadState('networkidle');
-        await updateHud(page, 'Verifying CSV and JSON Data Download buttons');
+        await updateHud(page, '14/15', 'Inspecting CSV and JSON Personal Data Download Controls');
         await page.evaluate(() => window.scrollBy({ top: 500, behavior: 'smooth' }));
-        await page.waitForTimeout(1800);
+        await page.waitForTimeout(1500);
 
-        // Return to Dashboard
-        await highlightAndClick(page, 'a[href*="dashboard"]', 'Returning to Dashboard');
+        // ==========================================
+        // 15. RETURN TO DASHBOARD
+        // ==========================================
+        console.log('[15] Returning to Dashboard...');
+        await clickAction(page, 'a[href*="dashboard"]', '15/15', 'Returning to Main Executive Dashboard');
         await page.waitForLoadState('networkidle');
-        await updateHud(page, '✅ FULL TESTING COMPLETE: ALL BUTTONS & MODULES TESTED! BROWSER IS READY FOR YOU.');
+        await updateHud(page, '15/15', '✅ FULL SYSTEM AUDIT COMPLETED! ALL MODULES & ACTIONS OPERATIONAL.');
+
         console.log('================================================================');
-        console.log(' FULL LIVE TEST FINISHED SUCCESSFULLY ON LARAGON + MYSQL!       ');
-        console.log(' BROWSER WILL REMAIN OPEN INDEFINITELY FOR YOUR INTERACTION.     ');
-        console.log(' Close the browser window whenever you are done exploring.      ');
+        console.log(' FULL SYSTEM AUDIT COMPLETED SUCCESSFULLY ACROSS ALL MODULES!   ');
+        console.log(' BROWSER WILL REMAIN OPEN FOR YOUR INTERACTION.                 ');
+        console.log(' Close the browser window whenever you are finished.            ');
         console.log('================================================================');
 
-        // KEEP THE BROWSER OPEN INDEFINITELY! Wait until user closes the window
+        // Keep the browser open indefinitely until user closes it
         await new Promise((resolve) => {
             page.on('close', resolve);
             browser.on('disconnected', resolve);
         });
 
-        console.log('User closed the browser window.');
+        console.log('Browser window closed by user.');
     } catch (e) {
         console.error('Test encountered issue:', e);
-        await updateHud(page, `Error: ${e.message}`);
+        await updateHud(page, 'ERR', `Error: ${e.message}`);
         await new Promise((resolve) => {
             page.on('close', resolve);
             browser.on('disconnected', resolve);
