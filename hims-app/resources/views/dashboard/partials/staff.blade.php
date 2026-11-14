@@ -152,22 +152,31 @@
 </div>
 
 @if(($upcoming_sessions ?? collect())->isNotEmpty())
-<div class="hims-card animate-in mt-3">
-    <div class="card-header">
-        <h5><i class="bi bi-calendar-event"></i> Upcoming Training Sessions</h5>
-        <a href="{{ route('training.index') }}" class="btn-hims btn-hims-ghost btn-sm">All</a>
+<div class="hims-card animate-in mt-3" style="border:1px solid #059669;box-shadow:0 4px 12px rgba(5,150,105,0.06)">
+    <div class="card-header d-flex justify-content-between align-items-center" style="background:#f0fdf4">
+        <div>
+            <h5 style="color:#065f46;margin:0"><i class="bi bi-calendar-check-fill text-success"></i> Training Sessions to Attend</h5>
+            <small style="color:#047857">Scheduled hospital training sessions you are required or eligible to attend</small>
+        </div>
+        <a href="{{ route('training.index') }}" class="btn-hims btn-hims-ghost btn-sm" style="color:#065f46;border-color:#a7f3d0">View Training Schedule &rarr;</a>
     </div>
     <div class="card-body" style="padding:0">
         <table class="hims-table">
-            <thead><tr><th>Session</th><th>Date</th><th>Venue</th><th>CPD</th><th></th></tr></thead>
+            <thead><tr><th>Session</th><th>Date &amp; Time</th><th>Venue</th><th>CPD</th><th>Action</th></tr></thead>
             <tbody>
                 @foreach($upcoming_sessions as $session)
                 <tr>
-                    <td data-label="Session"><strong>{{ $session->title }}</strong></td>
-                    <td data-label="Date">{{ $session->session_date }}</td>
-                    <td data-label="Venue">{{ $session->venue_name ?? '—' }}</td>
-                    <td data-label="CPD">{{ $session->cpd_hours }}</td>
-                    <td data-label="Actions"><a href="{{ route('training.sessions.show', $session->session_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a></td>
+                    <td data-label="Session">
+                        <strong>{{ $session->title }}</strong>
+                        <div style="font-size:11px;color:#6b7280">{{ $session->session_code ?? '' }}</div>
+                    </td>
+                    <td data-label="Date & Time" style="font-size:12.5px">
+                        <strong>{{ \Carbon\Carbon::parse($session->session_date)->format('M d, Y') }}</strong><br>
+                        <span style="color:#6b7280">{{ $session->start_time ?? '' }} – {{ $session->end_time ?? '' }}</span>
+                    </td>
+                    <td data-label="Venue">{{ $session->venue_name ?? 'Hospital Main' }}</td>
+                    <td data-label="CPD"><span class="hims-badge blue">{{ $session->cpd_hours }} hrs</span></td>
+                    <td data-label="Action"><a href="{{ route('training.sessions.show', $session->session_id) }}" class="btn-hims btn-hims-primary btn-sm"><i class="bi bi-eye"></i> View Session</a></td>
                 </tr>
                 @endforeach
             </tbody>

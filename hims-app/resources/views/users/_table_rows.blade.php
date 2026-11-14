@@ -17,7 +17,7 @@
     <td data-label="Email" style="font-size:13px;color:#6b7280">{{ $user->email }}</td>
     <td data-label="Role">
         <span class="hims-badge {{ $user->role === 'admin' ? 'red' : ($user->role === 'hr_manager' ? 'blue' : ($user->role === 'supervisor' ? 'yellow' : 'gray')) }}">
-            {{ ucfirst(str_replace('_',' ',$user->role ?? 'staff')) }}
+            {{ ($user->role ?? 'staff') === 'staff' ? 'Trainee' : ucfirst(str_replace('_',' ',$user->role)) }}
         </span>
     </td>
     <td data-label="Status">

@@ -276,7 +276,7 @@ class ReportingLineService
             'admin' => 'Admin',
             'hr_manager' => 'HR Manager',
             'supervisor' => 'Supervisor',
-            'staff' => 'Staff',
+            'staff' => 'Trainee',
             default => 'No HIMS account',
         };
     }

@@ -43,7 +43,7 @@
                         <div class="col-md-6">
                             <label class="hims-label">Role *</label>
                             <select name="role" class="hims-input hims-select" required>
-                                <option value="staff"      {{ ($user->role ?? 'staff') === 'staff'      ? 'selected' : '' }}>Staff</option>
+                                <option value="staff"      {{ ($user->role ?? 'staff') === 'staff'      ? 'selected' : '' }}>Trainee</option>
                                 <option value="supervisor" {{ $user->role === 'supervisor' ? 'selected' : '' }}>Supervisor</option>
                                 <option value="hr_manager" {{ $user->role === 'hr_manager' ? 'selected' : '' }}>HR Manager</option>
                                 <option value="admin"      {{ $user->role === 'admin'      ? 'selected' : '' }}>Administrator</option>

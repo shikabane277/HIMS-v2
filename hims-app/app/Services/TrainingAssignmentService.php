@@ -131,6 +131,33 @@ class TrainingAssignmentService
             ],
         );
 
+        // Notify assigned employees that they have mandatory training to attend or complete
+        $subjectTitle = $subjectType === 'course'
+            ? (DB::table('courses')->where('course_id', $subjectId)->value('title') ?? 'Required Course')
+            : (DB::table('training_sessions')->where('session_id', $subjectId)->value('title') ?? 'Required Training Session');
+
+        $notifService = app(NotificationService::class);
+        $dueStr = $requiredBy ? ' (Due by '.$requiredBy.')' : '';
+        $notifType = $subjectType === 'course' ? 'course_assigned' : 'training_assigned';
+        $notifTitle = $subjectType === 'course'
+            ? 'New Course Assigned: '.Str::limit($subjectTitle, 50)
+            : 'Training Session Scheduled: '.Str::limit($subjectTitle, 50);
+        $notifMsg = $subjectType === 'course'
+            ? "You have been assigned to complete {$subjectTitle}{$dueStr}."
+            : "You are required to attend {$subjectTitle}{$dueStr}. Check Training for details.";
+        $refType = $subjectType === 'course' ? 'course_enrollments' : 'training_sessions';
+
+        foreach ($employeeIds as $targetEmpId) {
+            $notifService->notify(
+                $targetEmpId,
+                $notifType,
+                $notifTitle,
+                $notifMsg,
+                $refType,
+                $subjectId
+            );
+        }
+
         return $result + ['assignment_id' => $assignmentId, 'employees' => count($employeeIds)];
     }
 

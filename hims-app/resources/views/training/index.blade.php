@@ -24,6 +24,84 @@
     <div class="col-sm-3"><div class="stat-card"><div class="stat-icon"><i class="bi bi-star"></i></div><div class="stat-value">{{ $stats['avg_feedback_score'] ?? '—' }}</div><div class="stat-label">Avg Feedback Score</div></div></div>
 </div>
 
+{{-- Trainee / Employee Personal Training Status --}}
+@if(isset($myRegistrations) && $myRegistrations->isNotEmpty())
+<div class="hims-card mb-4" style="border:1px solid #059669;box-shadow:0 4px 12px rgba(5,150,105,0.08)">
+    <div class="card-header d-flex justify-content-between align-items-center" style="background:#f0fdf4">
+        <div>
+            <h5 style="color:#065f46;margin:0"><i class="bi bi-person-check-fill text-success"></i> My Training Status &amp; Sessions to Attend</h5>
+            <small style="color:#047857">Your upcoming enrolled training sessions and attendance records</small>
+        </div>
+        <span class="hims-badge green">{{ $myRegistrations->count() }} Enrolled</span>
+    </div>
+    <div class="card-body" style="padding:0">
+        <table class="hims-table">
+            <thead>
+                <tr>
+                    <th>Session Code &amp; Title</th>
+                    <th>Date &amp; Time</th>
+                    <th>Venue</th>
+                    <th>CPD Credit</th>
+                    <th>Attendance Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($myRegistrations as $reg)
+                @php
+                    $isPast = \Carbon\Carbon::parse($reg->session_date)->isPast();
+                    $badgeTone = match($reg->status) {
+                        'attended' => 'green',
+                        'registered' => ($isPast ? 'yellow' : 'blue'),
+                        'waitlisted' => 'yellow',
+                        'cancelled' => 'red',
+                        default => 'gray'
+                    };
+                    $statusLabel = match($reg->status) {
+                        'attended' => 'Attended ✓',
+                        'registered' => ($isPast ? 'Pending Check-in' : 'Needs to Attend'),
+                        'waitlisted' => 'Waitlisted',
+                        'cancelled' => 'Cancelled',
+                        default => ucfirst($reg->status)
+                    };
+                @endphp
+                <tr>
+                    <td data-label="Session">
+                        <div style="font-weight:700;color:var(--hims-primary)">{{ $reg->session_title }}</div>
+                        <div style="font-size:11px;color:#6b7280">{{ $reg->session_code ?? 'SESSION' }}</div>
+                    </td>
+                    <td data-label="Date & Time" style="font-size:12.5px">
+                        <strong>{{ \Carbon\Carbon::parse($reg->session_date)->format('M d, Y') }}</strong><br>
+                        <span style="color:#6b7280">{{ $reg->start_time }} – {{ $reg->end_time }}</span>
+                    </td>
+                    <td data-label="Venue">
+                        <i class="bi bi-geo-alt text-muted"></i> {{ $reg->venue_name ?? 'Hospital Main Venue' }}
+                    </td>
+                    <td data-label="CPD Credit">
+                        <span class="hims-badge blue">{{ $reg->cpd_hours ?? 0 }} hrs</span>
+                    </td>
+                    <td data-label="Attendance Status">
+                        <span class="hims-badge {{ $badgeTone }}">
+                            <i class="bi {{ $reg->status === 'attended' ? 'bi-check-circle-fill' : 'bi-clock-fill' }}"></i>
+                            {{ $statusLabel }}
+                        </span>
+                        @if($reg->required_by)
+                            <div style="font-size:11px;color:#dc2626;margin-top:2px">Required by: {{ $reg->required_by }}</div>
+                        @endif
+                    </td>
+                    <td data-label="Action">
+                        <a href="{{ route('training.sessions.show', $reg->session_id) }}" class="btn-hims btn-hims-ghost btn-sm">
+                            <i class="bi bi-box-arrow-up-right"></i> Details
+                        </a>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
+
 {{-- Training Analytics & Trends --}}
 <div class="row g-3 mb-4">
     <div class="col-lg-7">
@@ -95,10 +173,19 @@
                             </td>
                             <td data-label="Actions">
                                 <a href="{{ route('training.sessions.show', $session->session_id) }}" class="btn-hims btn-hims-ghost btn-sm">View</a>
-                                <form method="POST" action="{{ route('training.register', $session->session_id) }}" style="display:inline">
-                                    @csrf
-                                    <button type="submit" class="btn-hims btn-hims-primary btn-sm"><i class="bi bi-plus-circle"></i> Register</button>
-                                </form>
+                                @php
+                                    $isAlreadyRegistered = isset($myRegistrations) && $myRegistrations->contains('session_id', $session->session_id);
+                                @endphp
+                                @if($isAlreadyRegistered)
+                                    <span class="btn-hims btn-hims-ghost btn-sm text-success" style="cursor:default">
+                                        <i class="bi bi-check2-circle"></i> Enrolled
+                                    </span>
+                                @else
+                                    <form method="POST" action="{{ route('training.register', $session->session_id) }}" style="display:inline">
+                                        @csrf
+                                        <button type="submit" class="btn-hims btn-hims-primary btn-sm"><i class="bi bi-plus-circle"></i> Register</button>
+                                    </form>
+                                @endif
                             </td>
                         </tr>
                         @empty

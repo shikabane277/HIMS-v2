@@ -102,7 +102,7 @@
                 <option value="admin" @selected(request('role') === 'admin')>Administrator</option>
                 <option value="hr_manager" @selected(request('role') === 'hr_manager')>HR Manager</option>
                 <option value="supervisor" @selected(request('role') === 'supervisor')>Supervisor</option>
-                <option value="staff" @selected(request('role') === 'staff')>Staff</option>
+                <option value="staff" @selected(request('role') === 'staff')>Trainee</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -278,7 +278,7 @@
                     <div class="col-md-6">
                         <label class="hims-label">Role *</label>
                         <select name="role" class="hims-input hims-select" required>
-                            <option value="staff">Staff</option>
+                            <option value="staff">Trainee</option>
                             <option value="supervisor">Supervisor</option>
                             <option value="hr_manager">HR Manager</option>
                             <option value="admin">Administrator</option>
@@ -298,7 +298,7 @@
                         <span class="badge bg-white text-dark border me-1">Admin</span> Full &nbsp;|&nbsp;
                         <span class="badge bg-white text-dark border me-1">HR Manager</span> All modules &nbsp;|&nbsp;
                         <span class="badge bg-white text-dark border me-1">Supervisor</span> Team &nbsp;|&nbsp;
-                        <span class="badge bg-white text-dark border">Staff</span> Self
+                        <span class="badge bg-white text-dark border">Trainee</span> Self / Training Status
                     </div>
                 </div>
             </div>

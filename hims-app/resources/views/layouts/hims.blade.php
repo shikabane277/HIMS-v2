@@ -110,7 +110,7 @@
             <div class="user-avatar">{{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}</div>
             <div class="user-info">
                 <span class="user-name">{{ Auth::user()->name ?? 'User' }}</span>
-                <span class="user-role">{{ ucwords(str_replace('_',' ', Auth::user()->role ?? 'staff')) }}</span>
+                <span class="user-role">{{ (Auth::user()->role ?? 'staff') === 'staff' ? 'Trainee' : ucwords(str_replace('_',' ', Auth::user()->role)) }}</span>
             </div>
         </a>
         <form method="POST" action="{{ route('logout') }}">
@@ -218,7 +218,7 @@
                     </details>
                     <details class="help-faq">
                         <summary>I forgot my password.</summary>
-                        <p>Use <strong>Forgot password?</strong> on the login screen to request a reset link. If email isn't configured on this deployment, the page explains where the link went — or an administrator can reset it for you from <strong>Users &amp; Access</strong>.</p>
+                        <p>Self-service password reset is disabled for hospital security. Reach out to a Hospital Administrator to provision a temporary password or reset your account through <strong>Users &amp; Access</strong>.</p>
                     </details>
                     <details class="help-faq">
                         <summary>Who do I contact for support?</summary>

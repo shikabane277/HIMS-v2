@@ -86,17 +86,9 @@
                 <h4 style="font-size:18px;font-weight:800;color:var(--hims-text-dark);margin:0">Appraisal Overview</h4>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <div class="dropdown" style="position:relative">
-                    <button type="button" class="btn-hims btn-hims-ghost btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #e5e7eb">
-                        Actions <i class="bi bi-chevron-down" style="font-size:10px;margin-left:4px"></i>
-                    </button>
-                </div>
                 <a href="{{ route('reports.index') }}" class="btn-hims btn-hims-ghost btn-sm" style="width:32px;height:32px;padding:0;justify-content:center;border:1px solid #e5e7eb;border-radius:8px" title="Refresh">
                     <i class="bi bi-arrow-clockwise"></i>
                 </a>
-                <button type="button" class="btn-hims btn-hims-ghost btn-sm" style="width:32px;height:32px;padding:0;justify-content:center;border:1px solid #e5e7eb;border-radius:8px" title="More options">
-                    <i class="bi bi-three-dots"></i>
-                </button>
             </div>
         </div>
     </div>

@@ -212,6 +212,8 @@ class NotificationService
             str_starts_with($type, 'competency_') => ['bi-bullseye', 'info'],
             str_starts_with($type, 'cycle_shortfall') => ['bi-arrow-repeat', 'danger'],
             str_starts_with($type, 'cycle_') => ['bi-arrow-repeat', 'warning'],
+            str_starts_with($type, 'training_assigned') => ['bi-calendar-check-fill', 'warning'],
+            str_starts_with($type, 'course_assigned') => ['bi-book-half', 'warning'],
             $type === 'course_completed' => ['bi-mortarboard-fill', 'success'],
             $type === 'cpd_verified' => ['bi-patch-check-fill', 'success'],
             default => ['bi-bell-fill', 'neutral'],
@@ -229,6 +231,9 @@ class NotificationService
             'employee_renewal_cycles' => $user->can('view-compliance')
                 ? route('learning.renewals.index')
                 : route('learning.cycles.mine'),
+            'training_sessions' => route('training.index'),
+            'training_registrations' => route('training.index'),
+            'training_assignments' => route('training.index'),
             'course_enrollments' => route('employees.progression.mine'),
             'cpd_records' => route('learning.cpd.index', [
                 'focus' => $notification->reference_id,

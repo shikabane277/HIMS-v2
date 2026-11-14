@@ -58,7 +58,20 @@ class TrainingController extends Controller
             ->join('employees as e', 'tf.employee_id', '=', 'e.employee_id')
             ->select('tf.*', 'ts.title as session_title',
                 DB::raw("CONCAT(e.first_name,' ',e.last_name) AS employee_name"))
-            ->orderByDesc('tf.submitted_at')->limit(10)->get();
+            ->orderByDesc('tf.submitted_at')->limit(5)->get();
+
+        // Trainee / Employee personal registrations status
+        $empId = $this->currentEmployeeId();
+        $myRegistrations = collect();
+        if ($empId) {
+            $myRegistrations = DB::table('training_registrations as tr')
+                ->join('training_sessions as ts', 'tr.session_id', '=', 'ts.session_id')
+                ->leftJoin('training_venues as tv', 'ts.venue_id', '=', 'tv.venue_id')
+                ->where('tr.employee_id', $empId)
+                ->select('tr.*', 'ts.title as session_title', 'ts.session_code', 'ts.session_date', 'ts.start_time', 'ts.end_time', 'ts.cpd_hours', 'tv.venue_name')
+                ->orderByDesc('ts.session_date')
+                ->get();
+        }
 
         // Chart Metrics: Category Attendance vs Registration
         $categoryAttendance = DB::table('training_sessions as ts')
@@ -87,7 +100,7 @@ class TrainingController extends Controller
 
         return view('training.index', compact(
             'stats', 'sessions', 'venues', 'activeVenues', 'instructors', 'feedback', 'categories', 'category',
-            'trainingCatLabels', 'trainingCatRegistered', 'trainingCatAttended', 'feedbackMetrics'
+            'trainingCatLabels', 'trainingCatRegistered', 'trainingCatAttended', 'feedbackMetrics', 'myRegistrations'
         ));
     }
 
