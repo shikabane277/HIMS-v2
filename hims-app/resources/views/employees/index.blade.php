@@ -121,6 +121,7 @@
                     <th>Role</th>
                     <th>Hire Date</th>
                     <th>Status</th>
+                    <th>Login</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -151,6 +152,12 @@
                             <span class="status-dot {{ $emp->employment_status === 'active' ? 'active' : 'inactive' }}"></span>
                             {{ ucfirst($emp->employment_status) }}
                         </span>
+                    </td>
+                    @php
+                        $acct = \App\Support\AccountStatus::of($emp->account_user_id ? (object) ['is_active' => $emp->account_is_active, 'locked_until' => $emp->account_locked_until, 'access_expires_at' => $emp->account_expires_at ?? null] : null);
+                    @endphp
+                    <td data-label="Login">
+                        <span class="hims-badge {{ $acct['badge'] }}" title="{{ $acct['detail'] }}"><i class="bi {{ $acct['icon'] }}"></i> {{ $acct['label'] }}</span>
                     </td>
                     <td data-label="Actions">
                         <div style="display:flex;gap:6px;align-items:center">

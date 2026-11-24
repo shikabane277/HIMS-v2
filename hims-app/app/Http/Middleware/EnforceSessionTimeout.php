@@ -25,9 +25,9 @@ use Symfony\Component\HttpFoundation\Response;
  * pinging cannot hold a session open past the limit (see routes/auth.php
  * `session/ping`, which now checks rather than refreshes).
  *
- * The config value is read the same way Laravel reads session.lifetime so the
- * two agree: env('SESSION_IDLE_TIMEOUT') minutes if set, else the session
- * lifetime in minutes, else 5.
+ * The limit is config('session.idle_timeout') in SECONDS (SESSION_IDLE_TIMEOUT,
+ * default 120 = 2 minutes). The browser script and session/ping read the same value via
+ * idleTimeoutSeconds(), so all three agree.
  */
 class EnforceSessionTimeout
 {
@@ -48,7 +48,12 @@ class EnforceSessionTimeout
              * revocation, so this check lives here, on every request.
              */
             if (isset($user->is_active) && ! $user->is_active) {
-                return $this->endSession($request, 'Your account has been deactivated.');
+                return $this->endSession($request, 'Your account has been deactivated.', ['reason' => 'deactivated']);
+            }
+
+            // A trainee's placement ended: same effect as deactivation.
+            if (method_exists($user, 'accessHasExpired') && $user->accessHasExpired()) {
+                return $this->endSession($request, 'Your access period has ended.', ['reason' => 'expired']);
             }
 
             $timeoutSeconds = $this->idleTimeoutSeconds();
@@ -59,33 +64,34 @@ class EnforceSessionTimeout
                 return $this->endSession($request, 'Your session has expired due to inactivity.');
             }
 
-            $request->session()->put('hims_last_activity', time());
+            // The status probe must never count as activity, or a timer could
+            // hold a forgotten tab open. Everything else — including the
+            // input-driven heartbeat (session/activity) — does.
+            if (! $request->routeIs('session.ping')) {
+                $request->session()->put('hims_last_activity', time());
+            }
         }
 
         return $next($request);
     }
 
     /**
-     * Idle limit in seconds, resolved the way Laravel resolves session.lifetime.
+     * Idle limit in seconds, from config('session.idle_timeout') only.
      *
-     * env() is consulted first rather than only config(), because .env may set
-     * SESSION_LIFETIME while config/session.php's default chain would otherwise
-     * hand back a smaller value than the operator asked for. Both are in
-     * minutes, matching Laravel's own units.
+     * Previously this read env() directly and treated the value as minutes,
+     * while the browser treated the same setting as seconds — a .env value of
+     * 180 meant 3 minutes in the tab and 3 hours on the server. env() also
+     * returns null once `php artisan config:cache` has run.
      */
-    private function idleTimeoutSeconds(): int
+    public static function idleTimeoutSeconds(): int
     {
-        $minutes = (int) (env('SESSION_IDLE_TIMEOUT') ?: (env('SESSION_LIFETIME') ?: config('session.lifetime', 3)));
-
-        // A zero or negative value would expire every request instantly; fall
-        // back to the hospital's 3 minutes rather than locking everyone out.
-        return max(60, $minutes * 60);
+        return max(60, (int) config('session.idle_timeout', 120));
     }
 
     /**
      * Log out and send the visitor somewhere that explains why.
      */
-    private function endSession(Request $request, string $message): Response
+    private function endSession(Request $request, string $message, array $query = ['timeout' => 1]): Response
     {
         Auth::logout();
         $request->session()->invalidate();
@@ -94,10 +100,12 @@ class EnforceSessionTimeout
         if ($request->expectsJson() || $request->is('api/*')) {
             return response()->json([
                 'message' => $message,
-                'redirect' => route('login', ['timeout' => 1]),
+                'redirect' => route('landing', $query),
             ], 401);
         }
 
-        return redirect()->route('login', ['timeout' => 1]);
+        // Back to the public landing page rather than the sign-in form, so an
+        // unattended screen shows nothing about anyone.
+        return redirect()->route('landing', $query);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuditRequests;
 use App\Http\Middleware\EnforceSessionTimeout;
 use App\Http\Middleware\EnsurePasswordIsChanged;
 use App\Http\Middleware\EnsureUserHasRole;
@@ -9,7 +10,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
-return Application::configure(basePath: dirname(__DIR__))
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsurePasswordIsChanged::class,
             EnforceSessionTimeout::class,
             SecurityHeaders::class,
+            AuditRequests::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -38,6 +40,8 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })->create();
 
+// Serverless hosts (Vercel) only allow writes under /tmp. This line was
+// previously unreachable because the builder above was returned directly.
 if ($storage = env('APP_STORAGE')) {
     $app->useStoragePath($storage);
 }

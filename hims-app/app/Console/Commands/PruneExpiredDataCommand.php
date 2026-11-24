@@ -16,7 +16,7 @@ class PruneExpiredDataCommand extends Command
 {
     protected $signature = 'hims:prune-expired-data
                             {--chat-days=90 : Retention period in days for AI chat transcripts}
-                            {--audit-days=365 : Retention period in days for audit trail logs}
+                            {--audit-days= : Prune audit trail rows older than this many days (default: never; minimum 2190 = 6 years)}
                             {--dry-run : Report row counts without deleting}';
 
     protected $description = 'Enforce GDPR Article 5(1)(e) storage limitation by pruning expired OTPs, reset tokens, AI chats, and aged logs';
@@ -24,12 +24,16 @@ class PruneExpiredDataCommand extends Command
     public function handle(): int
     {
         $chatDays = max(1, (int) $this->option('chat-days'));
-        $auditDays = max(30, (int) $this->option('audit-days'));
+        // Audit records are evidence (credentialing decisions, review changes,
+        // record access). They are kept indefinitely unless an operator asks
+        // for pruning explicitly, and never for less than six years.
+        $auditDaysOption = $this->option('audit-days');
+        $auditDays = $auditDaysOption !== null && $auditDaysOption !== '' ? max(2190, (int) $auditDaysOption) : null;
         $dryRun = (bool) $this->option('dry-run');
 
         $otpCutoff = now()->subDay();
         $chatCutoff = now()->subDays($chatDays);
-        $auditCutoff = now()->subDays($auditDays);
+        $auditCutoff = $auditDays ? now()->subDays($auditDays) : null;
 
         $stats = [
             'login_otps' => 0,
@@ -59,15 +63,14 @@ class PruneExpiredDataCommand extends Command
             $stats['ai_chat_sessions'] = $dryRun ? $query->count() : $query->delete();
         }
 
-        if (Schema::hasTable('audit_trails')) {
+        if ($auditCutoff && Schema::hasTable('audit_trails')) {
             $query = DB::table('audit_trails')->where('created_at', '<', $auditCutoff);
             $stats['audit_trails'] = $dryRun ? $query->count() : $query->delete();
         }
 
         $mode = $dryRun ? '[DRY-RUN]' : '[PURGED]';
-        $this->info("{$mode} GDPR Data Retention Summary: " . json_encode($stats));
+        $this->info("{$mode} GDPR Data Retention Summary: ".json_encode($stats));
 
         return self::SUCCESS;
     }
 }
-

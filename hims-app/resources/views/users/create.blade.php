@@ -35,13 +35,17 @@
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Role *</label>
-                            <select name="role" class="hims-input hims-select" required>
-                                <option value="staff" {{ old('role') === 'staff' ? 'selected' : '' }}>Trainee</option>
-                                <option value="supervisor" {{ old('role') === 'supervisor' ? 'selected' : '' }}>Supervisor</option>
-                                <option value="hr_manager" {{ old('role') === 'hr_manager' ? 'selected' : '' }}>HR Manager</option>
-                                <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Administrator</option>
-                            </select>
+<select name="role" class="hims-input hims-select" required onchange="var t=this.form.querySelector('[data-access-end]'); if (t) { t.style.display = this.value === 'trainee' ? '' : 'none'; t.querySelector('input').required = this.value === 'trainee'; }">
+                            @foreach(\App\Support\Roles::options() as $value => $label)
+                                <option value="{{ $value }}" @selected(old('role', 'staff') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
                         </div>
+                    <div class="col-md-6" data-access-end style="{{ old('role') === 'trainee' ? '' : 'display:none' }}">
+                        <label class="hims-label">Access end date <span style="color:#9ca3af;font-weight:400">(required for trainees)</span></label>
+                        <input type="date" name="access_expires_at" class="hims-input" min="{{ now()->addDay()->toDateString() }}" value="{{ old('access_expires_at') }}" @required(old('role') === 'trainee')>
+                        <div style="font-size:11px;color:#6b7280">Last day of the placement / orientation. Sign-in stops after this date.</div>
+                    </div>
                         <div class="col-md-6">
                             <label class="hims-label">Link to Employee <span style="color:#9ca3af;font-weight:400">(optional)</span></label>
                             <select name="employee_id" class="hims-input hims-select">
@@ -51,13 +55,12 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-12 mt-1" style="background:var(--hims-primary-pale);border-radius:8px;padding:12px;font-size:12.5px;color:#6b7280;border:1px solid var(--hims-border)">
-                            <strong style="color:var(--hims-primary)">Role access levels:</strong><br>
-                            <span class="badge bg-white text-dark border me-1"><i class="bi bi-shield-lock text-primary-hims"></i> Admin</span> Full access &nbsp;|&nbsp;
-                            <span class="badge bg-white text-dark border me-1"><i class="bi bi-person-badge text-primary-hims"></i> HR Manager</span> All modules &nbsp;|&nbsp;
-                            <span class="badge bg-white text-dark border me-1"><i class="bi bi-people text-primary-hims"></i> Supervisor</span> Team management &nbsp;|&nbsp;
-                            <span class="badge bg-white text-dark border me-1"><i class="bi bi-person text-primary-hims"></i> Trainee</span> View own training status &amp; records
-                        </div>
+                        <div class="col-12 mt-1" style="background:var(--hims-primary-pale);border-radius:8px;padding:10px 12px;font-size:12px;color:#6b7280;border:1px solid var(--hims-border)">
+                        <strong style="color:var(--hims-primary)">Account types:</strong>
+                        @foreach(\App\Support\Roles::definitions() as $def)
+                            <div style="margin-top:4px"><span class="badge bg-white text-dark border me-1"><i class="bi {{ $def['icon'] }}"></i> {{ $def['label'] }}</span> {{ $def['scope'] }} — {{ $def['who'] }}</div>
+                        @endforeach
+                    </div>
                         <div class="col-12 d-flex gap-2 justify-content-end mt-2">
                             <a href="{{ route('users.index') }}" class="btn-hims btn-hims-outline">Cancel</a>
                             <button type="submit" class="btn-hims btn-hims-primary"><i class="bi bi-check-circle"></i> Create User</button>

@@ -16,6 +16,8 @@
     @include('dashboard.partials.staff')
 @elseif(($role ?? '') === 'supervisor')
     @include('dashboard.partials.supervisor')
+@elseif(($role ?? '') === 'training_officer')
+    @include('dashboard.partials.training')
 @else
     @include('dashboard.partials.organisation')
 @endif

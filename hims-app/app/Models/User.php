@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['name', 'email', 'password', 'role', 'is_active', 'employee_id', 'email_verified_at', 'two_factor_code', 'two_factor_expires_at', 'totp_secret'])]
+#[Fillable(['name', 'email', 'password', 'role', 'is_active', 'access_expires_at', 'employee_id', 'email_verified_at', 'two_factor_code', 'two_factor_expires_at', 'totp_secret'])]
 #[Hidden(['password', 'remember_token', 'two_factor_code', 'totp_secret'])]
 class User extends Authenticatable
 {
@@ -30,6 +30,7 @@ class User extends Authenticatable
             'two_factor_expires_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'access_expires_at' => 'datetime',
         ];
     }
 
@@ -47,7 +48,8 @@ class User extends Authenticatable
     /* ---------------------------------------------------------------
      | Role helpers
      |
-     | users.role is one of: admin | hr_manager | supervisor | staff
+     | users.role is one of App\Support\Roles::ALL:
+     | admin | hr_manager | training_officer | supervisor | staff | trainee
      | ---------------------------------------------------------------
      */
 
@@ -77,6 +79,37 @@ class User extends Authenticatable
     public function isStaff(): bool
     {
         return $this->role === 'staff';
+    }
+
+    public function isTrainingOfficer(): bool
+    {
+        return $this->role === 'training_officer';
+    }
+
+    public function isTrainee(): bool
+    {
+        return $this->role === 'trainee';
+    }
+
+    /** Self-service accounts: staff and trainees see only their own records. */
+    public function isSelfServiceOnly(): bool
+    {
+        return $this->hasRole('staff', 'trainee');
+    }
+
+    /** A time-limited account (e.g. trainee) whose end date has passed. */
+    public function accessHasExpired(): bool
+    {
+        return $this->access_expires_at !== null && $this->access_expires_at->isPast();
+    }
+
+    /**
+     * Hospital-wide view of learning, training and compliance records:
+     * admin, HR and the Training Officer (who sees nothing else hospital-wide).
+     */
+    public function seesAllLearners(): bool
+    {
+        return $this->hasRole('admin', 'hr_manager', 'training_officer');
     }
 
     public function canCompleteReviews(): bool

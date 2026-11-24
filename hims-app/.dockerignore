@@ -32,3 +32,4 @@ phpunit.xml
 .idea
 .vscode
 *.md
+_claude_backup_*

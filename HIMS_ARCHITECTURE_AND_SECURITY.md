@@ -41,7 +41,7 @@ graph TD
 
     subgraph "Data Layer"
         E --> H["Raw Query Builder (DB::table)<br/>+ Crypt Field Encryption"]
-        H --> I["MySQL 8 (53 Tables, 1 View, 2 Triggers, 40 Migrations)"]
+        H --> I["MySQL 8 (55 Tables, 1 View, 2 Triggers, 44 Migrations)"]
     end
 
     A --> C
@@ -53,7 +53,7 @@ graph TD
 |---|---|
 | **Frontend** | HTML5 + hand-authored `public/css/hims.css` + vanilla JS. **Bootstrap Icons** (font glyphs) via CDN only — the Bootstrap CSS *framework* is not used, so no reboot/normalise layer exists and the stylesheet must declare its own element defaults (see the `.hims-table th` note in §1). Tailwind/Vite are installed but the domain UI bypasses the build (`resources/css/app.css` is 3 lines). Domain views extend `layouts/hims` (including `profile/edit`). Record creation happens in **modals** (`.hims-modal-backdrop` / `.hims-modal`, z-index 1200, transparent backdrop acting purely as a dismissal hit area) driven by one shared controller, `partials/modal-js.blade.php`, and rendered through a `@stack('modals')` outside `<main>` so their `position: fixed` resolves against the viewport rather than the animated (transformed) content wrapper; multi-select uses **checkbox lists** (`.hims-checklist`), not `<select multiple>`. Tabular data uses one `.hims-table` style, with regression tests enforcing header/data alignment on the desktop grid and, below 768px, the restacking of every table into labelled record cards — `thead` hidden, each row a bordered card, each cell printing its own heading from `data-label` — so that no screen asks for a horizontal swipe. Sensitive workforce pages render with an in-place CSS blur (`.hims-record-blurred`) and unlock overlay when the **Record Access Password** gate is locked. Because the stylesheet and favicon are served outside the build, their URLs carry the file's own content hash (`substr(md5_file($path), 0, 8)`) from `partials/app-css.blade.php` and `partials/favicon.blade.php`. |
 | **Backend** | **PHP ^8.3**, **Laravel 13.22**. Controllers + `routes/web.php` routing, plus `SecurityHeaders`, `EnforceSessionTimeout`, and `EnsurePasswordIsChanged` middleware in the `web` stack. |
-| **Database** | MySQL 8 (`DB_CONNECTION=mysql`). **53 tables, 1 view, 2 triggers, 40 applied migrations**. `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`; MySQL triggers auto-compute competency gap; **three statuses are derived rather than stored** — `App\Support\CredentialStatus` (credential expiry), `CycleStatus` (review cycle closed) and `ReviewStatus` (review frozen) all compute from a date on every read, in PHP and as bound SQL. |
+| **Database** | MySQL 8 (`DB_CONNECTION=mysql`). **55 tables, 1 view, 2 triggers, 44 applied migrations**. `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`; MySQL triggers auto-compute competency gap; **three statuses are derived rather than stored** — `App\Support\CredentialStatus` (credential expiry), `CycleStatus` (review cycle closed) and `ReviewStatus` (review frozen) all compute from a date on every read, in PHP and as bound SQL. |
 | **Authentication** | Breeze v2.4 session auth on the `users` table + **Mandatory Two-Factor Authentication (2FA)** via Email OTP (5-minute expiry, SHA-256 hashed) or RFC 6238 TOTP Authenticator (`users.totp_secret` encrypted at rest, replay-protected via `totp_consumed_counter`). Login throttling = 5 attempts (`LoginRequest`, 15-minute lockout on 5th failure). Strict **3-minute silent session idle timeout** (`EnforceSessionTimeout`) and immediate session termination when `is_active = false`. Public self-registration and self-service "Forgot Password" are disabled — admins provision accounts and issue temporary passwords via `UserController` (`must_change_password` enforced by `EnsurePasswordIsChanged`). |
 | **Authorisation** | 20 Gates defined in `AppServiceProvider::registerGates()` + the `role` route middleware, both keyed on `users.role`, plus the **Record Access Password Gate (`App\Support\RecordAccess`)** protecting sensitive employee/credential screens. See [§3.2](#32-granular-access-control-rbac). The AI assistant adds subject-matter RBAC in `AiAccessPolicy` with a **strict prohibition on employee personal data across all roles**; see [§3.2.1](#321-subject-matter-rbac-for-the-ai-assistant). |
 | **Privacy & GDPR** | Strict GDPR & Philippine Data Privacy Act (RA 10173) controls: Art. 7/13 consent banner (`POST /profile/gdpr-consent`), Art. 15/20 JSON data portability export (`GET /profile/export-data`), Art. 17 cascading account erasure (`DELETE /profile`) and separated employee PII anonymization (`POST /employees/{id}/anonymize`), and Art. 5(1)(e) automated data retention pruning (`php artisan hims:prune-expired-data` / `GET /api/cron/prune`). |
@@ -68,7 +68,7 @@ graph TD
 
 ## 2. Database Design (MySQL 8.0+)
 
-The current MySQL database contains **53 tables and 1 view**, with **40 applied migration rows**. This includes
+The current MySQL database contains **55 tables and 1 view**, with **44 applied migration rows**. This includes
 Laravel's own `users`, `sessions`, `cache`, `jobs`, `failed_jobs`, `job_batches`, `password_reset_tokens`, and
 `cache_locks` infrastructure tables, security/integration tables (`system_integrations`, `user_trusted_devices`,
 `system_settings`, `audit_trails`), plus the HIMS domain tables. All
@@ -338,8 +338,24 @@ leaves the deterministic analysis and the on-page feedback list fully intact.
     *   *Columns*: `position_id` (PK), `position_title`, `department_id` (FK), `current_holder_id` (FK), `is_critical` (bool), `vacancy_risk` (varchar, app-validated), `risk_factors` (JSON), `impact_description`, `estimated_vacancy_date`, `last_reviewed_at`, `last_reviewed_by` (FK), `quarterly_review_notes`, `created_at`, `updated_at`.
     *   HR/Admin can record a quarterly review; the timestamp, linked reviewer and notes are audited. The
         organisation dashboard flags high/critical-risk positions with no `ready_now` candidate.
+    *   **Promotion requirements (v2.25.0, migration `2026_11_24_000003`)**: `target_role_id`, `min_performance_score`
+        (`DECIMAL(3,2)`), `min_years_service`, `required_credentials` (JSON), set from the candidate page through
+        `PUT /succession/positions/{id}/requirements` (HR/Admin).
 27. **`succession_candidates`**: Target successor backup plans.
     *   *Columns*: `candidate_id` (PK), `position_id` (FK), `employee_id` (FK), `performance_score` (**int, 1–5**), `potential_score` (**int, 1–5**), `nine_box_label` (`VARCHAR(30)`, written by the application), `readiness_level`, `development_plan` (JSON, unused), `mentor_id` (FK), `status`, `nomination_notes` (`TEXT`, nullable), `nominated_by` (FK), `nominated_at` (DEFAULT CURRENT_TIMESTAMP), `reviewed_at`, `approved_at`.
+    *   **Promotion (v2.25.0)**: `promoted_at`, `promoted_by`, `promotion_override_reason` and `qualification_snapshot` (JSON copy of the checklist at the moment of promotion).
+        `SuccessionController::promoteCandidate()` records the promotion only when
+        `SuccessionQualificationService` passes all eight checks:
+        1. Approved nomination.
+        2. `ready_now`.
+        3. Latest completed review ≥ minimum.
+        4. No open PIP.
+        5. No critical gap against the target role, computed by `CompetencyGapAnalysisService::analyseEmployee(..., againstRoleId)`.
+        6. Years of service.
+        7. Required credentials valid, and no expired credential.
+        8. No overdue `course_enrollments.due_date`.
+
+        Otherwise it requires a typed override reason, which is audited. No salary column is touched; pay changes belong to HR1.
     *   `nomination_notes` holds the rationale typed into the nominate modal. It is **write-once**: only
         `storeCandidate()` writes it, `updateCandidate()` does not read or clear it, and the edit form has no
         field for it — so revising a candidate's ratings cannot wipe the reasoning behind the nomination. It is
@@ -403,6 +419,25 @@ leaves the deterministic analysis and the on-page feedback list fully intact.
         restricted to sender, recipient, and HR/Admin moderators. Private posts are excluded from public
         statistics and `v_recognition_leaderboard`.
 
+32a. **`award_types`** *(v2.25.0, migration `2026_11_24_000002`)*: Formal awards HR can issue.
+    *   *Columns*: `award_type_id` (PK), `name` (unique), `category` (`service`, `excellence`, `performance`,
+        `compassion`, `innovation`, `conduct`, `teamwork`, `leadership`, `learning`), `description`, `criteria`,
+        `badge_icon`, `badge_color`, `certificate_title`, `certificate_body` (placeholders `{citation}`, `{period}`,
+        `{years}`, `{cpd_hours}`, `{name}`, `{award}`, `{date}`, `{code}`), `signatory_name`, `signatory_title`,
+        `auto_rule` (`service_years` | `cpd_hours_year` | null), `auto_value`, `points_value`, `is_active`,
+        `created_by`, timestamps. 15 rows are seeded: service at 5/10/15/20/25/30 years plus nine nominated or
+        automatic awards.
+32b. **`employee_awards`**: One issued award, and its certificate.
+    *   *Columns*: `award_id` (PK), `award_type_id`, `employee_id`, `citation`, `awarded_on`, `period_label`,
+        `awarded_by`, `source` (`manual` | `auto`), `certificate_code` (unique, `HR3-AW-YYYY-XXXXXXXX`), `status`
+        (`issued` | `revoked`), `revoked_reason`, timestamps; indexed on `(employee_id, status)` and
+        `(award_type_id, employee_id)`.
+    *   `AwardService` issues, revokes and runs the automatic rules. `hims:auto-awards` (daily at 06:10) is
+        idempotent: it skips any employee who already holds the type (and, for the CPD award, that year's period).
+    *   Public, rate-limited, code-only endpoints: `GET /awards/verify/{code}` (certificate page, revoked stamp
+        when revoked) and `GET /awards/badge/{code}.svg` (badge image). Management routes under
+        `/recognition/awards/...` sit behind `role:admin,hr_manager`.
+
 ### 2.8 AI Assistant Subsystem
 33. **`ai_chat_sessions`**: One row per conversation in the assistant sidebar.
     *   *Columns*: `id` (PK, UUID), `user_id` (FK → `users`, `ON DELETE CASCADE`), `title` (nullable, 120 — derived from the first question, so an abandoned chat never gets a misleading name), `pending_action` (text, nullable — holds a JSON payload, but declared `TEXT`, not a MySQL `JSON` column), `pending_action_at` (timestamp, nullable), `created_at`, `updated_at`.
@@ -463,7 +498,7 @@ interactive workflows.
         exception use, score/comment/status updates, employee response/acknowledgement; and every succession
         position/candidate/milestone mutation. Reads and every other UI edit are not comprehensively logged.
     *   *`resource_id` best effort*: UUIDs are generated in PHP, not by MySQL, so a create's row `INSERT` carries no `LAST_INSERT_ID()`. The executor reads back the newest row since a pre-call timestamp, which is correct for a quiet system and a plausible guess under load. Concurrency could pick a different row; the audit row is still correct about who did what, and `resource_id` is nullable for exactly this reason.
-    *   *Hash chaining* is documented in the migration but unimplemented in `App\Support\AuditTrail`. Those three hash columns stay NULL.
+    *   *Hash chaining* is implemented (v2.25.0): `before_state_hash`, `after_state_hash`, `chain_hash` and `chain_seq` are written by `App\Support\AuditTrail`; see §3.4.
 
 **Alerts escalate; they are not private.** `NotificationService::escalationChain($employeeId)` resolves each
 credential or reassessment alert to up to three recipients — the employee, their `supervisor_id`, and the head of
@@ -615,13 +650,13 @@ The controls below are the ones the application actually enforces.
 
 > **Controls and limitations.** Field-level encryption (`Crypt::encryptString`) protects `employees.phone`,
 > `employee_credentials.credential_number`, `system_integrations.api_key`, and `users.totp_secret`.
-> **Mandatory Multi-Factor Authentication (2FA)** (Email OTP & RFC 6238 TOTP), a **3-minute silent idle timeout**,
+> **Mandatory Multi-Factor Authentication (2FA)** (Email OTP & RFC 6238 TOTP), a **2-minute silent idle timeout**,
 > **HTTP Security Headers** (`SecurityHeaders`), the **Record Access Password Gate** (`App\Support\RecordAccess`),
 > **AI Employee Data Prohibition**, and **GDPR / Philippine Data Privacy Act (RA 10173) Data Subject Rights**
 > (consent recording, JSON data portability export, right to erasure, separated employee PII anonymization, and
 > automated storage-limitation pruning) are all implemented and active. There is no table-driven permission model,
-> no comprehensive read-every-row access log, and no cryptographic hash chain on `audit_trails`; see
-> [§3.4](#34-write-tracking).
+> no read-every-row access log (sensitive record *opens* are logged, not every query), and `audit_trails` is a
+> SHA-256 hash chain verified by `php artisan hims:audit-verify`; see [§3.4](#34-write-tracking).
 
 ### 3.1 Portal Authentication, Mandatory 2FA & Session Lifecycle
 
@@ -644,7 +679,7 @@ sequenceDiagram
         TwoFA-->>User: Regenerate Session + Set hims_last_activity
     end
     User->>MW: Authenticated Request
-    MW->>MW: Verify is_active=true, idle <= 5m, must_change_password=false
+    MW->>MW: Verify is_active=true, access not expired, idle <= 2m, must_change_password=false
     MW->>Rec: Access Protected Workforce / Credential Page
     alt Record Access Locked
         Rec-->>User: Render Page Blurred (.hims-record-blurred) + Unlock Overlay
@@ -670,10 +705,19 @@ sequenceDiagram
 *   **Brute Force Protection**: `App\Http\Requests\Auth\LoginRequest` rate-limits on an email+IP throttle key
     and tracks failures on `users`. The fifth failed attempt sets `locked_until` for **15 minutes**. Success
     clears the counter/lock, and an Admin can unlock early through `UserController::unlockAccount()`.
-*   **3-Minute Silent Session Timeout & Immediate Deactivation**: `EnforceSessionTimeout` checks `hims_last_activity`
-    on every request and terminates sessions idle for more than 3 minutes (`SESSION_IDLE_TIMEOUT=180`,
-    `SESSION_LIFETIME=5`) with zero warning modals, redirecting to `/login?timeout=1`. It also immediately terminates
-    any active session if the user's account is deactivated (`is_active = false`).
+*   **2-Minute Silent Session Timeout & Immediate Deactivation**: `EnforceSessionTimeout` checks `hims_last_activity`
+    on every request and terminates sessions idle for more than `config('session.idle_timeout')` **seconds**
+    (`SESSION_IDLE_TIMEOUT=120`, floor 60) with zero warning modals, redirecting to the public landing page
+    (`/?timeout=1`). `EnforceSessionTimeout::idleTimeoutSeconds()` is the single source the middleware, the browser
+    script (`partials/idle-logout`) and `session/ping` all read. `session/ping` never counts as activity; the
+    browser reports real use through `POST session/activity`, which fires at most once a minute and only after an
+    input event, so a forgotten tab cannot keep itself alive. The middleware also ends any active session at once
+    if the account is deactivated (`/?reason=deactivated`) or a Trainee's `users.access_expires_at` has passed
+    (`/?reason=expired`). `LoginRequest` refuses both at sign-in.
+*   **Public landing page**: `GET /` (route `landing`) is the pre-login screen and the destination for sign-out and
+    time-out. It renders no employee data.
+*   **HSTS**: `SecurityHeaders` sends `Strict-Transport-Security: max-age=31536000; includeSubDomains` on HTTPS
+    responses only, so local `http://hims-app.test` development is unaffected.
 *   **CSRF Protection**: Laravel's `VerifyCsrfToken` runs in the default `web` middleware group; all
     state-changing Blade forms emit `@csrf`.
 *   **Session cookie**: `HttpOnly` and `SameSite=Lax` by framework default. `bootstrap/app.php` configures
@@ -684,13 +728,26 @@ sequenceDiagram
 Authorisation is enforced by **Gates + route middleware**, both keyed on a single role column. There are no
 Policy classes.
 
-*   **Role source of truth**: `users.role`, one of **`admin` | `hr_manager` | `supervisor` | `staff`**.
-    `App\Models\User` exposes `hasRole(...$roles)`, `isAdmin()`, `isHrManager()`, `isSupervisor()`, `isStaff()`.
-*   **20 Gates** are defined in `AppServiceProvider::registerGates()`: `manage-users`, `manage-departments`,
-    `manage-employees`, `view-employees`, `manage-performance`, `manage-review-cycles`, `manage-competency`,
-    `manage-competency-framework`, `manage-learning`, `manage-training`, `manage-venues`, `record-completion`,
-    `view-compliance`, `manage-compliance`, `manage-succession`, `view-succession`, `manage-recognition`,
-    `view-audit-history`, `view-org-analytics`, `run-gap-analysis`.
+*   **Role source of truth**: `users.role`, one of **`admin` | `hr_manager` | `training_officer` | `supervisor` |
+    `staff` | `trainee`**, catalogued in `App\Support\Roles` (labels, icons, scope and the can/cannot lists the
+    Users form displays). `App\Models\User` exposes `hasRole(...$roles)`, `isAdmin()`, `isHrManager()`,
+    `isTrainingOfficer()`, `isSupervisor()`, `isStaff()`, `isTrainee()`, `accessHasExpired()` and
+    `seesAllLearners()`.
+*   **Training Officer scope**: controllers that set `protected bool $learningScope = true` (Learning,
+    Compliance, Training, Gap Analysis) treat `training_officer` as hospital-wide through
+    `Controller::seesAllEmployees()`; every other controller does not, so the role never widens performance,
+    succession or employee administration.
+*   **Trainee**: an own-records role with a required `users.access_expires_at`; see §3.1.
+*   **24 Gates** are defined in `AppServiceProvider::registerGates()`: `manage-users`, `manage-departments`,
+    `manage-employees`, `view-employees`, `manage-performance`, `view-performance`, `manage-review-cycles`,
+    `manage-competency`, `manage-competency-framework`, `manage-learning`, `manage-training`, `take-attendance`,
+    `manage-venues`, `record-completion`, `view-compliance`, `manage-compliance`, `manage-succession`,
+    `view-succession`, `manage-recognition`, `view-audit-history`, `view-org-analytics`, `run-gap-analysis`,
+    `view-training-needs`, `view-reports`.
+    *   `take-attendance` receives the session row: it allows training managers and **whoever is the session's
+        named instructor**, so a staff nurse teaching a BLS class checks in its learners.
+    *   `view-performance` hides Performance from `trainee` and `training_officer`; `view-training-needs` lets a
+        Training Officer open department-level gap analysis without `run-gap-analysis`.
     *   **No Gate covers review authority at all.** Every rule there needs the review row — who its subject is,
         who its reviewer is, which cycle it belongs to and whether that cycle has ended — and a Gate closure
         receives only `$user`. They are private controller methods instead
@@ -961,9 +1018,25 @@ read screen are MySQL-gated — the listings select `CONCAT()`, which sqlite doe
 
 ### 3.4 Write Tracking
 
-Per-record timestamps exist widely, but there are no Observers and no `::observe()` registrations. Instead,
-selected sensitive and administrative paths call `AuditTrail::record()` explicitly. Reads and any write path
-without an explicit call are not attributable beyond the row's timestamps.
+Per-record timestamps exist widely, but there are no Observers and no `::observe()` registrations. Coverage comes
+in two layers:
+
+*   **Rich domain entries.** Selected sensitive and administrative paths call `AuditTrail::record()` explicitly
+    with before/after state.
+*   **Baseline request entries (`App\Http\Middleware\AuditRequests`).** Every *successful* POST/PUT/PATCH/DELETE
+    by a signed-in user is written as `http_<verb>` with the route name, route parameters and submitted fields
+    (passwords, tokens and secrets removed). Opening a sensitive record (employee file, credentials, reviews, gap
+    analysis, succession, appraisal reports, audit log) is written as `view`. A 4xx/5xx response, or a redirect
+    carrying freshly flashed validation errors (`_flash.new`), is skipped because it changed nothing.
+
+**Tamper evidence.** `AuditTrail::record()` appends each row to a SHA-256 hash chain:
+*   `before_state_hash` and `after_state_hash` hold the hashes of the canonical states.
+*   `chain_hash` is `SHA-256(previous chain_hash + this row's content hash)`.
+*   `chain_seq` (migration `2026_11_24_000001`) orders the chain.
+
+The head (`seq:hash`) lives in `system_settings.audit_chain_head` and is row-locked while a row is appended, so concurrent writers cannot fork the chain. `php artisan hims:audit-verify` recomputes the chain and exits non-zero at the first edited, deleted or re-ordered row. If old rows were pruned deliberately, the first remaining row becomes the trusted anchor. Rows written before this release have no `chain_seq` and are outside the chain.
+
+**Retention.** `hims:prune-expired-data` no longer deletes audit rows unless `--audit-days` is given, and never deletes rows younger than 2190 days (6 years).
 
 Two tables retain alert history beyond that, both written by the notification subsystem rather than by user
 action:
@@ -1016,17 +1089,16 @@ the planner decided they meant.
 
 Three deliberate gaps:
 
-*   **`before_state_hash`, `after_state_hash`, `chain_hash` stay NULL.** The migration defines them for a
-    tamper-evident chain that is not implemented. Half-building it — writing hashes nothing verifies — would
-    imply a guarantee the system cannot make, so they are left empty rather than populated.
+*   **The hash chain proves integrity, not completeness of coverage.** It detects tampering with rows that were
+    written; it cannot record an action that no path audits. Since v2.25.0 the baseline request layer above covers
+    every successful write, so the remaining gap is ordinary list reads.
 *   **`resource_id` is best effort on create, and null for a bulk write.** UUIDs are generated in PHP, so there
     is no `LAST_INSERT_ID()` to read back; the executor takes the newest row in the target table since a
     pre-call timestamp. Under concurrency that can name the wrong row. `sync_renewal_cycles` leaves it null
     outright — the write spans many rows, so no single id identifies it, and the counts go in `after_state`
     instead. The actor, action, and payload are still correct in every case.
-*   **Coverage is selective, not a system-wide access log.** The implemented workflows above are attributable,
-    but reads are not logged and any write path without an explicit `AuditTrail::record()` call leaves only its
-    ordinary timestamps. An empty audit search therefore does not prove a record was untouched.
+*   **Reads are logged only for sensitive record opens.** List pages and searches are not, so an empty audit
+    search for "view" does not prove nobody saw a row in a list.
 
 ---
 
@@ -1186,14 +1258,16 @@ route sits behind `['auth', 'verified']`, with per-route `role:` gating.
 
 | Module | Handler | Views | Access |
 |---|---|---|---|
-| Dashboard | `DashboardController` | `dashboard.blade.php` + `dashboard/partials/` | all authenticated |
+| Landing | closure `landing` in `routes/web.php` | `landing.blade.php` | public (`GET /`); destination of sign-out and idle time-out |
+| Dashboard | `DashboardController` | `dashboard.blade.php` + `dashboard/partials/` (incl. `training` for Training Officers) | all authenticated |
 | Performance | `PerformanceController` | `performance/` (+ `cycles/`, `reviews/`, `kpis/`) | read: all, **row-scoped to own / authored / direct reports** · review create: `admin,hr_manager,supervisor` **and** the chain-of-command check ([§3.2.2](#322-performance-review-authority)) · scoring: same role gate, then **the named `reviewer_id` only**, and refused once the cycle's end date has passed · cycles & KPIs: `admin,hr_manager` |
 | Competency | `CompetencyController` | `competency/` (+ `assessments/`, `credentials/`, `domains/`, `role-requirements/`) | read: all · assess & HR1/HR2 sync: `admin,hr_manager,supervisor` · domains & role requirements: `admin,hr_manager` · credentials blurred until Record Access unlocked |
-| Gap Analysis | `GapAnalysisController` (`competency.gap.*`) | `competency/gap-analysis/` | `admin,hr_manager,supervisor` |
+| Gap Analysis | `GapAnalysisController` (`competency.gap.*`) | `competency/gap-analysis/` (+ `competency/partials/_gap-method`) | index & department: `admin,hr_manager,supervisor,training_officer` · employee drill-down: `admin,hr_manager,supervisor` |
 | Learning | `LearningController` + `ComplianceController` | `learning/` (+ `courses/`, `modules/`, `cpd/`, `pathways/`, `assignments/`, `renewals/`) | canonical `learning.*` routes · catalogue/modules (`MOD-INF-101`–`MOD-DPA-601`)/CPD/pathways: all authenticated · course/pathway authoring: `admin,hr_manager` · Required Training/Renewals/Reports: `admin,hr_manager,supervisor`, read lists row-scoped · rules/sync/accounts: `admin,hr_manager` (`accounts` blurred until Record Access unlocked) · `learning.cycles.mine`: all roles |
-| Training | `TrainingController` | `training/` (+ `sessions/`, `venues/`) | read/register: all · own feedback: all (needs attendance) · check-in & sessions: `admin,hr_manager,supervisor` · venues: `admin,hr_manager` |
+| Training | `TrainingController` | `training/` (+ `sessions/`, `venues/`) | read/register: all · own feedback: all (needs attendance) · sessions: `admin,hr_manager,training_officer,supervisor` · check-in: `take-attendance` gate (training managers or the session's named instructor) · venues: `admin,hr_manager,training_officer` |
 | Succession | `SuccessionController` | `succession/` (+ `candidates/`, `positions/`) | `admin,hr_manager,supervisor` (staff: no access) · admin/HR full confidential management · supervisors see redacted direct-report candidates/positions and manage those milestones only |
 | Recognition | `RecognitionController` | `recognition/` (+ `badges/`, `posts/`, `comments/`, `certificates/`) | public wall: all · private: sender/recipient/HR/Admin · writes require a linked employee · badges/moderation/points: `admin,hr_manager` |
+| Awards & Certificates | `AwardController` + `AwardService` | `recognition/awards/` (`index`, `certificate`, `badge-svg`) | `/recognition/awards`: all authenticated (own awards; HR/Admin all) · type/issue/revoke/run-auto: `admin,hr_manager` · `GET /awards/verify/{code}`, `GET /awards/badge/{code}.svg`: public, `throttle:60,1` |
 | Reports & Analytics | `ReportController` | `reports/` (`index`, `performance`, `compliance`, `appraisal`) | `admin,hr_manager,supervisor` (includes CSV exports for performance & compliance) |
 | Employees | `EmployeeController` | `employees/` | group `admin,hr_manager,supervisor`; supervisor read is direct-report scoped · CRUD & separated PII anonymize (`POST /employees/{id}/anonymize`): `admin,hr_manager` · blurred until Record Access unlocked |
 | Departments | **inline closures in `routes/web.php`** (no controller) | `departments/index.blade.php` | `admin,hr_manager` (create, update, delete when empty) |

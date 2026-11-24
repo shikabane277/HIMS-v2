@@ -27,6 +27,13 @@ class SecurityHeaders
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
         $response->headers->set('X-Permitted-Cross-Domain-Policies', 'none');
 
+        // Once a browser has reached HIMS over HTTPS, never let it fall back to
+        // plain HTTP (cookie theft on hospital Wi-Fi). Only sent over HTTPS, so
+        // local http://hims-app.test development is unaffected.
+        if ($request->isSecure()) {
+            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
+
         // Prevent shared hospital workstation browsers from caching authenticated PII pages.
         if (Auth::check() && ! $response->headers->has('Content-Disposition')) {
             $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
@@ -36,4 +43,3 @@ class SecurityHeaders
         return $response;
     }
 }
-

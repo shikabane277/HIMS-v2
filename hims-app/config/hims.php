@@ -33,4 +33,25 @@ return [
 
     'credential_scan_time' => env('CREDENTIAL_SCAN_TIME', '06:30'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Cron endpoint secret
+    |--------------------------------------------------------------------------
+    |
+    | Shared secret for GET /api/cron/{sync|scan|prune|digest}. Callers send
+    | `Authorization: Bearer <secret>` (Vercel Cron does this automatically
+    | when CRON_SECRET is set) or `X-Cron-Key: <secret>`. Leave empty to
+    | disable the endpoint outside the local environment.
+    |
+    */
+
+    'cron_secret' => env('CRON_SECRET', ''),
+
+    /*
+    | Run `hims:backup` nightly from the scheduler. Turn off on hosts without
+    | persistent disk (Vercel) and rely on database-provider backups there.
+    */
+
+    'backup_schedule_enabled' => env('BACKUP_SCHEDULE_ENABLED', true),
+
 ];

@@ -44,15 +44,16 @@
                     $expired = $cred->expiry_date && \Carbon\Carbon::parse($cred->expiry_date)->isPast();
                     $expiring = !$expired && $cred->expiry_date && \Carbon\Carbon::parse($cred->expiry_date)->diffInDays(now()) <= 30;
                     $rawNum = $cred->credential_number ?? '';
-                    $maskedNum = $rawNum ? ('••••-••••-' . (strlen($rawNum) > 4 ? substr($rawNum, -4) : '1234')) : '—';
+                    $maskedNum = $rawNum ? ('••••-••••-' . (strlen($rawNum) > 4 ? substr($rawNum, -4) : '••••')) : '—';
                 @endphp
                 <tr id="credential-{{ $cred->credential_id }}" style="scroll-margin-top:84px">
                     <td data-label="Employee"><strong>{{ $cred->employee_name ?? '—' }}</strong></td>
                     <td data-label="Type">{{ $cred->credential_type }}</td>
                     <td data-label="Number" style="font-family:monospace;font-size:12.5px">
                         @if($rawNum)
-                        <span id="cred-num-{{ $cred->credential_id }}">{{ $maskedNum }}</span>
-                        <button type="button" class="btn-hims btn-hims-ghost btn-sm" style="padding:1px 5px;font-size:11px" onclick="let d = document.getElementById('cred-num-{{ $cred->credential_id }}'); d.innerText = d.innerText === '{{ $maskedNum }}' ? '{{ $rawNum }}' : '{{ $maskedNum }}';">Show</button>
+                        <span id="cred-num-{{ $cred->credential_id }}" data-masked="{{ $maskedNum }}" data-full="{{ $rawNum }}">{{ $maskedNum }}</span>
+                        {{-- Values travel in data-* attributes, never inside inline JS, so a credential number containing a quote cannot break out into script. --}}
+                        <button type="button" class="btn-hims btn-hims-ghost btn-sm" style="padding:1px 5px;font-size:11px" onclick="var d = document.getElementById('cred-num-{{ $cred->credential_id }}'); d.textContent = d.textContent === d.dataset.masked ? d.dataset.full : d.dataset.masked;">Show</button>
                         @else
                         —
                         @endif
@@ -63,8 +64,20 @@
                     </td>
                     <td data-label="Status"><span class="hims-badge {{ $expired ? 'red' : ($expiring ? 'yellow' : 'green') }}">
                         {{ $expired ? 'Expired' : ($expiring ? 'Expiring Soon' : 'Valid') }}
-                    </span></td>
+                    </span>
+                    @if($cred->verified_at)
+                        <span class="hims-badge blue" title="Verified {{ \Carbon\Carbon::parse($cred->verified_at)->format('M d, Y') }}{{ $cred->verifier_name ? ' by '.$cred->verifier_name : '' }}"><i class="bi bi-patch-check"></i> Verified</span>
+                    @else
+                        <span class="hims-badge" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0" title="Not yet checked against the issuing body">Unverified</span>
+                    @endif
+                    </td>
                     <td data-label="Actions">
+                        @if(! $cred->verified_at && auth()->user()?->hasRole('admin', 'hr_manager'))
+                        <form method="POST" action="{{ route('competency.credentials.verify', $cred->credential_id) }}" style="display:inline" onsubmit="return confirm('Confirm you have checked this credential with the issuing body (primary-source verification)?');">
+                            @csrf
+                            <button type="submit" class="btn-hims btn-hims-ghost btn-sm"><i class="bi bi-patch-check"></i> Verify</button>
+                        </form>
+                        @endif
                         @can('view-audit-history')
                         <button type="button" class="btn-hims btn-hims-ghost btn-sm" data-history-resource-type="employee_credentials" data-history-resource-id="{{ $cred->credential_id }}"><i class="bi bi-clock-history"></i> History</button>
                         @endcan

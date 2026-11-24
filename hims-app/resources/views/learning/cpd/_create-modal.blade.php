@@ -47,8 +47,8 @@
                         <label class="hims-label" for="cpd_source_type">Source *</label>
                         <select name="source_type" id="cpd_source_type" class="hims-input hims-select" required>
                             <option value="external" @selected(old('source_type','external') === 'external')>External activity — needs HR verification</option>
-                            <option value="course"   @selected(old('source_type') === 'course')>HIMS course</option>
-                            <option value="training" @selected(old('source_type') === 'training')>HIMS training session</option>
+                            <option value="course"   @selected(old('source_type') === 'course')>HIMS course — qualifies once completed</option>
+                            <option value="training" @selected(old('source_type') === 'training')>HIMS training session — qualifies once attendance is recorded</option>
                         </select>
                         <small style="color:#9ca3af;font-size:11.5px">
                             Hours earned inside HIMS are verified automatically. External activity stays

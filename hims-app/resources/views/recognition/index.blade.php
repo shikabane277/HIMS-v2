@@ -369,12 +369,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         new Chart(recCanvas, {
             data: {
-                labels: trendLabels.length ? trendLabels : ['May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026'],
+                labels: trendLabels,
                 datasets: [
                     {
                         type: 'line',
                         label: 'Reactions & Cheers',
-                        data: trendLabels.length ? reactionCounts : [32, 45, 58, 72, 65, 88],
+                        data: reactionCounts,
                         borderColor: '#8b5cf6',
                         backgroundColor: 'rgba(139, 92, 246, 0.12)',
                         borderWidth: 2.5,
@@ -386,7 +386,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     {
                         type: 'bar',
                         label: 'Kudos Given',
-                        data: trendLabels.length ? postCounts : [14, 20, 26, 32, 28, 40],
+                        data: postCounts,
                         backgroundColor: 'rgba(5, 150, 105, 0.75)',
                         hoverBackgroundColor: '#059669',
                         borderRadius: 6,
@@ -440,9 +440,9 @@ document.addEventListener('DOMContentLoaded', function () {
         new Chart(badgeCanvas, {
             type: 'doughnut',
             data: {
-                labels: badgeLabels.length ? badgeLabels : ['Compassion', 'Clinical Excellence', 'Teamwork', 'Patient Advocacy', 'Integrity'],
+                labels: badgeLabels,
                 datasets: [{
-                    data: hasData ? badgeData : [25, 30, 20, 15, 10],
+                    data: badgeData,
                     backgroundColor: ['#059669', '#0284c7', '#8b5cf6', '#d97706', '#ec4899'],
                     borderWidth: 2,
                     borderColor: '#ffffff'

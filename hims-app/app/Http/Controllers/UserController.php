@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\AccountStatus;
 use App\Support\AuditTrail;
+use App\Support\Roles;
+use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -65,7 +69,9 @@ class UserController extends Controller
         $aiIncludeComments = DB::table('system_settings')->where('key', 'ai_include_comments')->value('value') === '1';
         $aiRedactNames = DB::table('system_settings')->where('key', 'ai_redact_names')->value('value') !== '0';
 
-        return view('users.index', compact('users', 'total', 'employees', 'aiIncludeComments', 'aiRedactNames'));
+        $roleCounts = User::query()->selectRaw('role, COUNT(*) as c')->groupBy('role')->pluck('c', 'role');
+
+        return view('users.index', compact('users', 'total', 'employees', 'aiIncludeComments', 'aiRedactNames', 'roleCounts'));
     }
 
     public function create()
@@ -93,7 +99,9 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email',
             'password' => ['required', 'confirmed', Password::min(8)],
-            'role' => 'required|in:admin,hr_manager,supervisor,staff',
+            'role' => ['required', Rule::in(Roles::ALL)],
+            // Trainees (students, interns, orientees) must have an end date.
+            'access_expires_at' => ['nullable', 'required_if:role,trainee', 'date', 'after:today'],
             'employee_id' => 'nullable|string|exists:employees,employee_id|unique:users,employee_id',
         ]);
 
@@ -113,6 +121,7 @@ class UserController extends Controller
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
+                'access_expires_at' => $request->filled('access_expires_at') ? Carbon::parse($request->access_expires_at)->endOfDay() : null,
                 'employee_id' => $employeeId,
                 'email_verified_at' => now(),
             ]);
@@ -121,6 +130,7 @@ class UserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'access_expires_at' => optional($user->access_expires_at)->toDateString(),
             ]);
         } catch (QueryException $e) {
             $msg = $e->getMessage();
@@ -215,7 +225,9 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => "required|string|email|max:255|unique:users,email,{$user->id}",
-            'role' => 'required|in:admin,hr_manager,supervisor,staff',
+            'role' => ['required', Rule::in(Roles::ALL)],
+            // Trainees (students, interns, orientees) must have an end date.
+            'access_expires_at' => ['nullable', 'required_if:role,trainee', 'date', 'after:today'],
             'employee_id' => "nullable|string|exists:employees,employee_id|unique:users,employee_id,{$user->id}",
         ]);
 
@@ -231,6 +243,7 @@ class UserController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'role' => $request->role,
+                'access_expires_at' => $request->filled('access_expires_at') ? Carbon::parse($request->access_expires_at)->endOfDay() : null,
                 'employee_id' => $request->employee_id ?: null,
             ]);
 
@@ -276,7 +289,9 @@ class UserController extends Controller
             'updated_at' => now(),
         ]);
 
-        return redirect()->route('users.index')->with('success', 'User account unlocked successfully.');
+        AuditTrail::record('user_account_unlocked', 'users', (string) $id);
+
+        return back()->with('success', 'User account unlocked successfully.');
     }
 
     public function updateAiSettings(Request $request)
@@ -376,13 +391,18 @@ class UserController extends Controller
         $user->is_active = $newStatus;
         $user->save();
 
+        if (! $newStatus) {
+            // Remembered devices would otherwise skip 2FA on reactivation.
+            AccountStatus::revokeTrustedDevices([$user->id]);
+        }
+
         AuditTrail::record('user_account_status_toggled', 'users', (string) $user->id, afterState: [
             'is_active' => $newStatus,
             'user_id' => $user->id,
             'email' => $user->email,
         ]);
 
-        return redirect()->route('users.index')->with('success', "Account for {$user->name} has been ".($newStatus ? 'activated.' : 'deactivated.'));
+        return back()->with('success', "Account for {$user->name} has been ".($newStatus ? 'activated.' : 'deactivated.'));
     }
 
     private function adminCount(): int

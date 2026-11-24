@@ -29,6 +29,8 @@ use Illuminate\Support\Str;
  */
 class ComplianceController extends Controller
 {
+    protected bool $learningScope = true;
+
     public function __construct(
         private TrainingAssignmentService $assignments,
         private RenewalCycleService $cycles,

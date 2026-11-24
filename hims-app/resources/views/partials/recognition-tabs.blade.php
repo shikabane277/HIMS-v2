@@ -5,6 +5,8 @@
 @php
     $currentView = $view ?? request()->query('view', 'feed');
     $isCertificates = request()->routeIs('recognition.certificates.*') || request()->routeIs('learning.certificates.*');
+    $isAwards = request()->routeIs('recognition.awards.*');
+    $isCertificates = $isCertificates || $isAwards; // keeps Wall/Received/Sent un-highlighted
     $canModerate = $canModerate ?? (auth()->check() && (auth()->user()->role === 'admin' || auth()->user()->role === 'hr_manager'));
 @endphp
 
@@ -21,9 +23,13 @@
        class="hims-tab {{ !$isCertificates && $currentView === 'sent' ? 'active' : '' }}">
         <i class="bi bi-send"></i> Sent
     </a>
+    <a href="{{ route('recognition.awards.index') }}"
+       class="hims-tab {{ $isAwards ? 'active' : '' }}">
+        <i class="bi bi-award"></i> Awards &amp; Badges
+    </a>
     <a href="{{ route('recognition.certificates.index') }}"
-       class="hims-tab {{ $isCertificates ? 'active' : '' }}">
-        <i class="bi bi-patch-check"></i> Certificates
+       class="hims-tab {{ $isCertificates && ! $isAwards ? 'active' : '' }}">
+        <i class="bi bi-patch-check"></i> Course Certificates
     </a>
     @if($canModerate)
     <a href="{{ route('recognition.index', ['view' => 'private']) }}"
@@ -59,9 +65,14 @@
                         {{ !$isCertificates && $currentView === 'sent' ? 'selected' : '' }}>
                     Sent
                 </option>
+                <option value="{{ route('recognition.awards.index') }}"
+                        data-icon="bi bi-award"
+                        {{ $isAwards ? 'selected' : '' }}>
+                    Awards &amp; Badges
+                </option>
                 <option value="{{ route('recognition.certificates.index') }}"
                         data-icon="bi bi-patch-check"
-                        {{ $isCertificates ? 'selected' : '' }}>
+                        {{ $isCertificates && ! $isAwards ? 'selected' : '' }}>
                     Certificates
                 </option>
                 @if($canModerate)

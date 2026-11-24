@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\Roles;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -212,7 +213,7 @@ class ReportingLineService
             ->join('departments as d', 'e.department_id', '=', 'd.department_id')
             ->join('users as u', 'u.employee_id', '=', 'e.employee_id')
             ->where('e.is_people_manager', true)
-            ->where('u.role', 'staff')
+            ->whereNotIn('u.role', self::REVIEW_ACCESS_ROLES)
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from('users as review_account')
@@ -273,11 +274,8 @@ class ReportingLineService
     public static function roleLabel(?string $role): string
     {
         return match ($role) {
-            'admin' => 'Admin',
-            'hr_manager' => 'HR Manager',
-            'supervisor' => 'Supervisor',
-            'staff' => 'Trainee',
-            default => 'No HIMS account',
+            null, '' => 'No HIMS account',
+            default => Roles::label($role),
         };
     }
 

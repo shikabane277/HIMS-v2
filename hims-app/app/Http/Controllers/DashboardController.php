@@ -26,8 +26,95 @@ class DashboardController extends Controller
             $user->isAdmin() => view('dashboard', $this->adminData()),
             $user->isHrManager() => view('dashboard', $this->hrData()),
             $user->isSupervisor() => view('dashboard', $this->supervisorData($user->departmentId())),
+            $user->isTrainingOfficer() => view('dashboard', $this->trainingOfficerData()),
+            $user->isTrainee() => view('dashboard', $this->traineeData($user)),
             default => view('dashboard', $this->staffData($user->employee_id)),
         };
+    }
+
+    /* ───────────────────────── training officer ──────────────────────── */
+
+    /**
+     * The hospital's learning programme at a glance: what is coming up, who is
+     * overdue, what is waiting for verification and which licences lapse soon.
+     * No performance or succession data.
+     */
+    private function trainingOfficerData(): array
+    {
+        $today = now()->toDateString();
+        $since = now()->subDays(90)->toDateString();
+
+        $registrations90 = DB::table('training_registrations as tr')
+            ->join('training_sessions as ts', 'tr.session_id', '=', 'ts.session_id')
+            ->whereBetween('ts.session_date', [$since, $today])
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN tr.status = 'attended' OR tr.check_in_time IS NOT NULL THEN 1 ELSE 0 END) as attended")
+            ->first();
+
+        $overdue = DB::table('course_enrollments as ce')
+            ->join('employees as e', 'ce.employee_id', '=', 'e.employee_id')
+            ->join('courses as c', 'ce.course_id', '=', 'c.course_id')
+            ->leftJoin('departments as d', 'e.department_id', '=', 'd.department_id')
+            ->whereNotNull('ce.assignment_id')->where('ce.status', '!=', 'completed')
+            ->whereNotNull('ce.due_date')->where('ce.due_date', '<', $today)
+            ->where('e.employment_status', 'active')
+            ->select('e.first_name', 'e.last_name', 'd.name as department_name', 'c.title', 'ce.due_date as required_by')
+            ->orderBy('ce.due_date');
+
+        $expiring = DB::table('employee_credentials as ec')
+            ->join('employees as e', 'ec.employee_id', '=', 'e.employee_id')
+            ->where('e.employment_status', 'active')
+            ->whereNotNull('ec.expiry_date')
+            ->whereBetween('ec.expiry_date', [$today, now()->addDays(60)->toDateString()]);
+
+        return [
+            'role' => 'training_officer',
+            'scope' => 'Whole hospital — learning & training',
+            'heading' => 'Training & Development Dashboard',
+            'subheading' => 'Sessions, mandatory training, CPD verification and expiring certifications across the hospital.',
+            'stats' => [
+                'sessions_upcoming' => DB::table('training_sessions')->where('status', 'scheduled')
+                    ->whereBetween('session_date', [$today, now()->addDays(30)->toDateString()])->count(),
+                'attendance_rate' => $registrations90 && $registrations90->total > 0
+                    ? (int) round($registrations90->attended / $registrations90->total * 100) : null,
+                'mandatory_overdue' => (clone $overdue)->count(),
+                'cpd_pending' => DB::table('cpd_records')->where('source_type', 'external')->where('verified', false)->count(),
+                'expiring_60' => (clone $expiring)->count(),
+                'active_courses' => DB::table('courses')->where('is_active', true)->count(),
+            ],
+            'upcoming_sessions' => DB::table('training_sessions as ts')
+                ->leftJoin('training_venues as tv', 'ts.venue_id', '=', 'tv.venue_id')
+                ->leftJoin('employees as i', 'ts.instructor_id', '=', 'i.employee_id')
+                ->where('ts.status', 'scheduled')->whereDate('ts.session_date', '>=', $today)
+                ->select('ts.session_id', 'ts.title', 'ts.session_date', 'ts.start_time', 'ts.capacity', 'ts.cpd_hours', 'tv.venue_name',
+                    DB::raw("CONCAT(i.first_name,' ',i.last_name) as instructor_name"))
+                ->selectSub(fn ($q) => $q->from('training_registrations')->whereColumn('training_registrations.session_id', 'ts.session_id')
+                    ->whereIn('status', ['registered', 'attended'])->selectRaw('COUNT(*)'), 'registered_count')
+                ->orderBy('ts.session_date')->limit(8)->get(),
+            'overdue_training' => $overdue->limit(10)->get(),
+            'expiring_credentials' => $expiring
+                ->select('e.first_name', 'e.last_name', 'ec.credential_type', 'ec.expiry_date')
+                ->orderBy('ec.expiry_date')->limit(10)->get(),
+        ];
+    }
+
+    /* ───────────────────────────── trainee ───────────────────────────── */
+
+    /** Staff dashboard without performance reviews, plus placement details. */
+    private function traineeData($user): array
+    {
+        $data = $this->staffData($user->employee_id);
+        $data['is_trainee'] = true;
+        $data['heading'] = 'My Training Dashboard';
+        $data['subheading'] = 'Your orientation / placement: learning, training sessions, skills and certificates.';
+        $data['access_expires_at'] = $user->access_expires_at;
+        $data['preceptor'] = $user->employee_id
+            ? DB::table('employees as e')->join('employees as s', 'e.supervisor_id', '=', 's.employee_id')
+                ->where('e.employee_id', $user->employee_id)
+                ->select('s.first_name', 's.last_name', 's.position_title', 's.email')->first()
+            : null;
+
+        return $data;
     }
 
     /* ────────────────────────────── admin ────────────────────────────── */

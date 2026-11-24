@@ -31,8 +31,8 @@ Welcome to the **HIMS Performance & Development Module**! This guide describes w
 
 ### Logging In & Mandatory Two-Factor Authentication (2FA)
 
-1. Open your web browser and go to your hospital's HIMS website.
-2. Enter your **email address** and **password**, then click **Log In**.
+1. Open your web browser and go to your hospital's HIMS website. The first screen is the **HR3 landing page**, which lists the modules and shows no staff data. Click **Sign in**.
+2. Enter your **email address** and **password**, then click **Log In**. A **deactivated** account, or a **Trainee** account whose access end date has passed, is refused here with a message telling you whom to contact.
 3. Complete the **Two-Factor Verification** step:
    - **If you have enabled an Authenticator App (TOTP)** on your profile, enter the 6-digit code from your authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.).
    - **Otherwise (Email OTP)**, HIMS sends a 6-digit verification code to your email address (valid for 5 minutes). Enter the code and click **Verify**.
@@ -96,8 +96,12 @@ What you can reach depends on your assigned role:
 |---|---|
 | **Admin** | Everything — all modules, plus user accounts. Reviews are the one exception: like everyone else, an Admin may only review their own direct reports |
 | **HR Manager** | All modules except user accounts. Reviews follow the same reporting-line rule as everyone else |
+| **Training Officer** | The hospital's learning programme, for everyone: courses, pathways, sessions, venues, attendance, mandatory-training assignments, renewal rules, CPD verification, course completions, accreditation reports and department training-needs analysis. No performance reviews or scores, succession, awards, employee administration or accounts. Has its own **Training dashboard** |
 | **Supervisor** | Create and score reviews for their own direct reports, create competency assessments and credentials, run gap analysis, schedule training sessions, view redacted succession records for direct-report candidates, manage those candidates' milestones, and read their team's compliance figures |
-| **Staff** | Dashboard, My Development, performance and competency pages, reading and responding to their own reviews, learning, CPD logging, their own renewal cycles, training registration and feedback, and recognition |
+| **Staff** | Dashboard, My Development, performance and competency pages, reading and responding to their own reviews, learning, CPD logging, their own renewal cycles, training registration and feedback, recognition, and their own awards, certificates and badges |
+| **Trainee** | For students on placement, interns, OJT and orientees. The same as Staff, without performance reviews, until the **access end date** an administrator sets. On that date the account stops signing in |
+
+> **Instructors are not a separate account.** Whoever is named as a training session's instructor can take attendance for that session, whatever their role.
 
 > **Note:** Menu items you do not have access to are hidden from your sidebar.
 >
@@ -358,7 +362,7 @@ The Competency page shows a department-level matrix of where proficiency falls s
 
 ### Sidebar: 🤖 AI Gap Analysis
 
-> **Who can use this:** Admins, HR Managers, and Supervisors.
+> **Who can use this:** Admins, HR Managers, and Supervisors. Training Officers can open the department-level training-needs view.
 
 #### Using It
 
@@ -369,6 +373,23 @@ The Competency page shows a department-level matrix of where proficiency falls s
 5. To analyse one person, find them in the **Analyse an Individual** list and click through to their report.
 
 The analysis runs when you open the page — there is no separate "Run Analysis" button.
+
+#### How a gap is calculated
+
+On an individual's report every gap row shows its own **Gap**, **Severity** and **Priority** working, and a **How gaps are calculated** panel explains the rules, so you can check any figure by hand:
+
+| Step | Formula | Example |
+|---|---|---|
+| **Gap** | Current level − Required level | Current 2 − Required 4 = **−2** |
+| **Severity** | 2 or more levels below → **Critical**. 1 below on a mandatory or critical competency → **Critical**. 1 below otherwise → **Moderate**. At or above → **None** | −2 → Critical |
+| **Priority** (0–100) | \|gap\| × 25, + 30 if mandatory/critical to the role, + 15 if still below after training, capped at 100 | 2 × 25 + 30 = **80** |
+
+A competency with no assessment yet gets a fixed priority: 90 if it is mandatory or critical, otherwise 60.
+
+Two summary figures sit at the top of an individual's report:
+
+*   **Readiness** = competencies met ÷ competencies required. It only counts a competency once it is fully met.
+*   **Proficiency coverage** = Σ min(current, required) ÷ Σ required × 100. It gives credit for progress: someone at level 3 of a required 4 counts 3 of 4 points.
 
 #### An individual's report also reads what their supervisor wrote
 
@@ -484,7 +505,15 @@ For everything the system did not witness — a conference, a webinar, private s
 
 > The **Log CPD** button on **My Cycles** does the same thing — it is a link back to My CPD with the same modal already open.
 
-**Whether it counts straight away depends on where the activity came from.** An activity that HIMS can already see — an in-house course or a training session you attended here — is accepted as verified immediately. Anything external (a conference, a webinar, private study) is saved as **unverified** and waits for HR to approve it. Unverified hours are listed with your other records but are marked as pending.
+**Every CPD entry is marked Qualified, Not qualified or Pending, and only qualified hours count** towards renewal cycles and your dashboard total. HIMS checks for evidence:
+
+| Activity type | Qualified when | Otherwise |
+|---|---|---|
+| **Course** | You have a **completed** enrolment in that course | Not qualified, with the reason shown |
+| **Training session** | Your **attendance was recorded** at check-in | Not qualified until the instructor checks you in |
+| **External** (conference, webinar, private study) | HR has verified the certificate | Pending |
+
+Qualified hours are capped at what the course or session is worth, so a 2-hour session cannot count as 20. When you are checked in at a session, its hours are added for you automatically. If the attendance is withdrawn, those hours stop counting.
 
 > **Only HR Managers and Admins can verify.** If your external activity is still pending, the person to ask is HR. As ordinary staff you cannot approve your own entry — you do not have the permission at all. Note for HR Managers and Admins: the system does **not** stop you verifying your own CPD record, so treat that as a matter of policy rather than something HIMS enforces.
 
@@ -494,7 +523,7 @@ For everything the system did not witness — a conference, a webinar, private s
 
 The Learning Overview carries a **Certificates Issued** stat card, which counts the rows in the `certificates` table.
 
-> **The system does not issue certificates.** Nothing writes to that table — no code path anywhere in HIMS creates a certificate when you finish a course — so in practice the card reads **0** and stays there. There is no download and no QR verification. Read the card as "certificates on record", not as evidence that HIMS produced any.
+> **The system does not issue certificates.** Nothing writes to that table — no code path anywhere in HIMS creates a certificate when you finish a course — so in practice the card reads **0** and stays there. There is no download and no QR verification. Read the card as "certificates on record", not as evidence that HIMS produced any. Recognition **awards** do issue their own verifiable certificates; see [§11](#11-social-recognition).
 
 ---
 
@@ -731,6 +760,23 @@ For each candidate in your permitted scope you can add **milestones**: courses, 
 
 Each milestone moves through **Not Started → In Progress → Completed**. The completion date is stamped automatically when you mark it complete, and cleared if you move it back. The share of completed milestones drives the Dev Progress percentage in the pipeline.
 
+#### Promotion Qualification (Admins/HR)
+
+On a candidate's page, the **Position requirements** panel (Admins/HR) sets what a successor to that position must meet: the target job role, a minimum performance score, minimum years of service, and required licences or credentials. Click **Save requirements**.
+
+Open a candidate to see the **Promotion qualification** checklist. Each line is a ✓ or ✗ taken from HIMS records, not typed in:
+
+1. Nomination approved by HR
+2. Readiness is **Ready now**
+3. Latest completed review is at or above the position's minimum score
+4. No open performance improvement plan
+5. No critical competency gaps against the **target** role
+6. Years of service meet the minimum (if set)
+7. Required credentials held and valid, and no expired credential of any kind
+8. No overdue mandatory training
+
+Under **Promote into this position**, the **Promote** button is available once every line passes. While any line fails, it reads **Promote with override** and needs a typed reason, and the override is recorded in the audit trail. Promotion here is about qualification for the post. **Salary is not changed in HR3**; any pay change follows in HR1.
+
 #### Readiness Evidence
 
 Open a candidate and, below their milestones, two panels show what HIMS already records about them elsewhere. Readiness is still your judgement, but you can now check it against evidence instead of recollection.
@@ -774,6 +820,20 @@ matches the author; every other post is labelled **Peer**.
 Recognition is never anonymous: the sender and recipient remain visible in both modes. A **Public** post appears on the hospital wall. A **Private** post is visible only to its sender, its recipient, and HR/Admin moderators. It does not appear in public totals, the top-department calculation, or the leaderboard.
 
 Admins and HR Managers can create additional badge types from the **New Value Badge** modal.
+
+#### Awards & Certificates
+
+Open **Recognition → Awards**. Everyone sees their own awards here and on their profile. Each award comes with:
+
+*   a **digital certificate**: a printable page with the award, citation, date, signatory and a unique code such as `HR3-AW-2026-7K3QF9ZD`. Use **Download PDF** (it opens your browser's print dialog) to save it, or **Copy link** to share it. Anyone with the link can check that it is genuine, and a revoked certificate says so;
+*   a **badge** image you can share, which is also shown on your employee profile.
+
+**For HR Managers and Admins:**
+
+1. **Award types.** Fifteen starter types are provided: service milestones at 5, 10, 15, 20, 25 and 30 years, Compassionate Care, Clinical Excellence, Outstanding Employee of the Quarter, Innovation & Suggestion, Exemplary Conduct, Team Excellence, Preceptor & Mentor of the Year, Patient Safety Champion and Lifelong Learner. Click **New award type** to create your own. Choose a badge icon and colour, the certificate title and wording (`{citation}`, `{period}`, `{years}` and `{cpd_hours}` are filled in for you), the signatory and the points.
+2. **Issue an award.** Click **Issue award**, pick the type and date, tick one or more recipients (use the filter box to find people or a whole unit), and add a citation. Each recipient gets their own certificate and a notification.
+3. **Revoke** an award, giving a reason. The certificate stays verifiable but is stamped **Revoked**.
+4. **Automatic awards.** Service milestones (from the HR1 hire date) and the Lifelong Learner award (40 qualified CPD hours in a calendar year) are issued every morning. You can also click **Run automatic awards** to issue them now. Nobody receives the same automatic award twice.
 
 #### Reacting & Commenting
 
@@ -947,14 +1007,15 @@ Sensitive tables and records (such as the Employees directory, Credentials regis
 ### How the System Protects Your Account
 
 - **Mandatory 2FA** on every login (Email OTP with 5-minute expiry or RFC 6238 Authenticator App with replay protection).
-- **3-Minute Silent Inactivity Timeout:** If you leave HIMS idle for 3 minutes, your session ends automatically and redirects to the login page on your next click.
+- **2-Minute Silent Inactivity Timeout:** If you leave HIMS idle for 2 minutes, your session ends automatically without a warning and the tab returns to the public landing page, so an unattended screen shows nothing about anyone.
+- **Deactivation takes effect at once:** If an administrator deactivates your account, or a Trainee's access end date passes, any open session ends on its next click.
 - **Account Lockout:** After 5 failed login attempts, your account is locked for 15 minutes (or until an Administrator unlocks it).
 - **Field-Level Encryption at Rest:** Employee phone numbers, credential licence numbers, external HR API keys, and TOTP secrets are encrypted in the database using AES-256-CBC (`Crypt`).
 - **Audit Logging:** Logins, 2FA events, Record Access unlocks, GDPR data exports/deletions, and sensitive administrative writes are recorded in `audit_trails`.
 
 ### Logging Out
 
-Click **Logout** at the bottom of the sidebar.
+Click **Logout** at the bottom of the sidebar. You return to the landing page.
 
 ---
 

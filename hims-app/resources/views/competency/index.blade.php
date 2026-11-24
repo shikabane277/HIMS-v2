@@ -226,11 +226,11 @@ document.addEventListener('DOMContentLoaded', function () {
         new Chart(domainCanvas, {
             type: 'bar',
             data: {
-                labels: domainLabels.length ? domainLabels : ['Clinical Practice', 'Patient Safety', 'Ethics & Law', 'Leadership', 'Informatics'],
+                labels: domainLabels,
                 datasets: [
                     {
                         label: 'Required Benchmark',
-                        data: domainLabels.length ? domainRequired : [4.0, 4.5, 4.0, 3.5, 3.8],
+                        data: domainRequired,
                         backgroundColor: 'rgba(2, 132, 199, 0.25)',
                         borderColor: '#0284c7',
                         borderWidth: 1.5,
@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     },
                     {
                         label: 'Current Assessed Avg',
-                        data: domainLabels.length ? domainAssessed : [3.5, 4.1, 3.8, 3.2, 3.4],
+                        data: domainAssessed,
                         backgroundColor: 'rgba(5, 150, 105, 0.85)',
                         borderColor: '#059669',
                         borderWidth: 1.5,
@@ -286,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function () {
             data: {
                 labels: credLabels,
                 datasets: [{
-                    data: hasData ? credData : [45, 4, 1],
+                    data: credData,
                     backgroundColor: ['#059669', '#d97706', '#ef4444'],
                     borderWidth: 2,
                     borderColor: '#ffffff'

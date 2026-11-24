@@ -32,7 +32,9 @@ class RecordAccess
 
         $hash = DB::table('system_settings')->where('key', 'record_access_password_hash')->value('value');
         if (! $hash) {
-            $hash = Hash::make('password');
+            // No password configured means nobody can unlock — never fall back
+            // to a guessable default. An admin sets it under Users → Settings.
+            return false;
         }
 
         if (Hash::check($password, $hash)) {

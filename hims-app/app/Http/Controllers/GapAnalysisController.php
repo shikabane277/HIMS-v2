@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\CompetencyGapAnalysisService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Objective 6 — AI-Driven Competency Gap Analysis.
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\DB;
  */
 class GapAnalysisController extends Controller
 {
+    protected bool $learningScope = true;
+
     public function __construct(private CompetencyGapAnalysisService $analysis) {}
 
     /**
@@ -28,8 +31,9 @@ class GapAnalysisController extends Controller
             return redirect()->route('competency.gap.employee', $request->query('employee_id'));
         }
 
-        // Supervisors are pinned to their own department; HR/admin may choose.
-        $departmentId = $user->seesWholeOrganisation()
+        // Supervisors are pinned to their own department; HR/admin and the
+        // Training Officer may choose.
+        $departmentId = $this->seesAllEmployees()
             ? $request->query('department')
             : $user->departmentId();
 
@@ -49,10 +53,17 @@ class GapAnalysisController extends Controller
         // fetched on demand so the landing page stays fast.
         $department = $this->analysis->analyseDepartment($departmentId, withAi: false);
 
+        // Individual analyses quote performance reviews, so the Training
+        // Officer works from the department / training-demand view only.
+        if (! Gate::allows('run-gap-analysis')) {
+            $employees = collect();
+            $allEmployees = collect();
+        }
+
         return view('competency.gap-analysis.index', [
             'employees' => $employees,
             'allEmployees' => $allEmployees,
-            'departments' => $user->seesWholeOrganisation()
+            'departments' => $this->seesAllEmployees()
                                 ? DB::table('departments')->orderBy('name')->get()
                                 : collect(),
             'departmentId' => $departmentId,
@@ -95,14 +106,14 @@ class GapAnalysisController extends Controller
     {
         $user = auth()->user();
 
-        $departmentId = $user->seesWholeOrganisation()
+        $departmentId = $this->seesAllEmployees()
             ? $request->query('department')
             : $user->departmentId();
 
-        abort_if(! $user->seesWholeOrganisation() && ! $departmentId, 403,
+        abort_if(! $this->seesAllEmployees() && ! $departmentId, 403,
             'Your account is not linked to a department.');
 
-        $departments = $user->seesWholeOrganisation()
+        $departments = $this->seesAllEmployees()
             ? DB::table('departments')->orderBy('name')->get()
             : collect();
 

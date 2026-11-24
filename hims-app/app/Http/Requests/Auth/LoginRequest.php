@@ -83,9 +83,20 @@ class LoginRequest extends FormRequest
         // This prevents locked accounts from logging in even with correct creds,
         // while using the same generic error so attackers can't distinguish
         // "locked" from "wrong password".
-        if ($user->locked_until && now()->lt($user->locked_until)) {
+        // Time-limited accounts (trainees) stop working on their end date.
+        if ($user->accessHasExpired()) {
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'This account\'s access ended on '.$user->access_expires_at->format('F j, Y').'. Ask HR or the Training Officer to extend it if your placement continues.',
+            ]);
+        }
+
+        // Only reached with the correct password, so saying "locked" here
+        // tells the real owner what is going on without telling a guesser
+        // anything about which emails exist.
+        if ($user->locked_until && now()->lt($user->locked_until)) {
+            $minutes = max(1, (int) ceil(now()->diffInSeconds($user->locked_until) / 60));
+            throw ValidationException::withMessages([
+                'email' => "This account is locked after repeated failed sign-in attempts. Try again in {$minutes} minute(s), or ask an administrator to unlock it.",
             ]);
         }
 

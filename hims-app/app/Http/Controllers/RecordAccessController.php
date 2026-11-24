@@ -41,9 +41,14 @@ class RecordAccessController extends Controller
 
         $this->auditRecordAccess('record_access_unlocked');
 
-        $intended = $request->input('intended') ?: route('dashboard');
-        $parsedPath = parse_url($intended, PHP_URL_PATH) ?: '/dashboard';
-        $path = '/'.ltrim($parsedPath, '/');
+        // Only ever return to a page on this site. The old code redirected to
+        // whatever `intended` held, so a crafted link could bounce a signed-in
+        // user to an outside site straight after they typed the password.
+        $intendedRaw = (string) $request->input('intended', '');
+        $parsedPath = parse_url($intendedRaw, PHP_URL_PATH) ?: '/dashboard';
+        $parsedQuery = parse_url($intendedRaw, PHP_URL_QUERY);
+        $path = '/'.ltrim($parsedPath, '/\\');
+        $intended = url($path).($parsedQuery ? '?'.$parsedQuery : '');
 
         // Grant access
         $grants = $request->session()->get('record_access_grants', []);

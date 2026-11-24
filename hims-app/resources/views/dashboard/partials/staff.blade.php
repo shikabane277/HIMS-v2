@@ -12,12 +12,22 @@
 
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3">
+        @if($is_trainee ?? false)
+        <div class="stat-card animate-in">
+            <div class="stat-icon"><i class="bi bi-calendar-range"></i></div>
+            <div class="stat-value" style="font-size:20px">{{ ! empty($access_expires_at) ? \Carbon\Carbon::parse($access_expires_at)->format('M j, Y') : '—' }}</div>
+            <div class="stat-label">Access Until</div>
+            <div class="stat-change {{ ! empty($access_expires_at) && \Carbon\Carbon::parse($access_expires_at)->diffInDays(now(), true) <= 14 ? 'down' : 'up' }}"><i class="bi bi-hourglass-split"></i>
+                {{ ! empty($access_expires_at) ? (int) ceil(now()->diffInDays(\Carbon\Carbon::parse($access_expires_at), false)).' day(s) left' : 'No end date set' }}</div>
+        </div>
+        @else
         <div class="stat-card animate-in">
             <div class="stat-icon"><i class="bi bi-star"></i></div>
             <div class="stat-value">{{ $stats['latest_score'] ? number_format($stats['latest_score'],2) : '—' }}</div>
             <div class="stat-label">Latest Review Score</div>
             <div class="stat-change up"><i class="bi bi-bar-chart"></i> Out of 5.00</div>
         </div>
+        @endif
     </div>
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card animate-in" style="animation-delay:.06s">
@@ -100,6 +110,21 @@
 
 <div class="row g-3">
     <div class="col-lg-6">
+        @if($is_trainee ?? false)
+        <div class="hims-card animate-in">
+            <div class="card-header"><h5><i class="bi bi-person-video3"></i> My Preceptor / Supervisor</h5></div>
+            <div class="card-body" style="font-size:13.5px">
+                @if(! empty($preceptor))
+                    <div style="font-weight:700;font-size:15px">{{ $preceptor->first_name }} {{ $preceptor->last_name }}</div>
+                    <div style="color:#6b7280">{{ $preceptor->position_title ?: 'Supervisor' }}</div>
+                    @if($preceptor->email)<div style="margin-top:6px"><a href="mailto:{{ $preceptor->email }}">{{ $preceptor->email }}</a></div>@endif
+                    <p style="color:#6b7280;font-size:12.5px;margin:10px 0 0">Your preceptor signs off your skills and records your training completions. Trainees are evaluated through competency checks rather than the annual review cycle.</p>
+                @else
+                    <p style="color:#9ca3af;margin:0">No preceptor assigned yet — ask the Training Officer or HR.</p>
+                @endif
+            </div>
+        </div>
+        @else
         <div class="hims-card animate-in">
             <div class="card-header"><h5><i class="bi bi-clipboard-data"></i> My Reviews</h5></div>
             <div class="card-body" style="padding:0">
@@ -122,6 +147,7 @@
                 </table>
             </div>
         </div>
+        @endif
     </div>
 
     <div class="col-lg-6">

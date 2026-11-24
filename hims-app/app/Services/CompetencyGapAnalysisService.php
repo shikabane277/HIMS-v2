@@ -31,12 +31,18 @@ class CompetencyGapAnalysisService
      *
      * @return array<string, mixed>
      */
-    public function analyseEmployee(string $employeeId, bool $withAi = true): array
+    public function analyseEmployee(string $employeeId, bool $withAi = true, ?string $againstRoleId = null): array
     {
         $employee = $this->employeeProfile($employeeId);
 
         if (! $employee) {
             return ['error' => 'Employee not found.'];
+        }
+
+        // Measure against a different job role (e.g. the post someone is being
+        // considered for in succession) instead of their current one.
+        if ($againstRoleId) {
+            $employee->role_id = $againstRoleId;
         }
 
         $requirements = $this->roleRequirements($employee);
@@ -57,6 +63,8 @@ class CompetencyGapAnalysisService
             'moderate_gaps' => $gaps->where('severity', 'moderate')->count(),
             'met' => $gaps->where('status', 'met')->count(),
             'readiness_pct' => $this->readinessPercentage($gaps),
+            'proficiency_pct' => $this->proficiencyPercentage($gaps),
+            'proficiency_points' => $this->proficiencyPoints($gaps),
             'cpd_hours_last_year' => $training['cpd_hours_last_year'],
             'trainings_attended' => $training['sessions_attended'],
             'courses_completed' => $training['courses_completed'],
@@ -181,7 +189,8 @@ class CompetencyGapAnalysisService
             ->select(
                 'c.competency_id', 'c.competency_name', 'c.competency_code', 'c.description',
                 'cc.category_name', 'cd.domain_name',
-                DB::raw('GREATEST(rcr.minimum_proficiency, c.required_proficiency) as required_proficiency'),
+                // Portable GREATEST() — SQLite (tests) has no GREATEST.
+                DB::raw('CASE WHEN rcr.minimum_proficiency > c.required_proficiency THEN rcr.minimum_proficiency ELSE c.required_proficiency END as required_proficiency'),
                 'rcr.is_critical',
                 'c.is_mandatory'
             )
@@ -382,6 +391,15 @@ class CompetencyGapAnalysisService
                     'assessed_date' => null,
                     'priority' => $req->is_critical || $req->is_mandatory ? 90 : 60,
                     'note' => 'No assessment on record — proficiency is unknown.',
+                    'calculation' => [
+                        'gap' => "Required level {$required}, current level unknown — gap cannot be calculated until HR2 records an assessment.",
+                        'severity' => ($req->is_critical || $req->is_mandatory)
+                            ? 'Critical: an unassessed competency that is mandatory or critical to the role.'
+                            : 'Moderate: an unassessed competency that is not mandatory.',
+                        'priority' => ($req->is_critical || $req->is_mandatory)
+                            ? 'Fixed priority 90 (unassessed + mandatory/critical).'
+                            : 'Fixed priority 60 (unassessed).',
+                    ],
                 ];
             }
 
@@ -401,11 +419,31 @@ class CompetencyGapAnalysisService
             $trainedBy = $training['competencies_trained'][$req->competency_id] ?? null;
 
             $priority = 0;
+            $priorityParts = [];
             if ($gap < 0) {
-                $priority = min(100, abs($gap) * 25
-                    + (($req->is_critical || $req->is_mandatory) ? 30 : 0)
-                    + ($trainedBy ? 15 : 0));
+                $base = abs($gap) * 25;
+                $roleWeight = ($req->is_critical || $req->is_mandatory) ? 30 : 0;
+                $trainingWeight = $trainedBy ? 15 : 0;
+                $raw = $base + $roleWeight + $trainingWeight;
+                $priority = min(100, $raw);
+                $priorityParts = ['|'.$gap.'| × 25 = '.$base];
+                if ($roleWeight) {
+                    $priorityParts[] = '+ 30 (mandatory / critical to role)';
+                }
+                if ($trainingWeight) {
+                    $priorityParts[] = '+ 15 (still below after training)';
+                }
+                $priorityText = implode(' ', $priorityParts).' = '.$raw.($raw > 100 ? ' → capped at 100' : '');
+            } else {
+                $priorityText = 'Requirement met — priority 0.';
             }
+
+            $severityText = match (true) {
+                $gap >= 0 => 'None: current level meets or exceeds the requirement.',
+                $gap <= -2 => 'Critical: two or more levels below the requirement.',
+                ($req->is_critical || $req->is_mandatory) => 'Critical: one level below on a mandatory / critical competency.',
+                default => 'Moderate: one level below on a non-mandatory competency.',
+            };
 
             return [
                 'competency_id' => $req->competency_id,
@@ -423,6 +461,11 @@ class CompetencyGapAnalysisService
                 'trained_by' => $trainedBy,
                 'assessed_date' => $assessment->assessed_date,
                 'priority' => $priority,
+                'calculation' => [
+                    'gap' => "Current {$current} − Required {$required} = ".($gap > 0 ? '+' : '').$gap,
+                    'severity' => $severityText,
+                    'priority' => $priorityText,
+                ],
                 'note' => $gap >= 0
                     ? 'Meets requirement.'
                     : ($trainedBy
@@ -431,6 +474,32 @@ class CompetencyGapAnalysisService
             ];
         })
             ->sortByDesc('priority');
+    }
+
+    /**
+     * Proficiency coverage: how much of the required proficiency the employee
+     * already has, counting partial progress. Each competency contributes
+     * min(current, required) out of required; unassessed counts as 0.
+     *
+     *   coverage = Σ min(current, required) ÷ Σ required × 100
+     *
+     * "Readiness" (met ÷ total) treats 3-of-4 the same as 0-of-4; coverage
+     * shows the difference.
+     */
+    private function proficiencyPercentage(Collection $gaps): int
+    {
+        [$have, $need] = $this->proficiencyPoints($gaps);
+
+        return $need > 0 ? (int) round($have / $need * 100) : 0;
+    }
+
+    /** @return array{0:int,1:int} [points held, points required] */
+    private function proficiencyPoints(Collection $gaps): array
+    {
+        $need = (int) $gaps->sum('required');
+        $have = (int) $gaps->sum(fn ($g) => $g['current'] === null ? 0 : min((int) $g['current'], (int) $g['required']));
+
+        return [$have, $need];
     }
 
     private function readinessPercentage(Collection $gaps): int

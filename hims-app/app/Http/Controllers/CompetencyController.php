@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\HrIntegrationService;
+use App\Support\AuditTrail;
 use App\Support\CredentialStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -115,7 +116,9 @@ class CompetencyController extends Controller
     {
         $query = DB::table('employee_credentials as ec')
             ->join('employees as e', 'ec.employee_id', '=', 'e.employee_id')
-            ->select('ec.*', DB::raw("CONCAT(e.first_name,' ',e.last_name) as employee_name"))
+            ->leftJoin('employees as vb', 'ec.verified_by', '=', 'vb.employee_id')
+            ->select('ec.*', DB::raw("CONCAT(e.first_name,' ',e.last_name) as employee_name"),
+                DB::raw("CASE WHEN vb.employee_id IS NULL THEN NULL ELSE CONCAT(vb.first_name,' ',vb.last_name) END as verifier_name"))
             ->selectRaw(CredentialStatus::caseSql('ec.expiry_date').' as status', CredentialStatus::caseBindings())
             ->when($request->query('focus'), fn ($q, $id) => $q->where('ec.credential_id', $id))
             ->orderBy('ec.expiry_date');
@@ -155,6 +158,47 @@ class CompetencyController extends Controller
         $hr1Integration = DB::table('system_integrations')->where('system_code', 'hr1')->first();
 
         return view('competency.credentials.index', compact('credentials', 'stats', 'employees', 'hr1Integration'));
+    }
+
+    /**
+     * Primary-source verification: HR/admin confirms the licence or
+     * certificate was checked with the issuing body. Records who and when, and
+     * writes a before/after audit entry. A credential arriving from HR1 is
+     * "Unverified" until this happens.
+     */
+    public function verifyCredential(Request $request, string $id)
+    {
+        $credential = DB::table('employee_credentials')->where('credential_id', $id)->first();
+        abort_if(! $credential, 404);
+        $this->authorizeEmployeeAccess($credential->employee_id);
+
+        if ($credential->verified_at) {
+            return back()->with('error', 'This credential is already verified.');
+        }
+
+        $verifierId = $this->currentEmployeeId();
+        if (! $verifierId) {
+            return back()->with('error', 'Your login is not linked to an employee record, so the verification cannot be attributed. Ask an administrator to link it.');
+        }
+
+        if ($verifierId === $credential->employee_id) {
+            return back()->with('error', 'You cannot verify your own credential. Ask another HR officer or administrator.');
+        }
+
+        $now = now();
+        DB::table('employee_credentials')->where('credential_id', $id)->update([
+            'verified_by' => $verifierId,
+            'verified_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        AuditTrail::record('verify_credential', 'employee_credentials', $id,
+            beforeState: ['verified_by' => $credential->verified_by, 'verified_at' => $credential->verified_at],
+            afterState: ['verified_by' => $verifierId, 'verified_at' => $now->toDateTimeString()],
+            metadata: ['employee_id' => $credential->employee_id, 'credential_type' => $credential->credential_type],
+        );
+
+        return back()->with('success', 'Credential marked as verified.');
     }
 
     public function storeCredential(Request $request)

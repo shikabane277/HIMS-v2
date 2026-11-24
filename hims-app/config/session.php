@@ -42,7 +42,15 @@ return [
 
     'lifetime' => (int) env('SESSION_LIFETIME', 3),
 
-    'idle_timeout' => (int) env('SESSION_IDLE_TIMEOUT', 180),
+    /*
+     | Idle timeout in SECONDS (default 120 = 2 minutes). One unit, read in one
+     | place: EnforceSessionTimeout, the session/ping endpoint and the
+     | idle-logout script all take this value. Real keyboard/mouse activity in
+     | the page sends a heartbeat (POST session/activity) at most once a minute,
+     | so someone typing a long review is not logged out mid-sentence; an
+     | untouched tab sends nothing and still expires on time.
+     */
+    'idle_timeout' => max(60, (int) env('SESSION_IDLE_TIMEOUT', 120)),
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 

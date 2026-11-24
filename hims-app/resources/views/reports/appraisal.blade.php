@@ -161,7 +161,7 @@
     {{-- Right Column: Tabs & Analytics matching Image 1 --}}
     <div class="col-lg-9 col-md-8">
         <div class="hims-card" style="border:1px solid #e5e7eb">
-            {{-- Tabs Navigation: Overview, KRAs, Feedback, Self Appraisal --}}
+            {{-- Tabs Navigation: Overview, KRAs, Reviewer Notes, Employee Response --}}
             <div style="border-bottom:1px solid #e5e7eb;padding:0 24px;background:#fafafa">
                 <nav class="d-flex gap-4" style="margin-bottom:-1px">
                     <button type="button" class="appraisal-tab-btn" onclick="switchAppraisalTab('overview')" id="tabBtn-overview" style="background:none;border:none;padding:16px 4px;font-size:14px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s">
@@ -171,10 +171,10 @@
                         KRAs
                     </button>
                     <button type="button" class="appraisal-tab-btn" onclick="switchAppraisalTab('feedback')" id="tabBtn-feedback" style="background:none;border:none;padding:16px 4px;font-size:14px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s">
-                        Feedback
+                        Reviewer Notes
                     </button>
                     <button type="button" class="appraisal-tab-btn" onclick="switchAppraisalTab('self')" id="tabBtn-self" style="background:none;border:none;padding:16px 4px;font-size:14px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s">
-                        Self Appraisal
+                        Employee Response
                     </button>
                 </nav>
             </div>
@@ -325,7 +325,7 @@
 
             {{-- TAB 3: Feedback Tab --}}
             <div class="card-body appraisal-tab-pane d-none" id="pane-feedback" style="padding:28px">
-                <h5 style="font-size:16px;font-weight:800;margin-bottom:16px">Multi-Source Feedback & Reviewer Notes</h5>
+                <h5 style="font-size:16px;font-weight:800;margin-bottom:16px">Reviewer Notes</h5>
                 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:16px">
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <div style="width:28px;height:28px;border-radius:50%;background:#0284c7;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">
@@ -335,14 +335,14 @@
                         <span class="hims-badge blue" style="font-size:11px">Supervisor Evaluation</span>
                     </div>
                     <p style="color:#4b5563;font-size:13.5px;line-height:1.6;margin:0">
-                        {{ $review->strengths_text ?: 'Employee consistently demonstrates adherence to clinical protocols, thorough documentation, and effective interdisciplinary collaboration throughout this appraisal period.' }}
+                        {{ $review->strengths_text ?: 'No reviewer comments were recorded for this appraisal.' }}
                     </p>
                 </div>
             </div>
 
             {{-- TAB 4: Self Appraisal Tab --}}
             <div class="card-body appraisal-tab-pane d-none" id="pane-self" style="padding:28px">
-                <h5 style="font-size:16px;font-weight:800;margin-bottom:16px">Self Appraisal & Self Evaluation</h5>
+                <h5 style="font-size:16px;font-weight:800;margin-bottom:16px">Employee Response & Self-Assessment</h5>
                 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:16px">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <strong style="font-size:14px;color:var(--hims-text-dark)">Self-Assessed Score</strong>

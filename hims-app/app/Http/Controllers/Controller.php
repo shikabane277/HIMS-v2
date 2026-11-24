@@ -8,6 +8,21 @@ use Illuminate\Support\Facades\DB;
 abstract class Controller
 {
     /**
+     * Learning, training and compliance controllers set this to true so the
+     * Training Officer sees every learner hospital-wide there — and nowhere
+     * else (performance, succession and employee records stay out of reach).
+     */
+    protected bool $learningScope = false;
+
+    /** Whether the signed-in user sees every employee in this controller. */
+    protected function seesAllEmployees(): bool
+    {
+        $user = auth()->user();
+
+        return $user && ($user->seesWholeOrganisation() || ($this->learningScope && $user->seesAllLearners()));
+    }
+
+    /**
      * Return the current user's linked employee_id, or null if none.
      * Use this everywhere instead of auth()->user()->employee_id to avoid
      * crashing NOT NULL FK inserts when the field is nullable on users.
@@ -47,7 +62,7 @@ abstract class Controller
             return false;
         }
 
-        if ($user->seesWholeOrganisation()) {
+        if ($this->seesAllEmployees()) {
             return true;
         }
 
@@ -84,7 +99,7 @@ abstract class Controller
     {
         $user = auth()->user();
 
-        if (! $user || $user->seesWholeOrganisation()) {
+        if (! $user || $this->seesAllEmployees()) {
             return $query;
         }
 

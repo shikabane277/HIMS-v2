@@ -12,6 +12,6 @@ class ExampleTest extends TestCase
 {
     public function test_root_redirects_guests_to_login(): void
     {
-        $this->get('/')->assertRedirect(route('login', absolute: false));
+        $this->get('/')->assertOk()->assertSee('Sign in to HR3');
     }
 }

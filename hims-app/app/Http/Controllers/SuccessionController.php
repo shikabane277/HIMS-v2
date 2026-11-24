@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\NotificationService;
 use App\Services\RenewalCycleService;
+use App\Services\SuccessionQualificationService;
 use App\Support\AuditTrail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -64,7 +66,7 @@ class SuccessionController extends Controller
             return $candidate;
         }
 
-        foreach (['performance_score', 'potential_score', 'nine_box_label', 'readiness_level', 'mentor_id', 'status', 'nomination_notes'] as $field) {
+        foreach (['performance_score', 'potential_score', 'nine_box_label', 'readiness_level', 'mentor_id', 'status', 'nomination_notes', 'promotion_override_reason', 'qualification_snapshot', 'promoted_by'] as $field) {
             $candidate->{$field} = null;
         }
 
@@ -508,6 +510,105 @@ class SuccessionController extends Controller
         return redirect()->route('succession.candidates.show', $id)->with('success', 'Candidate nomination approved successfully.');
     }
 
+    /**
+     * Promote a candidate into the position. Allowed when every qualification
+     * check passes; otherwise only with a written override reason, which is
+     * kept with the record. Pay is not changed here — the position and salary
+     * change is made in HR1 (employee master).
+     */
+    public function promoteCandidate(Request $request, $id)
+    {
+        abort_unless($this->canSeeConfidentialSuccessionData(), 403);
+
+        $candidate = DB::table('succession_candidates')->where('candidate_id', $id)->first();
+        abort_if(! $candidate, 404);
+        $position = DB::table('critical_positions')->where('position_id', $candidate->position_id)->first();
+
+        if ($candidate->status === 'promoted') {
+            return back()->with('error', 'This candidate has already been promoted.');
+        }
+
+        $result = app(SuccessionQualificationService::class)->evaluate($candidate, $position);
+        $override = trim((string) $request->input('override_reason'));
+
+        if (! $result['qualified'] && mb_strlen($override) < 15) {
+            return back()->with('error', 'Not yet qualified ('.$result['passed'].' of '.$result['total'].' checks passed). Resolve the open items, or record a justification of at least 15 characters to promote anyway.');
+        }
+
+        $previousHolder = $position->current_holder_id;
+        $now = now();
+
+        DB::transaction(function () use ($id, $candidate, $position, $result, $override, $now) {
+            DB::table('succession_candidates')->where('candidate_id', $id)->update([
+                'status' => 'promoted',
+                'promoted_at' => $now,
+                'promoted_by' => $this->currentEmployeeId(),
+                'promotion_override_reason' => $result['qualified'] ? null : $override,
+                'qualification_snapshot' => json_encode($result),
+            ]);
+
+            DB::table('critical_positions')->where('position_id', $position->position_id)->update([
+                'current_holder_id' => $candidate->employee_id,
+                'updated_at' => $now,
+            ]);
+
+            // Other nominees for the same post are no longer in line for it.
+            DB::table('succession_candidates')->where('position_id', $position->position_id)
+                ->where('candidate_id', '!=', $id)->whereIn('status', ['proposed', 'approved'])
+                ->update(['status' => 'closed', 'reviewed_at' => $now]);
+        });
+
+        AuditTrail::record('succession_candidate_promoted', 'succession_candidates', $id,
+            beforeState: ['status' => $candidate->status, 'position_holder' => $previousHolder],
+            afterState: [
+                'status' => 'promoted',
+                'position_id' => $position->position_id,
+                'qualified' => $result['qualified'],
+                'checks_passed' => $result['passed'].'/'.$result['total'],
+                'override_reason' => $result['qualified'] ? null : $override,
+            ]);
+
+        app(NotificationService::class)->notify(
+            $candidate->employee_id, 'succession_promoted',
+            'Promotion confirmed: '.$position->position_title,
+            'HR has confirmed your promotion. Your new position and pay will be updated in the employee records (HR1).',
+            'succession_candidates', $id);
+
+        return redirect()->route('succession.candidates.show', $id)->with('success',
+            ($result['qualified'] ? 'Promoted — all qualification checks passed.' : 'Promoted with a recorded override.')
+            .' Next: update the employee\'s position and salary grade in HR1.');
+    }
+
+    /** Requirements a successor must meet for this position. */
+    public function updatePositionRequirements(Request $request, $id)
+    {
+        abort_unless($this->canSeeConfidentialSuccessionData(), 403);
+        $position = DB::table('critical_positions')->where('position_id', $id)->first();
+        abort_if(! $position, 404);
+
+        $data = $request->validate([
+            'target_role_id' => ['nullable', 'string', 'exists:roles,role_id'],
+            'min_performance_score' => ['nullable', 'numeric', 'min:1', 'max:5'],
+            'min_years_service' => ['nullable', 'integer', 'min:0', 'max:40'],
+            'required_credentials' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $credentials = collect(preg_split('/[,\n]+/', (string) ($data['required_credentials'] ?? '')))
+            ->map(fn ($c) => trim($c))->filter()->unique()->values()->all();
+
+        $after = [
+            'target_role_id' => $data['target_role_id'] ?? null,
+            'min_performance_score' => $data['min_performance_score'] ?? null,
+            'min_years_service' => $data['min_years_service'] ?? null,
+            'required_credentials' => $credentials ? json_encode($credentials) : null,
+        ];
+
+        DB::table('critical_positions')->where('position_id', $id)->update($after + ['updated_at' => now()]);
+        AuditTrail::record('succession_requirements_updated', 'critical_positions', $id, afterState: $after);
+
+        return back()->with('success', 'Promotion requirements saved.');
+    }
+
     public function rejectCandidate($id)
     {
         abort_unless($this->canSeeConfidentialSuccessionData(), 403, 'Only HR Managers and Administrators can reject succession nominations.');
@@ -624,11 +725,19 @@ class SuccessionController extends Controller
         $candidate = $this->redactConfidentialCandidate($candidate);
         $dev_paths = DB::table('leadership_development_paths')->where('candidate_id', $id)->get();
 
+        $position = DB::table('critical_positions')->where('position_id', $candidate->position_id)->first();
+        $raw = DB::table('succession_candidates')->where('candidate_id', $id)->first();
+
         // Keyed `evidence`, not `readiness` — the view already binds $readiness
         // to the candidate's readiness_level string.
         return view('succession.candidates.show', compact('candidate', 'dev_paths') + [
             'evidence' => $this->readinessEvidence($candidate->employee_id),
             'canSeeConfidential' => $this->canSeeConfidentialSuccessionData(),
+            'qualification' => $this->canSeeConfidentialSuccessionData()
+                ? app(SuccessionQualificationService::class)->evaluate($raw, $position)
+                : null,
+            'position' => $position,
+            'roles' => DB::table('roles')->orderBy('role_name')->get(['role_id', 'role_name']),
         ]);
     }
 

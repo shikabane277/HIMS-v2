@@ -53,7 +53,8 @@
     "VIEW_COMPILED_PATH": "/tmp/storage/framework/views",
     "CACHE_STORE": "database",
     "SESSION_DRIVER": "cookie",
-    "LOG_CHANNEL": "stderr"
+    "LOG_CHANNEL": "stderr",
+    "BACKUP_SCHEDULE_ENABLED": "false"
   },
   "crons": [
     {
@@ -63,6 +64,14 @@
     {
       "path": "/api/cron/scan",
       "schedule": "30 22 * * *"
+    },
+    {
+      "path": "/api/cron/prune",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/digest",
+      "schedule": "45 23 * * 0"
     }
   ]
 }

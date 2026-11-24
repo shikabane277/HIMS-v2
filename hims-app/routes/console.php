@@ -43,3 +43,33 @@ Schedule::command('hims:prune-expired-data')
     ->dailyAt('02:00')
     ->withoutOverlapping()
     ->onOneServer();
+
+/*
+| Automatic awards — service milestones and CPD achievement, daily 06:10.
+| Each award is issued once, with its certificate and badge.
+*/
+Schedule::command('hims:auto-awards')
+    ->dailyAt('06:10')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+/*
+| Weekly supervisor digest — Monday 07:45, before the morning huddle.
+| The command existed but nothing ever ran it.
+*/
+Schedule::command('hims:send-supervisor-digest')
+    ->weeklyOn(1, '07:45')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+/*
+| Nightly backup — 01:30. Only meaningful on a host with persistent storage
+| (Laragon, Docker volume, VM); on Vercel use the database provider's own
+| backups instead. Copy storage/app/backups off the server as well.
+*/
+if (config('hims.backup_schedule_enabled', true)) {
+    Schedule::command('hims:backup')
+        ->dailyAt('01:30')
+        ->withoutOverlapping()
+        ->onOneServer();
+}

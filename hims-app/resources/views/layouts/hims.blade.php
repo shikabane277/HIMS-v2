@@ -50,13 +50,15 @@
         </a>
 
         <div class="sidebar-section-label">HR Modules</div>
+@can('view-performance')
         <a href="{{ route('performance.index') }}" class="sidebar-link {{ request()->routeIs('performance.*') ? 'active' : '' }}">
             <span class="nav-icon"><i class="bi bi-clipboard-data"></i></span> Performance
         </a>
+        @endcan
         <a href="{{ route('competency.index') }}" class="sidebar-link {{ request()->routeIs('competency.index') || request()->routeIs('competency.assessments.*') || request()->routeIs('competency.credentials.*') || request()->routeIs('competency.domains.*') ? 'active' : '' }}">
             <span class="nav-icon"><i class="bi bi-bullseye"></i></span> Competency
         </a>
-        @can('run-gap-analysis')
+        @can('view-training-needs')
         <a href="{{ route('competency.gap.index') }}" class="sidebar-link {{ request()->routeIs('competency.gap.*') ? 'active' : '' }}">
             <span class="nav-icon"><i class="bi bi-cpu"></i></span> AI Gap Analysis
         </a>
@@ -75,11 +77,11 @@
             <span class="nav-icon"><i class="bi bi-trophy"></i></span> Succession
         </a>
         @endcan
-        @if(auth()->user() && auth()->user()->role !== 'staff')
+        @can('view-reports')
         <a href="{{ route('reports.index') }}" class="sidebar-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">
             <span class="nav-icon"><i class="bi bi-file-earmark-bar-graph"></i></span> Reports & Analytics
         </a>
-        @endif
+        @endcan
 
         @canany(['view-employees','manage-departments','manage-users'])
         <div class="sidebar-section-label">Admin</div>
@@ -110,7 +112,7 @@
             <div class="user-avatar">{{ strtoupper(substr(Auth::user()->name ?? 'U', 0, 1)) }}</div>
             <div class="user-info">
                 <span class="user-name">{{ Auth::user()->name ?? 'User' }}</span>
-                <span class="user-role">{{ (Auth::user()->role ?? 'staff') === 'staff' ? 'Trainee' : ucwords(str_replace('_',' ', Auth::user()->role)) }}</span>
+                <span class="user-role">{{ \App\Support\Roles::label(Auth::user()->role ?? 'staff') }}</span>
             </div>
         </a>
         <form method="POST" action="{{ route('logout') }}">
@@ -1049,6 +1051,38 @@
 </script>
 <script src="{{ asset('js/hims-select.js') }}?v={{ file_exists(public_path('js/hims-select.js')) ? filemtime(public_path('js/hims-select.js')) : 1 }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+/*
+ * Empty-chart notice. Charts across HIMS show only recorded data: when every
+ * dataset is empty or zero, the canvas says so instead of drawing invented
+ * sample numbers (those fallbacks were removed on 2026-11-24).
+ */
+(function () {
+    if (!window.Chart) { return; }
+    Chart.register({
+        id: 'himsEmptyState',
+        afterDraw: function (chart) {
+            var sets = (chart.data && chart.data.datasets) || [];
+            var hasValue = sets.some(function (ds) {
+                return (ds.data || []).some(function (v) {
+                    var n = (v && typeof v === 'object') ? (v.y !== undefined ? v.y : v.x) : v;
+                    return n !== null && n !== undefined && Number(n) !== 0 && !isNaN(Number(n));
+                });
+            });
+            if (hasValue) { return; }
+            var ctx = chart.ctx, a = chart.chartArea || { left: 0, right: chart.width, top: 0, bottom: chart.height };
+            ctx.save();
+            ctx.clearRect(0, 0, chart.width, chart.height);
+            ctx.fillStyle = '#64748b';
+            ctx.font = '600 13px system-ui, -apple-system, Segoe UI, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('No data recorded yet', chart.width / 2, chart.height / 2);
+            ctx.restore();
+        }
+    });
+})();
+</script>
 @include('partials.record-access-gate')
 @include('partials.gdpr-privacy-banner')
 @include('partials.idle-logout')

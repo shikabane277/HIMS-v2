@@ -238,6 +238,9 @@ class NotificationService
             'cpd_records' => route('learning.cpd.index', [
                 'focus' => $notification->reference_id,
             ]).'#cpd-'.$notification->reference_id,
+            'employee_awards' => ($code = DB::table('employee_awards')->where('award_id', $notification->reference_id)->value('certificate_code'))
+                ? route('awards.verify', $code)
+                : route('recognition.awards.index'),
             default => route('dashboard'),
         };
     }

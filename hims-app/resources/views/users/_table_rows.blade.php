@@ -16,17 +16,23 @@
     </td>
     <td data-label="Email" style="font-size:13px;color:#6b7280">{{ $user->email }}</td>
     <td data-label="Role">
-        <span class="hims-badge {{ $user->role === 'admin' ? 'red' : ($user->role === 'hr_manager' ? 'blue' : ($user->role === 'supervisor' ? 'yellow' : 'gray')) }}">
-            {{ ($user->role ?? 'staff') === 'staff' ? 'Trainee' : ucfirst(str_replace('_',' ',$user->role)) }}
+        <span class="hims-badge {{ match($user->role) { 'admin' => 'red', 'hr_manager' => 'blue', 'training_officer' => 'purple', 'supervisor' => 'yellow', 'trainee' => 'green', default => 'gray' } }}">
+            <i class="bi {{ \App\Support\Roles::icon($user->role) }}"></i> {{ \App\Support\Roles::label($user->role ?? 'staff') }}
         </span>
     </td>
     <td data-label="Status">
+        @php $acct = \App\Support\AccountStatus::of($user); @endphp
         @if(!($user->is_active ?? true))
             <span class="hims-badge red"><i class="bi bi-person-x-fill"></i> Deactivated</span>
+        @elseif($acct['key'] === 'expired')
+            <span class="hims-badge gray" title="{{ $acct['detail'] }}"><i class="bi bi-calendar-x"></i> Access ended</span>
         @elseif($isLocked)
             <span class="hims-badge red" title="Locked until {{ $user->locked_until }}"><i class="bi bi-lock-fill"></i> Locked</span>
         @else
             <span class="hims-badge green">Active</span>
+            @if(! empty($user->access_expires_at))
+                <div style="font-size:11px;color:#6b7280;margin-top:2px">until {{ \Carbon\Carbon::parse($user->access_expires_at)->format('M j, Y') }}</div>
+            @endif
         @endif
     </td>
     <td data-label="Linked Employee" style="font-size:13px;color:#6b7280">{{ $user->employee_id ? '✓ Linked' : '—' }}</td>

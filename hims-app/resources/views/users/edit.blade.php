@@ -42,13 +42,17 @@
                         </div>
                         <div class="col-md-6">
                             <label class="hims-label">Role *</label>
-                            <select name="role" class="hims-input hims-select" required>
-                                <option value="staff"      {{ ($user->role ?? 'staff') === 'staff'      ? 'selected' : '' }}>Trainee</option>
-                                <option value="supervisor" {{ $user->role === 'supervisor' ? 'selected' : '' }}>Supervisor</option>
-                                <option value="hr_manager" {{ $user->role === 'hr_manager' ? 'selected' : '' }}>HR Manager</option>
-                                <option value="admin"      {{ $user->role === 'admin'      ? 'selected' : '' }}>Administrator</option>
-                            </select>
+<select name="role" class="hims-input hims-select" required onchange="var t=this.form.querySelector('[data-access-end]'); if (t) { t.style.display = this.value === 'trainee' ? '' : 'none'; t.querySelector('input').required = this.value === 'trainee'; }">
+                            @foreach(\App\Support\Roles::options() as $value => $label)
+                                <option value="{{ $value }}" @selected(old('role', $user->role ?? 'staff') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
                         </div>
+                    <div class="col-md-6" data-access-end style="{{ old('role', $user->role) === 'trainee' || $user->access_expires_at ? '' : 'display:none' }}">
+                        <label class="hims-label">Access end date <span style="color:#9ca3af;font-weight:400">(required for trainees)</span></label>
+                        <input type="date" name="access_expires_at" class="hims-input" value="{{ old('access_expires_at', optional($user->access_expires_at)->toDateString()) }}" @required(old('role', $user->role) === 'trainee')>
+                        <div style="font-size:11px;color:#6b7280">Last day of the placement / orientation. Sign-in stops after this date.</div>
+                    </div>
                         <div class="col-md-6">
                             <label class="hims-label">Linked Employee</label>
                             <select name="employee_id" class="hims-input hims-select">

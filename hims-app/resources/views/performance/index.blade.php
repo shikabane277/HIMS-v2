@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function () {
             data: {
                 labels: ratingLabels,
                 datasets: [{
-                    data: hasData ? ratingData : [4, 8, 12, 2],
+                    data: ratingData,
                     backgroundColor: ['#059669', '#0284c7', '#d97706', '#ef4444'],
                     borderWidth: 2,
                     borderColor: '#ffffff'
@@ -272,12 +272,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         new Chart(trendCanvas, {
             data: {
-                labels: cycleLabels.length ? cycleLabels : ['Q1 Cycle', 'Q2 Cycle', 'Q3 Cycle', 'Annual Cycle'],
+                labels: cycleLabels,
                 datasets: [
                     {
                         type: 'line',
                         label: 'Avg Score (/5.00)',
-                        data: cycleLabels.length ? avgScores : [3.85, 4.10, 3.92, 4.25],
+                        data: avgScores,
                         borderColor: '#059669',
                         backgroundColor: 'rgba(5, 150, 105, 0.1)',
                         borderWidth: 2.5,
@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     {
                         type: 'bar',
                         label: 'Reviews Completed',
-                        data: cycleLabels.length ? reviewCounts : [14, 22, 18, 30],
+                        data: reviewCounts,
                         backgroundColor: 'rgba(2, 132, 199, 0.75)',
                         hoverBackgroundColor: '#0284c7',
                         borderRadius: 6,

@@ -330,13 +330,54 @@ class HrIntegrationService
                     ->first();
 
                 if ($existing) {
-                    DB::table('employee_credentials')->where('credential_id', $existing->credential_id)->update([
+                    $existingNumber = null;
+                    if ($existing->credential_number) {
+                        try {
+                            $existingNumber = Crypt::decryptString($existing->credential_number);
+                        } catch (\Throwable) {
+                            $existingNumber = null;
+                        }
+                    }
+
+                    $newExpiry = $expiryDate ?: $existing->expiry_date;
+                    $newIssuer = $issuingBody ?: $existing->issuing_body;
+                    $substantiveChange = ($rawNumber !== '' && $rawNumber !== $existingNumber)
+                        || (string) $newExpiry !== (string) $existing->expiry_date
+                        || (string) $newIssuer !== (string) $existing->issuing_body;
+
+                    $updates = [
                         'credential_number' => $encNumber ?: $existing->credential_number,
-                        'issuing_body' => $issuingBody ?: $existing->issuing_body,
+                        'issuing_body' => $newIssuer,
                         'issue_date' => $issueDate ?: $existing->issue_date,
-                        'expiry_date' => $expiryDate ?: $existing->expiry_date,
+                        'expiry_date' => $newExpiry,
                         'updated_at' => now(),
-                    ]);
+                    ];
+
+                    // A renewed or re-issued credential is a new document: the
+                    // earlier primary-source verification no longer covers it.
+                    if ($substantiveChange && $existing->verified_at) {
+                        $updates['verified_by'] = null;
+                        $updates['verified_at'] = null;
+                    }
+
+                    DB::table('employee_credentials')->where('credential_id', $existing->credential_id)->update($updates);
+
+                    if ($substantiveChange) {
+                        AuditTrail::record('sync_credential_hr1_update', 'employee_credentials', $existing->credential_id,
+                            beforeState: [
+                                'issuing_body' => $existing->issuing_body,
+                                'expiry_date' => $existing->expiry_date,
+                                'verified_at' => $existing->verified_at,
+                                'number_changed' => false,
+                            ],
+                            afterState: [
+                                'issuing_body' => $newIssuer,
+                                'expiry_date' => $newExpiry,
+                                'verified_at' => $updates['verified_at'] ?? $existing->verified_at,
+                                'number_changed' => $rawNumber !== '' && $rawNumber !== $existingNumber,
+                            ],
+                            metadata: ['source' => 'HR1_API', 'employee_id' => $emp->employee_id]);
+                    }
                     $updated++;
                 } else {
                     $newCredId = (string) Str::uuid();

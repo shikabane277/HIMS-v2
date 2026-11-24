@@ -1,6 +1,37 @@
 # HIMS Access and Visibility Rules
 
-This document is the application-level policy for recognition, performance reviews, succession planning, notifications, and Global Search. Controller checks and route middleware remain the enforcement points; hiding a link or field in a view is not authorization.
+This document is the application-level policy for account types, recognition and awards, performance reviews, succession planning, notifications, and Global Search. Controller checks and route middleware remain the enforcement points; hiding a link or field in a view is not authorization.
+
+## Account Types
+
+The six roles live in one catalogue, `App\Support\Roles`. The Users screen, validation, labels, the AI assistant's scope and the permission matrix shown on the create/edit form all read it.
+
+| Role | Who | Scope | Can | Cannot |
+| --- | --- | --- | --- | --- |
+| `admin` — System Administrator | HRIS / IT staff | Whole hospital | Everything an HR Manager can do, plus login accounts, system settings, HR1/HR2 integrations and the record-access password | Deactivate the last active administrator |
+| `hr_manager` — HR Manager | HR heads and officers | Whole hospital | Cycles, KPIs, all reviews, competency framework, credential verification, learning, succession and promotions, awards, employee records | Manage login accounts or system settings |
+| `training_officer` — Training Officer | Training & Development / Nursing Education | Whole hospital, **learning and training only** | Courses, pathways, sessions, venues, attendance, mandatory-training assignments, renewal rules, CPD verification, course completions, accreditation reports, department training-needs analysis | See performance reviews or scores, succession, awards, employee administration or accounts |
+| `supervisor` — Supervisor / Department Head | Unit managers, charge nurses, preceptors with reports | Direct reports | Team reviews, assessments, gap analysis, team training and attendance, completions, team compliance, nominations | Other departments; hospital-wide frameworks, rules or venues |
+| `staff` — Staff | Every regular employee | Own records | Own reviews and response, competencies, credentials, CPD, certificates and badges; learning, training registration, recognition | Anyone else's records |
+| `trainee` — Trainee | Students on placement, interns, OJT, orientees | Own records until `users.access_expires_at` | Learning, training sessions, CPD, own competencies and certificates, recognition and badges | Performance reviews; signing in after the access end date |
+
+The instructor of a training session is not a role. Any account named as a session's instructor may take attendance for that session, through the `take-attendance` gate.
+
+A **Trainee** account requires an access end date. Once that date has passed, sign-in is refused. Any open session ends on its next request and returns to `/?reason=expired`. An administrator extends the date to restore access.
+
+### Account status
+
+`App\Support\AccountStatus` gives one status per login, and the same badge appears on the Users list, the employee directory and the employee profile:
+
+| Status | Meaning |
+| --- | --- |
+| Active | Can sign in |
+| Locked | Five failed sign-ins. Unlocks after 15 minutes, or an Administrator unlocks it |
+| Deactivated | `is_active = false`. Refused at sign-in, and any open session ends at its next request (`/?reason=deactivated`) |
+| Access ended | A trainee past `access_expires_at` |
+| No login account | The employee exists in HR1 but has no HR3 login |
+
+Setting an employee to `resigned`, `terminated` or `suspended` deactivates their linked login immediately. This is audited as `user_account_auto_deactivated`.
 
 ## Recognition
 
@@ -11,6 +42,16 @@ This document is the application-level policy for recognition, performance revie
 | HR/Admin | Public wall and all private recognition | Same named posting access when linked to an employee | Badges, posts, comments, and audit history |
 
 Recognition is always named. Public posts appear on the wall. Private posts are limited to the sender, recipient, and HR/admin moderators. Comments and reactions inherit the post audience. Anonymous recognition is not supported.
+
+### Awards & certificates
+
+| Role | Read | Create / issue |
+| --- | --- | --- |
+| Employee (any role) | Their own awards, certificates and badges on the Awards tab and their profile | No |
+| HR/Admin (`role:admin,hr_manager`) | All awards | Award types (badge, certificate wording, signatory, points); issue to one person or a team; revoke with a reason; run automatic awards |
+| Anyone with the link | `GET /awards/verify/{code}` shows the certificate (or that it was revoked); `GET /awards/badge/{code}.svg` serves the badge image | No |
+
+Both public endpoints accept only the certificate code and are rate-limited (60 requests per minute). A certificate shows the recipient's name, position and department, the award, the date, the citation and the signatory. It shows no other employee data. `hims:auto-awards` issues service milestones (5–30 years, from the HR1 hire date) and the Lifelong Learner award (40 qualified CPD hours in a calendar year) without duplicates. Every issue, revocation and award-type change is written to `audit_trails`.
 
 ## Reporting Lines and People Managers
 
@@ -47,6 +88,18 @@ Candidate ratings, 9-box placement, readiness, nomination status, the nomination
 The 9-box counts are computed for HR/Admin but **no 9-box grid is rendered** on the succession index — the figures exist without a visual grid, so do not direct anyone to one.
 
 The organisation dashboard alerts HR/admin when a high or critical vacancy-risk role has no `ready_now` successor.
+
+**Promotion is qualification-based.** A candidate is promoted only when every check in `SuccessionQualificationService` passes:
+1. The nomination is approved.
+2. The candidate is rated ready now.
+3. Their latest review meets the position's minimum score.
+4. They have no open PIP.
+5. They have no critical gaps against the target role.
+6. They meet the position's minimum years of service.
+7. Their required credentials are valid, and none of their credentials has expired.
+8. They have no overdue mandatory training.
+
+An HR/Admin override needs a written reason and is audited. The checklist is confidential: only HR/Admin see it, and only they can promote, so supervisors see neither. Salary is not handled in HR3; pay follows in HR1.
 
 ## Notifications
 

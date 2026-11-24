@@ -224,6 +224,8 @@ class AiAccessPolicy
             'admin' => 'system administrator, full access',
             'hr_manager' => 'HR manager, hospital-wide HR access',
             'supervisor' => 'department head, limited to their own department',
+            'training_officer' => 'training officer, hospital-wide learning and training only — no performance or succession data',
+            'trainee' => 'trainee (student / intern / orientee), limited to their own learning records',
             default => 'staff member, limited to their own records',
         };
     }

@@ -26,7 +26,7 @@ graph TB
 
     subgraph "Laravel 13 Core Backend"
         GW["Routing & Middleware<br/>(routes/web.php, Rate Limiting, CSRF, SecurityHeaders)"]
-        AUTH["Session Auth + Mandatory 2FA<br/>(Email OTP & RFC 6238 TOTP, 5-min Silent Idle Timeout)"]
+        AUTH["Session Auth + Mandatory 2FA<br/>(Email OTP & RFC 6238 TOTP, 2-min Silent Idle Timeout → landing page)"]
         INTEG["AiManager<br/>(Gemini / OpenAI / Anthropic / Compatible)<br/>🔒 Zero Employee Data Access"]
     end
 
@@ -43,7 +43,7 @@ graph TB
 
     subgraph "Data Layer"
         QB["Raw Query Builder (DB::table) + Crypt"]
-        MY["MySQL 8<br/>(53 Tables, 1 View, 2 Triggers, 40 Migrations)"]
+        MY["MySQL 8<br/>(55 Tables, 1 View, 2 Triggers, 44 Migrations)"]
     end
 
     subgraph "Security Middleware & Gates"
@@ -66,7 +66,7 @@ graph TB
 |---|---|
 | Styling | Hand-authored `public/css/hims.css`; Bootstrap **Icons** font only — no Bootstrap CSS framework, so no reboot layer: element defaults are declared in the stylesheet itself. Served outside the Vite build, so its URL carries the file's own content hash — see §14 |
 | Data access | Raw `DB::table()` Query Builder; `App\Models\User` is the only Eloquent model |
-| Authentication & 2FA | Laravel Breeze session auth + **Mandatory 2FA** (Email OTP 5-min TTL / RFC 6238 TOTP with replay counter), **3-minute silent idle timeout** (`EnforceSessionTimeout`), forced password change (`EnsurePasswordIsChanged`), and `SecurityHeaders` |
+| Authentication & 2FA | Laravel Breeze session auth + **Mandatory 2FA** (Email OTP 5-min TTL / RFC 6238 TOTP with replay counter), **2-minute silent idle timeout** (`EnforceSessionTimeout`, returns to the public landing page), forced password change (`EnsurePasswordIsChanged`), and `SecurityHeaders` |
 | Authorisation | 20 Gates + `EnsureUserHasRole` middleware over four roles (`admin` \| `hr_manager` \| `supervisor` \| `staff`) + **Record Access Password Gate** (`App\Support\RecordAccess`) blurring sensitive workforce/credential pages until unlocked |
 | Privacy & GDPR | GDPR / PH RA 10173 consent banner (`POST /profile/gdpr-consent`), self-service JSON data export (`GET /profile/export-data`), cascading account erasure (`DELETE /profile`), separated employee PII anonymization (`POST /employees/{id}/anonymize`), and daily data retention pruning (`hims:prune-expired-data`) |
 | Cache / queue / session | `CACHE_STORE=database`, `SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`; the app makes no cache calls |
@@ -204,16 +204,21 @@ resolved against the acting **identity**, and `admin` / `hr_manager` hold no bla
 | **`admin`** | Full CRUD | Cycles; direct-report reviews; logged exceptions | Full | Full confidential management | Post; all private; moderation/badges | Users + departments |
 | **`hr_manager`** | Full CRUD | Cycles; direct-report reviews; logged exceptions | Full | Full confidential management | Post; all private; moderation/badges | Departments |
 | **`supervisor`** | Direct-report read | Create/score own direct-report reviews; read connected reviews | Direct-report oversight, plus documented broader assignment-target behavior | Direct-report candidates only; confidential fields redacted; milestones only | Same sender/recipient audience as any employee | None |
-| **`staff`** | Own development records | Read/respond to own reviews | Catalogue, own CPD/cycles, session self-registration | **No access** | Named public/private posts involving them; public wall | None |
+| **`training_officer`** | **No access** | **No access** | Hospital-wide: catalogue, pathways, sessions, venues, attendance, assignments, renewal rules, CPD verification, completions, reports, department training needs | **No access** | Same as staff | None |
+| **`staff`** | Own development records | Read/respond to own reviews | Catalogue, own CPD/cycles, session self-registration | **No access** | Named public/private posts involving them; public wall; own awards | None |
+| **`trainee`** | Own development records | **No access** | Same as staff | **No access** | Same as staff | None — sign-in ends at `users.access_expires_at` |
 
 Admin and HR may step outside the reporting line for a review only on one of four logged exception bases —
 see [§4.A](#a-performance-management). Every role, including admin, is barred from reviewing itself.
 
-**Gates defined:** `manage-users`, `manage-departments`, `manage-employees`, `view-employees`,
-`manage-performance`, `manage-review-cycles`, `manage-competency`, `manage-competency-framework`,
-`manage-learning`, `manage-training`, `manage-venues`, `record-completion`, `view-compliance`,
-`manage-compliance`, `manage-succession`, `view-succession`, `manage-recognition`,
-`view-audit-history`, `view-org-analytics`, and `run-gap-analysis`.
+**Gates defined (24):** `manage-users`, `manage-departments`, `manage-employees`, `view-employees`,
+`manage-performance`, `view-performance`, `manage-review-cycles`, `manage-competency`,
+`manage-competency-framework`, `manage-learning`, `manage-training`, `take-attendance`, `manage-venues`,
+`record-completion`, `view-compliance`, `manage-compliance`, `manage-succession`, `view-succession`,
+`manage-recognition`, `view-audit-history`, `view-org-analytics`, `run-gap-analysis`, `view-training-needs`,
+and `view-reports`. Role definitions (labels, scope, can/cannot) live in `App\Support\Roles`; the Training
+Officer is hospital-wide only in controllers that set `$learningScope = true`. `take-attendance` receives the
+session row and also admits the session's named instructor, whatever their role.
 
 **No Gate covers review authority.** Every rule there needs the review row — who its subject is, who its
 reviewer is, which cycle it belongs to and whether that cycle has ended — and a Gate closure receives only
@@ -403,6 +408,8 @@ what the two screens actually render.
 
     The `course_enrollments.assignment_id` column is now required by application behavior for new rows: a value names the requirement that created the enrolment; null is retained only for legacy data and schema compatibility.
 
+*   **CPD qualification** (`CpdQualificationService`): every CPD row is *Qualified*, *Not qualified* or *Pending*. Course rows need a completed enrolment, training rows need recorded attendance, external rows need HR verification. Qualified hours are capped at the course or session's worth, and `cpd_records.verified` mirrors the decision, so renewal cycles count qualified hours only. Session check-in banks the hours; withdrawing attendance un-qualifies them.
+
 ### D. Training Management
 
 *   **Session Scheduling**: Instructor-led workshops (e.g., Infection Control Seminar) with date, times, capacity, category, registration deadline, and optional linked course.
@@ -435,6 +442,7 @@ manage milestones only for those direct-report candidates.
 *   **Vacancy Risk Flagging**: Each critical position carries a `low` / `medium` / `high` / `critical` risk level set when the position is created or edited, used to sort and highlight the positions list and the dashboard's at-risk panel.
 *   **Quarterly Review Tracking**: HR/Admin can stamp `last_reviewed_at`, `last_reviewed_by`, and optional `quarterly_review_notes`; the change is audited.
 *   **Coverage Alert**: The organisation dashboard lists high/critical-risk positions with no `ready_now` candidate.
+*   **Promotion Qualification** (`SuccessionQualificationService`): positions may set a target role, minimum review score, minimum years of service and required credentials. The candidate page shows an eight-check list: approved nomination, ready now, latest review ≥ minimum, no open PIP, no critical gaps against the target role, years of service, valid required credentials with none expired, and no overdue mandatory training. `promoteCandidate()` records `promoted_at`/`promoted_by` and a `qualification_snapshot` when all checks pass; otherwise an audited override reason is required. HR3 never changes salary.
 *   **Readiness Evidence** (`SuccessionController::readinessEvidence()`): the candidate page shows what the person has actually completed — pathway completion percentages, latest proficiency per competency against the required level, training and CPD totals, and their open renewal cycles. Readiness was previously a judgement typed into a form while the figures behind it lived one module away; surfacing them makes a promotion decision reviewable against evidence rather than against somebody's recollection. Reassessments are reduced to the newest row per competency in PHP, the same way the gap-analysis service does it.
 
 ### F. Social Recognition
@@ -452,6 +460,7 @@ manage milestones only for those direct-report candidates.
     *   *Innovation (Diskarte)*: For solving emergency bottlenecks.
     *   *Clinical Excellence*: For zero-error documentation or procedures.
 *   **Leaderboard**: Highlights public approved recognition only; private posts are excluded from statistics and the monthly leaderboard.
+*   **Awards & Certificates** (`/recognition/awards`): HR-defined `award_types` (15 seeded: service milestones 5–30 years, Compassionate Care, Clinical Excellence, Employee of the Quarter, Innovation, Exemplary Conduct, Team Excellence, Preceptor & Mentor, Patient Safety Champion, Lifelong Learner) issued as `employee_awards` to one person or a team. Each award has a printable digital certificate with a unique code (`HR3-AW-YYYY-XXXXXXXX`), publicly verifiable at `/awards/verify/{code}`, and a shareable SVG badge at `/awards/badge/{code}.svg`; badges show on the employee profile. `hims:auto-awards` issues service and CPD awards daily without duplicates. Revocation keeps the certificate verifiable with a *Revoked* stamp.
 
 ### G. Compliance & Oversight
 
@@ -675,8 +684,8 @@ The relational schema is configured for **MySQL 8**. All domain primary and fore
 >     `competency_assessments.gap`, and the unique index on `(venue_id, session_date, start_time)`. There are
 >     **no generated columns** and the only genuine `ENUM` in the database is `ai_chat_messages.role`.
 
-> **Live schema baseline.** The current MySQL database contains **53 tables and 1 view** with **40 applied
-> migration rows**. Earlier placeholder tables (`permissions`, `role_permissions`, `system_users`,
+> **Live schema baseline.** The current MySQL database contains **55 tables and 1 view** with **44 applied
+> migration rows** (v2.25.0 added `award_types` and `employee_awards`). Earlier placeholder tables (`permissions`, `role_permissions`, `system_users`,
 > `course_modules`, `quiz_questions`, `quiz_attempts`, `training_tests`, `training_test_results`,
 > `succession_reviews`, `credential_types`) and `peer_reviews` were removed by later migrations and are not
 > part of the live schema. The real account table is Laravel's `users`, extended with `role`, a nullable
@@ -1457,12 +1466,14 @@ those strings directly.
 
 > **Controls and limitations.** Field-level encryption (`Crypt::encryptString()`) protects `employees.phone`,
 > `employee_credentials.credential_number`, `system_integrations.api_key`, and `users.totp_secret`. Mandatory
-> multi-factor authentication (Email OTP & RFC 6238 TOTP), a 3-minute silent session inactivity timeout, a
+> multi-factor authentication (Email OTP & RFC 6238 TOTP), a 2-minute silent session inactivity timeout, a
 > secondary Record Access Password blur/unlock gate (`RecordAccess`), HTTP security headers (`SecurityHeaders`),
 > and GDPR / Philippine Data Privacy Act RA 10173 data subject rights (consent banner, JSON portability export,
 > self-service erasure, separated employee PII anonymization, and automated data retention pruning) are all
 > implemented. Audit logging (`audit_trails`) covers sensitive workflows, record unlocks, GDPR actions, and
-> administrative writes, though there is no tamper-evident hash chaining or table-driven permission model.
+> administrative writes, plus baseline logging of every successful write and sensitive record opens
+> (`AuditRequests`), and is a SHA-256 hash chain verified by `hims:audit-verify`. There is no table-driven
+> permission model.
 > Authoritative detail lives in `HIMS_ARCHITECTURE_AND_SECURITY.md` §3.
 
 ### 7.1 Authentication & Sessions
@@ -1482,7 +1493,7 @@ graph TD
     J --> K
     K -- No --> L["Increment 2FA Attempts / Throttle"]
     K -- Yes --> M["Auth::login + Session Regenerate + Audit Log"]
-    M --> N["EnforceSessionTimeout (5-min silent idle) & EnsurePasswordIsChanged"]
+    M --> N["EnforceSessionTimeout (2-min silent idle, deactivation, trainee access end) & EnsurePasswordIsChanged"]
     N --> O["Dashboard / Protected Routes (RecordAccess Blur Gate on Sensitive Views)"]
 ```
 
@@ -1490,17 +1501,17 @@ Public self-registration and self-service password reset (`/forgot-password`) ar
 
 ### 7.2 Security Settings
 
-*   **Laravel Breeze & Sessions** ✅ — session cookies are `HttpOnly` with `SameSite=Lax` by framework default. Strict 3-minute inactivity session timeout (`SESSION_IDLE_TIMEOUT=180`, `SESSION_LIFETIME=3`) with zero warning modals/prompts; inactive tabs end silently and redirect to login. Server-side `EnforceSessionTimeout` kills sessions immediately if an account is deactivated (`is_active = false`). Reverse-proxy IP resolution uses `APP_TRUSTED_PROXIES` rather than wildcard `*`.
+*   **Laravel Breeze & Sessions** ✅ — session cookies are `HttpOnly` with `SameSite=Lax` by framework default. Strict **2-minute** inactivity timeout (`SESSION_IDLE_TIMEOUT=120`, in seconds, read through `config('session.idle_timeout')`) with zero warning modals; an idle tab ends silently and returns to the public landing page (`/?timeout=1`). `session/ping` never extends a session; real input is reported through `POST session/activity` at most once a minute. Deactivated accounts and Trainees past `access_expires_at` are ended on their next request.
 *   **HTTP Security Headers (`SecurityHeaders`)** ✅ — `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, HSTS on HTTPS, and `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` on authenticated responses.
 *   **CSRF Protection** ✅ — `VerifyCsrfToken` in the default `web` group; all state-changing forms emit `@csrf`.
 *   **Brute-force throttling and account lockout** ✅ — `LoginRequest` throttles on an email+IP key at **5 failed attempts** and increments `failed_login_attempts`; the fifth failure sets `locked_until` for 15 minutes. A successful login resets both fields, and Admin can unlock through `UserController::unlockAccount()`. Self-service "Forgot Password" is removed; resets are administered (`must_change_password` enforced by `EnsurePasswordIsChanged`).
-*   **Role-Based Access Control (RBAC)** ✅ — 20 **Gates** + the `EnsureUserHasRole` middleware, keyed on `users.role`. See §3.1.
+*   **Role-Based Access Control (RBAC)** ✅ — 24 **Gates** + the `EnsureUserHasRole` middleware, keyed on `users.role` (6 roles, `App\Support\Roles`). See §3.1.
 *   **Record Access Password Gate (`App\Support\RecordAccess`)** ✅ — confidential workforce, credential, and account tables render blurred in place (`.hims-record-blurred`) with an inline unlock card until the user enters the admin-configured Record Access Password (`system_settings.record_access_password_hash`, `POST /record-access/unlock`), granting a 5-minute (`300s`) session window that can be manually re-locked (`POST /record-access/lock`).
 *   **GDPR & RA 10173 Data Privacy Controls** ✅ — explicit privacy consent banner (`POST /profile/gdpr-consent`), self-service JSON data export (`GET /profile/export-data`), self-service account erasure (`DELETE /profile`), HR/Admin separated employee PII anonymization (`POST /employees/{id}/anonymize`), and daily automated retention pruning (`php artisan hims:prune-expired-data`).
 *   **Input validation & SQL safety** ✅ — every write path calls `$request->validate([...])`; all queries use Query Builder parameter binding. `DB::raw` fragments (`CONCAT`, `DATE_FORMAT`, `FIELD`) contain no user-supplied interpolation.
 *   **Encryption at rest** ⚠️ — Laravel `Crypt::encryptString()` protects `employees.phone`, `employee_credentials.credential_number`, `system_integrations.api_key`, and `users.totp_secret`, with controller decryption on authorized reads and migrations encrypting existing rows. Other fields, including most performance and succession data, remain database plaintext.
 *   **Two-Factor Authentication (2FA / TOTP)** ✅ — mandatory 2FA via Email OTP (2-min expiry, SHA-256 hashed) and RFC 6238 TOTP MFA. OTP codes are never displayed on screen during SMTP delivery failures. TOTP secrets are encrypted at rest, require password verification on enrollment, and prevent replay attacks via `totp_consumed_counter`. Trusted-device 30-day bypasses have been removed.
-*   **Audit trail** ⚠️ — selective. Covered paths include AI writes, Record Access unlock/lock events, GDPR exports/erasures/anonymization, training assignments, renewal administration, course completion/reopen, employee and user creation/updates, competency assessments/credentials, recognition creation/moderation, performance cycle/review/score/response/acknowledgement changes, and all succession mutations. There are no Observers, no comprehensive read logging, and hash-chain columns remain null.
+*   **Audit trail** ✅ — two layers: rich `AuditTrail::record()` entries with before/after state on sensitive workflows (AI writes, Record Access, GDPR actions, training assignments, renewals, completions, employee/user administration, competency and credential verification, reviews, succession, recognition and awards), plus `AuditRequests` baseline rows for every successful write (`http_<verb>`) and every sensitive record open (`view`). Rows form a SHA-256 hash chain (`chain_seq`, `chain_hash`) checked by `php artisan hims:audit-verify`. Audit rows are retained indefinitely unless pruning is requested explicitly (minimum 6 years).
 
 ### 7.3 Compliance Control Summary
 
@@ -1508,18 +1519,18 @@ Public self-registration and self-service password reset (`/forgot-password`) ar
 |---|---|---|
 | Session auth, CSRF, password hashing | Baseline | ✅ Implemented |
 | HTTP Security Headers & no-store cache control | GDPR · HIPAA · RA 10173 | ✅ Implemented (`SecurityHeaders` middleware) |
-| 3-Minute silent idle timeout & deactivation | Hospital policy · HIPAA | ✅ Implemented (no prompts, auto-terminate) |
+| 2-Minute silent idle timeout & deactivation | Hospital policy · HIPAA | ✅ Implemented (no prompts, auto-terminate, landing page) |
 | Login rate-limiting & 5-attempt lockout | Baseline · Hospital policy | ✅ Implemented (5 attempts, 15-min lock, Admin unlock) |
-| Role-based access enforcement | Baseline | ✅ Implemented (20 Gates + `role` middleware) |
+| Role-based access enforcement | Baseline | ✅ Implemented (24 Gates + `role` middleware, 6 roles) |
 | Record Access Password Gate | Hospital policy · RA 10173 | ✅ Implemented (in-place blur overlay, 5-min session grant, manual lock, audited) |
 | GDPR / RA 10173 Data Subject Rights | GDPR · RA 10173 | ✅ Implemented (Consent banner, JSON export, account erasure, separated PII anonymization, retention pruning) |
 | AI Employee Data Prohibition | GDPR · RA 10173 | ✅ Implemented (`AiAccessPolicy` blocks `employees` topic for all roles; `AiEntityResolver` employee lookup disabled) |
 | Input validation / SQL-injection defence | Baseline | ✅ Implemented (validation + bound params) |
 | Field-level encryption at rest | HIPAA · RA 10173 | ⚠️ Partial — phone, credentials, API keys, TOTP secrets |
 | Multi-factor authentication | HIPAA · RA 10173 | ✅ Implemented (Email OTP & RFC 6238 TOTP MFA; encrypted secrets, replay counter, zero display leak) |
-| Audit trail of sensitive access/modification | GDPR · HIPAA · RA 10173 | ⚠️ Selective write + Record Access unlock + GDPR event logging; no hash chaining |
+| Audit trail of sensitive access/modification | GDPR · HIPAA · RA 10173 | ✅ Every successful write + sensitive record opens (`AuditRequests`), rich domain entries, SHA-256 hash chain (`hims:audit-verify`); list reads not logged |
 
-**Net position:** everyday web controls, multi-factor authentication, 3-minute silent timeouts, secondary record-access gating, limited field encryption, account lockout, and attributable writes on sensitive workflows are implemented. Comprehensive full-database encryption, read/access logging, and tamper-evident audit chaining remain absent, so the application must still be treated as **pre-compliance** rather than as a fully certified HIPAA or RA 10173 system.
+**Net position:** everyday web controls, multi-factor authentication, 2-minute silent timeouts, secondary record-access gating, limited field encryption, account lockout, and attributable writes on sensitive workflows are implemented. Comprehensive full-database encryption, read/access logging, and tamper-evident audit chaining remain absent, so the application must still be treated as **pre-compliance** rather than as a fully certified HIPAA or RA 10173 system.
 
 ---
 
@@ -1716,6 +1727,7 @@ mandatory reason field when one is selected. That does not survive being reduced
 | POST | `/competency/assessments` | `competency.assessments.store` | `admin,hr_manager,supervisor` |
 | GET | `/competency/credentials` | `competency.credentials.index` | all authenticated *(rows scoped)* |
 | POST | `/competency/credentials` | `competency.credentials.store` | `admin,hr_manager,supervisor` |
+| POST | `/competency/credentials/{id}/verify` | `competency.credentials.verify` | primary-source verification; self-verification refused |
 | POST | `/competency/domains` | `competency.domains.store` | `admin,hr_manager` |
 | GET | `/competency/domains/{id}` | `competency.domains.show` | all authenticated |
 
@@ -1901,7 +1913,7 @@ integrations should use the canonical `learning.*` routes above.
 | POST | `/training/sessions` | `training.sessions.store` | `admin,hr_manager,supervisor` |
 | GET | `/training/venues` | `training.venues.index` | all authenticated |
 | POST | `/training/venues` | `training.venues.store` | `admin,hr_manager` |
-| POST | `/training/sessions/{id}/checkin` | `training.sessions.checkin` | `admin,hr_manager,supervisor` |
+| POST | `/training/sessions/{id}/checkin` | `training.sessions.checkin` | `take-attendance` gate: admin, HR, Training Officer, supervisor, or the session's instructor |
 | POST | `/training/sessions/{id}/feedback` | `training.sessions.feedback.store` | all authenticated |
 
 Sessions are scheduled, venues managed, and employees register themselves. Scheduling a session, adding a
@@ -1943,6 +1955,8 @@ Whole group requires `admin,hr_manager,supervisor` — **`staff` have no access 
 | GET | `/succession/candidates/{id}/edit` | `succession.candidates.edit` | `admin,hr_manager` |
 | PUT | `/succession/candidates/{id}` | `succession.candidates.update` | `admin,hr_manager` |
 | DELETE | `/succession/candidates/{id}` | `succession.candidates.withdraw` | `admin,hr_manager` |
+| POST | `/succession/candidates/{id}/promote` | `succession.candidates.promote` | `admin,hr_manager` |
+| PUT | `/succession/positions/{id}/requirements` | `succession.positions.requirements` | `admin,hr_manager` |
 | POST | `/succession/candidates/{id}/milestones` | `succession.milestones.store` | group |
 | PUT | `/succession/candidates/{id}/milestones/{pathId}` | `succession.milestones.update` | group |
 | DELETE | `/succession/candidates/{id}/milestones/{pathId}` | `succession.milestones.destroy` | group |
@@ -1980,6 +1994,15 @@ Deliberately open to **every** role — recognition is peer-to-peer.
 | POST | `/recognition/badges` | `recognition.badges.store` | `admin,hr_manager` |
 | PATCH | `/recognition/posts/{id}/moderation` | `recognition.posts.moderate` | `admin,hr_manager` |
 | PATCH | `/recognition/comments/{id}/moderation` | `recognition.comments.moderate` | `admin,hr_manager` |
+| GET | `/recognition/awards` | `recognition.awards.index` | all authenticated (own awards; HR/Admin all) |
+| POST | `/recognition/awards/types` | `recognition.awards.types.store` | `admin,hr_manager` |
+| PUT | `/recognition/awards/types/{id}` | `recognition.awards.types.update` | `admin,hr_manager` |
+| POST | `/recognition/awards/types/{id}/toggle` | `recognition.awards.types.toggle` | `admin,hr_manager` |
+| POST | `/recognition/awards/issue` | `recognition.awards.issue` | `admin,hr_manager` |
+| POST | `/recognition/awards/{awardId}/revoke` | `recognition.awards.revoke` | `admin,hr_manager` |
+| POST | `/recognition/awards/run-auto` | `recognition.awards.run-auto` | `admin,hr_manager` |
+| GET | `/awards/verify/{code}` | `awards.verify` | **public**, `throttle:60,1` |
+| GET | `/awards/badge/{code}.svg` | `awards.badge` | **public**, `throttle:60,1` |
 
 Post and badge creation are modals on the index; there are no create-page GET routes. The main page computes its
 summary and top-department result with portable Query Builder, while MySQL still receives
@@ -2046,19 +2069,21 @@ Notes:
 
 | Area | Status |
 |---|---|
-| MySQL schema & migrations (53 live tables, 1 view, 2 triggers; 40 applied migrations) | ✅ Complete |
+| MySQL schema & migrations (55 live tables, 1 view, 2 triggers; 44 applied migrations) | ✅ Complete |
 | Laravel Breeze session auth; admin-provisioned accounts, registration & self-service password reset disabled | ✅ Complete |
-| Mandatory 2FA (Email OTP + RFC 6238 TOTP MFA), 5-min silent idle timeout, and 5-attempt lockout | ✅ Complete |
+| Mandatory 2FA (Email OTP + RFC 6238 TOTP MFA), 2-min silent idle timeout to the public landing page, and 5-attempt lockout | ✅ Complete |
 | Record Access Password Gate (`RecordAccess`) — in-place CSS blur & 5-min session unlock overlay | ✅ Complete |
 | GDPR / RA 10173 Compliance — consent banner, JSON portability export, self-service erasure, separated PII anonymization, daily retention pruning | ✅ Complete |
-| RBAC — 20 Gates + `EnsureUserHasRole` middleware over 4 roles | ✅ Complete *(Gates, not Policies)* |
+| RBAC — 24 Gates + `EnsureUserHasRole` middleware over 6 roles (adds Training Officer and time-limited Trainee) | ✅ Complete *(Gates, not Policies)* |
+| Account status (active / locked / deactivated / access ended) shown on users, directory and profile; employee separation deactivates the login | ✅ Complete |
+| Audit trail — baseline request logging + SHA-256 hash chain (`hims:audit-verify`) | ✅ Complete |
 | Performance module — cycles, named reviews, KPI scoring, employee response/acknowledgement, automatic close | ✅ Core paths |
 | Competency module — domains, assessments (trigger-computed gap), credentials, HR1/HR2 external sync | ✅ Complete |
 | Competency Gap Analysis (Objective 6) — org / department / employee views + JSON | ✅ Complete |
 | Learning — catalogue, 6 hospital clinical modules (`/learning/modules`), assignment-only enrolment, pathways, CPD, Required Training, renewals and reports | ✅ Complete |
 | Training — sessions, venues, registration, attendance check-in, feedback | ✅ Complete |
-| Succession module — confidential positions/candidates, 9-box, quarterly reviews, direct-report milestone scope, alerts | ✅ Complete except approval workflow |
-| Recognition module — named public/private posts, audience-limited interaction, moderation, public leaderboard | ✅ Complete |
+| Succession module — confidential positions/candidates, 9-box, quarterly reviews, direct-report milestone scope, alerts, qualification-based promotion | ✅ Complete |
+| Recognition module — named public/private posts, audience-limited interaction, moderation, public leaderboard, awards with verifiable certificates and badges | ✅ Complete |
 | Reports & Analytics (`/reports`) — executive HR analytics, custom report builder, and CSV exports | ✅ Complete |
 | Employees / Departments / Users / Audit Trail administration | ✅ Complete |
 | AI assistant + provider-agnostic AI layer (4 providers, strict zero employee personal data policy) | ✅ Complete |
@@ -2103,7 +2128,7 @@ Notes:
 | **Settings & Integrations** | `system_settings`, `system_integrations` | `system_settings` stores `record_access_password_hash` (bcrypt hash of the Record Access Password), `gdpr_consent_user_{id}` timestamps, and safe-default AI privacy keys (`ai_include_comments` = `'0'`, `ai_redact_names` = `'1'`). `system_integrations` stores HR1/HR2 API endpoints and `Crypt`-encrypted API keys. |
 | **Laravel & Auth infrastructure** | `users`, `user_trusted_devices`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `password_reset_tokens` | Framework & auth tables. `users` is the real auth table, extended with `role`, nullable `employee_id` FK, `is_active`, `must_change_password`, `failed_login_attempts` / `locked_until`, Email OTP columns, and RFC 6238 TOTP columns (`totp_secret`, `totp_enabled`, `totp_confirmed_at`, `totp_consumed_counter`). |
 
-**Current live baseline: 53 tables + 1 view, with 40 applied migration rows**, configured for MySQL 8. The
+**Current live baseline: 55 tables + 1 view, with 44 applied migration rows**, configured for MySQL 8. The
 legacy placeholder tables and `peer_reviews` named earlier in project history have been dropped. The newest
 migration is `2026_10_17_000001_harden_security_and_totp_settings`, which hardened TOTP replay tracking
 (`totp_consumed_counter`), encrypted existing TOTP secrets at rest, and enforced safe AI comment/redaction defaults.

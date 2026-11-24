@@ -86,6 +86,29 @@
     </div>
 </div>
 
+{{-- Account types & what each can do (App\Support\Roles) --}}
+<details class="hims-card mb-3" style="padding:12px 18px">
+    <summary style="cursor:pointer;font-weight:700;font-size:14px"><i class="bi bi-diagram-3"></i> Account types &amp; permissions</summary>
+    <p style="font-size:12.5px;color:#6b7280;margin:8px 0 12px">Accounts and employee details come from HR1/HR2; choose the account type here. Anyone named as a training session's instructor can take attendance for that session, whatever their account type.</p>
+    <div class="row g-3">
+        @foreach(\App\Support\Roles::definitions() as $key => $def)
+        <div class="col-md-6 col-xl-4">
+            <div style="border:1px solid var(--hims-border);border-radius:10px;padding:12px;height:100%">
+                <div style="font-weight:700"><i class="bi {{ $def['icon'] }}" style="color:var(--hims-primary)"></i> {{ $def['label'] }}
+                    <span class="hims-badge gray" style="font-weight:500">{{ (int) ($roleCounts[$key] ?? 0) }}</span></div>
+                <div style="font-size:12px;color:#6b7280;margin:2px 0 6px">{{ $def['who'] }} <strong>Scope:</strong> {{ $def['scope'] }}.</div>
+                <ul style="margin:0 0 4px;padding-left:18px;font-size:12px">
+                    @foreach($def['can'] as $item)<li>{{ $item }}</li>@endforeach
+                </ul>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:#991b1b;list-style:'✕  '">
+                    @foreach($def['cannot'] as $item)<li>{{ $item }}</li>@endforeach
+                </ul>
+            </div>
+        </div>
+        @endforeach
+    </div>
+</details>
+
 {{-- Filters Toolbar --}}
 <div class="hims-card mb-3" style="padding:12px 18px">
     <form method="GET" action="{{ route('users.index') }}" class="row g-2 align-items-center" id="usersFilterForm">
@@ -99,10 +122,9 @@
         <div class="col-md-3">
             <select name="role" id="userRoleFilter" class="hims-input hims-select" style="height:38px">
                 <option value="">All Roles</option>
-                <option value="admin" @selected(request('role') === 'admin')>Administrator</option>
-                <option value="hr_manager" @selected(request('role') === 'hr_manager')>HR Manager</option>
-                <option value="supervisor" @selected(request('role') === 'supervisor')>Supervisor</option>
-                <option value="staff" @selected(request('role') === 'staff')>Trainee</option>
+                @foreach(\App\Support\Roles::options() as $value => $label)
+                <option value="{{ $value }}" @selected(request('role') === $value)>{{ $label }}</option>
+                @endforeach
             </select>
         </div>
         <div class="col-md-2">
@@ -277,12 +299,16 @@
                     </div>
                     <div class="col-md-6">
                         <label class="hims-label">Role *</label>
-                        <select name="role" class="hims-input hims-select" required>
-                            <option value="staff">Trainee</option>
-                            <option value="supervisor">Supervisor</option>
-                            <option value="hr_manager">HR Manager</option>
-                            <option value="admin">Administrator</option>
+<select name="role" class="hims-input hims-select" required onchange="var t=this.form.querySelector('[data-access-end]'); if (t) { t.style.display = this.value === 'trainee' ? '' : 'none'; t.querySelector('input').required = this.value === 'trainee'; }">
+                            @foreach(\App\Support\Roles::options() as $value => $label)
+                                <option value="{{ $value }}" @selected('staff' === $value)>{{ $label }}</option>
+                            @endforeach
                         </select>
+                    </div>
+                    <div class="col-md-6" data-access-end style="display:none">
+                        <label class="hims-label">Access end date <span style="color:#9ca3af;font-weight:400">(required for trainees)</span></label>
+                        <input type="date" name="access_expires_at" class="hims-input" min="{{ now()->addDay()->toDateString() }}" value="" >
+                        <div style="font-size:11px;color:#6b7280">Last day of the placement / orientation. Sign-in stops after this date.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="hims-label">Link to Employee <span style="color:#9ca3af;font-weight:400">(optional)</span></label>
@@ -294,11 +320,10 @@
                         </select>
                     </div>
                     <div class="col-12" style="background:var(--hims-primary-pale);border-radius:8px;padding:10px 12px;font-size:12px;color:#6b7280;border:1px solid var(--hims-border)">
-                        <strong style="color:var(--hims-primary)">Access:</strong>
-                        <span class="badge bg-white text-dark border me-1">Admin</span> Full &nbsp;|&nbsp;
-                        <span class="badge bg-white text-dark border me-1">HR Manager</span> All modules &nbsp;|&nbsp;
-                        <span class="badge bg-white text-dark border me-1">Supervisor</span> Team &nbsp;|&nbsp;
-                        <span class="badge bg-white text-dark border">Trainee</span> Self / Training Status
+                        <strong style="color:var(--hims-primary)">Account types:</strong>
+                        @foreach(\App\Support\Roles::definitions() as $def)
+                            <div style="margin-top:4px"><span class="badge bg-white text-dark border me-1"><i class="bi {{ $def['icon'] }}"></i> {{ $def['label'] }}</span> {{ $def['scope'] }} — {{ $def['who'] }}</div>
+                        @endforeach
                     </div>
                 </div>
             </div>

@@ -42,7 +42,30 @@
                             <span class="hims-badge {{ $employee->employment_status === 'active' ? 'green' : 'gray' }} ms-1">
                                 {{ ucfirst($employee->employment_status) }}
                             </span>
+                            <span class="hims-badge {{ $accountStatus['badge'] }} ms-1" title="{{ $accountStatus['detail'] }}">
+                                <i class="bi {{ $accountStatus['icon'] }}"></i> {{ $accountStatus['label'] }}
+                            </span>
                         </div>
+                        @if($accountStatus['detail'])
+                            <div style="font-size:12px;color:#6b7280;margin-top:8px">{{ $accountStatus['detail'] }}</div>
+                        @endif
+                        @if($account && auth()->user()?->hasRole('admin'))
+                            <div class="d-flex gap-2 justify-content-center mt-2">
+                                @if($accountStatus['key'] === 'locked')
+                                    <form method="POST" action="{{ route('users.unlock', $account->id) }}">@csrf
+                                        <button class="btn-hims btn-hims-outline btn-sm"><i class="bi bi-unlock"></i> Unlock</button>
+                                    </form>
+                                @endif
+                                @if((int) $account->id !== (int) auth()->id())
+                                    <form method="POST" action="{{ route('users.toggle-active', $account->id) }}" onsubmit="return confirm('{{ $accountStatus['key'] === 'deactivated' ? 'Reactivate' : 'Deactivate' }} this login account?')">@csrf
+                                        <button class="btn-hims btn-hims-outline btn-sm" style="{{ $accountStatus['key'] === 'deactivated' ? '' : 'color:var(--hims-danger);border-color:var(--hims-danger)' }}">
+                                            <i class="bi {{ $accountStatus['key'] === 'deactivated' ? 'bi-person-check' : 'bi-person-x' }}"></i>
+                                            {{ $accountStatus['key'] === 'deactivated' ? 'Reactivate login' : 'Deactivate login' }}
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                     <div class="card-body">
                         <table class="hims-kv" style="width:100%;font-size:13px">
@@ -59,10 +82,10 @@
                                 <td style="padding:9px 0">
                                     @if($employee->phone)
                                         @php
-                                            $masked = '••• ••• ' . (strlen($employee->phone) > 4 ? substr($employee->phone, -4) : '4821');
+                                            $masked = '••• ••• ' . (strlen($employee->phone) > 4 ? substr($employee->phone, -4) : '••••');
                                         @endphp
-                                        <span id="phone-display">{{ $masked }}</span>
-                                        <button type="button" class="btn-hims btn-hims-ghost btn-sm" style="padding:1px 5px;font-size:11px" onclick="let d = document.getElementById('phone-display'); d.innerText = d.innerText === '{{ $masked }}' ? '{{ $employee->phone }}' : '{{ $masked }}';">Show</button>
+                                        <span id="phone-display" data-masked="{{ $masked }}" data-full="{{ $employee->phone }}">{{ $masked }}</span>
+                                        <button type="button" class="btn-hims btn-hims-ghost btn-sm" style="padding:1px 5px;font-size:11px" onclick="var d = document.getElementById('phone-display'); d.textContent = d.textContent === d.dataset.masked ? d.dataset.full : d.dataset.masked;">Show</button>
                                     @else
                                         —
                                     @endif
@@ -105,6 +128,28 @@
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                {{-- Awards & badges --}}
+                <div class="hims-card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-award"></i> Awards &amp; Badges</h5>
+                        <span class="hims-badge green">{{ $awards->count() }}</span>
+                    </div>
+                    <div class="card-body">
+                        @forelse($awards as $a)
+                            @if($loop->first)<div style="display:flex;flex-wrap:wrap;gap:14px">@endif
+                            <a href="{{ route('awards.verify', $a->certificate_code) }}" target="_blank" title="{{ $a->award_name }} — view certificate"
+                               style="display:flex;flex-direction:column;align-items:center;gap:5px;width:112px;text-align:center;text-decoration:none;color:inherit">
+                                <span style="width:54px;height:54px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:22px;background:{{ $a->badge_color }};box-shadow:0 0 0 4px {{ $a->badge_color }}33"><i class="bi {{ $a->badge_icon }}"></i></span>
+                                <span style="font-size:12px;font-weight:700;line-height:1.25">{{ $a->award_name }}</span>
+                                <span style="font-size:11px;color:#6b7280">{{ \Carbon\Carbon::parse($a->awarded_on)->format('M Y') }}</span>
+                            </a>
+                            @if($loop->last)</div>@endif
+                        @empty
+                            <p style="margin:0;color:#9ca3af;font-size:13px">No awards yet.</p>
+                        @endforelse
                     </div>
                 </div>
 

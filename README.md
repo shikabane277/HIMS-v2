@@ -46,19 +46,32 @@ Data Portability, and the Dashboard and My Development surfaces.
   (`/learning/modules`: `MOD-INF-101` through `MOD-DPA-601`), required-training
   assignment, learning pathways, renewal oversight, accreditation reporting, and CPD
   logging with a separate verification step. Course enrolment is assignment-only;
-  completing a course credits verified CPD hours.
+  completing a course credits verified CPD hours. Every CPD entry is marked
+  **Qualified / Not qualified / Pending** from evidence (completed enrolment, recorded
+  attendance or HR verification), and only qualified hours count.
 - **Training logistics** — session scheduling with a same-venue/same-start-time guard,
   self-service registration, roster attendance marking, and post-session feedback from
   anyone marked present.
 - **Succession planning** — key positions, named candidates, confidential readiness
   data, vacancy risk, quarterly position reviews, evidence and development milestones.
+  Promotion is **qualification-based**: an eight-point checklist (approval, readiness,
+  review score, no PIP, no critical gaps against the target role, service years,
+  credentials, mandatory training) must pass, or HR must record an audited override.
+  Salary is left to HR1.
 - **Recognition** — named public or private badges/posts, audience-limited comments and
   reactions, moderation and a public-only leaderboard.
+- **Awards & Certificates** — HR-defined awards (service milestones, compassionate care,
+  clinical excellence, employee of the quarter, mentor, safety, CPD and more) issued to a
+  person or a team. Each award comes with a printable digital certificate verifiable at
+  `/awards/verify/{code}` and a shareable SVG badge shown on the employee profile.
+  Service and CPD awards are issued automatically (`php artisan hims:auto-awards`).
 - **Reports & Analytics (`/reports`)** — executive workforce, performance, competency,
   learning, and compliance analytics with custom report generation and CSV export.
 - **AI Gap Analysis** — a per-employee and per-department competency gap narrative
   built from assessments and review scores, with strict privacy defaults
-  (`ai_include_comments = 0`, `ai_redact_names = 1`). Admin, HR manager and supervisor only.
+  (`ai_include_comments = 0`, `ai_redact_names = 1`). Every gap shows its arithmetic
+  (`current − required`, severity rule, priority sum). Admin, HR manager and supervisor;
+  Training Officers get the department training-needs view.
 - **Compliance & accreditation oversight, inside Learning** — the **Required
   Training**, **Renewals** and **Reports** tabs, all three behind the
   `view-compliance` gate. Assign multiple courses or sessions at once to an employee,
@@ -70,12 +83,15 @@ Data Portability, and the Dashboard and My Development surfaces.
   for all roles).** Destructive actions require an explicit in-chat confirmation.
 - **Security, 2FA, Record Access & GDPR / RA 10173 Compliance** — mandatory Two-Factor
   Authentication on every login (Email OTP or RFC 6238 Authenticator App TOTP),
-  3-minute silent session inactivity timeout, in-place **Record Access Password**
+  2-minute silent session inactivity timeout that returns to a public landing page,
+  in-place **Record Access Password**
   blur/unlock gate (`RecordAccess`), HTTP security headers (`SecurityHeaders`),
   explicit GDPR privacy consent banner, self-service **Download My Data (JSON)**
   (`GET /profile/export-data`), self-service account erasure (`DELETE /profile`),
   separated employee PII anonymization (`POST /employees/{id}/anonymize`), and daily
-  automated data retention pruning (`php artisan hims:prune-expired-data`).
+  automated data retention pruning (`php artisan hims:prune-expired-data`). The audit
+  trail is a SHA-256 hash chain (`php artisan hims:audit-verify`), with baseline logging
+  of every successful write and of sensitive record opens.
 
 Also included: a Facebook-style in-app notification feed with unread/read state and
 deep links, a permission-aware global search that opens the relevant module/tab, and
@@ -85,8 +101,10 @@ and due reassessments. That command always writes the in-app notifications and t
 (`CREDENTIAL_ALERT_EMAIL`, `config/hims.php`), so turn it on only once
 `php artisan hims:mail-test <address>` actually delivers.
 
-**Role-based access** is enforced at the route level (20 gates plus a `role:`
-middleware) and, in the modules that handle personal records, at the row level — a
+**Role-based access** is enforced at the route level (24 gates plus a `role:`
+middleware) over six account types — `admin`, `hr_manager`, `training_officer`,
+`supervisor`, `staff` and the time-limited `trainee` (`App\Support\Roles`) — and, in
+the modules that handle personal records, at the row level — a
 supervisor sees only their direct reports where that module applies the reporting-line
 rule, while HR and admin see the organisation-wide records permitted to their role.
 

@@ -86,7 +86,8 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Authorisation gates for the HIMS modules.
      *
-     * users.role is one of: admin | hr_manager | supervisor | staff
+     * users.role is one of App\Support\Roles::ALL:
+     * admin | hr_manager | training_officer | supervisor | staff | trainee
      * These back both route middleware and @can checks in the sidebar/views,
      * so navigation and enforcement can never drift apart.
      */
@@ -108,6 +109,10 @@ class AppServiceProvider extends ServiceProvider
         // employees.supervisor_id, because holding a role says nothing about
         // whether a particular person answers to you.
         Gate::define('manage-performance', fn ($user) => $user->hasRole('admin', 'hr_manager', 'supervisor'));
+
+        // Trainees (students, interns, orientees) are not in review cycles —
+        // they are evaluated through their preceptor and competency sign-off.
+        Gate::define('view-performance', fn ($user) => ! $user->isTrainee() && ! $user->isTrainingOfficer());
         Gate::define('manage-review-cycles', fn ($user) => $user->hasRole('admin', 'hr_manager'));
 
         // Competency assessment and credential verification.
@@ -123,8 +128,14 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-competency-framework', fn ($user) => $user->hasRole('admin', 'hr_manager'));
 
         // Course/pathway authoring and training scheduling.
-        Gate::define('manage-learning', fn ($user) => $user->hasRole('admin', 'hr_manager'));
-        Gate::define('manage-training', fn ($user) => $user->hasRole('admin', 'hr_manager', 'supervisor'));
+        // The Training Officer owns the learning programme hospital-wide.
+        Gate::define('manage-learning', fn ($user) => $user->hasRole('admin', 'hr_manager', 'training_officer'));
+        Gate::define('manage-training', fn ($user) => $user->hasRole('admin', 'hr_manager', 'training_officer', 'supervisor'));
+
+        // Attendance: training managers, or the instructor of that session
+        // (any account — a staff nurse teaching BLS marks her own class).
+        Gate::define('take-attendance', fn ($user, $session) => $user->can('manage-training')
+            || ($user->employee_id && $session && $session->instructor_id === $user->employee_id));
 
         // The venue register is narrower than scheduling into it: a supervisor
         // books a room for their ward's session but does not get to add rooms to
@@ -133,18 +144,18 @@ class AppServiceProvider extends ServiceProvider
         // framework gate — the Venues page is open to every role, so the trigger
         // that opens the modal needs the check the deleted GET page got for free
         // from its route.
-        Gate::define('manage-venues', fn ($user) => $user->hasRole('admin', 'hr_manager'));
+        Gate::define('manage-venues', fn ($user) => $user->hasRole('admin', 'hr_manager', 'training_officer'));
 
         // Recording that somebody finished a course. Wider than manage-learning
         // (a supervisor knows who on their ward has done the fire drill) but
         // deliberately excludes staff: completion is a statement about a person,
         // so nobody self-certifies. Mirrors the session check-in rule.
-        Gate::define('record-completion', fn ($user) => $user->hasRole('admin', 'hr_manager', 'supervisor'));
+        Gate::define('record-completion', fn ($user) => $user->hasRole('admin', 'hr_manager', 'training_officer', 'supervisor'));
 
         // Compliance oversight: supervisors see their own department's standing,
         // HR/admin set the policy behind it and read the hospital-wide reports.
-        Gate::define('view-compliance', fn ($user) => $user->hasRole('admin', 'hr_manager', 'supervisor'));
-        Gate::define('manage-compliance', fn ($user) => $user->hasRole('admin', 'hr_manager'));
+        Gate::define('view-compliance', fn ($user) => $user->hasRole('admin', 'hr_manager', 'training_officer', 'supervisor'));
+        Gate::define('manage-compliance', fn ($user) => $user->hasRole('admin', 'hr_manager', 'training_officer'));
 
         // Succession planning is deliberately narrow.
         Gate::define('manage-succession', fn ($user) => $user->hasRole('admin', 'hr_manager'));
@@ -163,5 +174,13 @@ class AppServiceProvider extends ServiceProvider
 
         // The AI gap analysis reads across employee performance data.
         Gate::define('run-gap-analysis', fn ($user) => $user->hasRole('admin', 'hr_manager', 'supervisor'));
+
+        // Department-level training needs (no individual performance data) —
+        // also open to the Training Officer.
+        Gate::define('view-training-needs', fn ($user) => $user->hasRole('admin', 'hr_manager', 'supervisor', 'training_officer'));
+
+        // Reports & Analytics hub (performance-heavy) — not for self-service
+        // accounts or the Training Officer, who has the accreditation report.
+        Gate::define('view-reports', fn ($user) => $user->hasRole('admin', 'hr_manager', 'supervisor'));
     }
 }

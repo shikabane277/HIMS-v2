@@ -86,6 +86,88 @@
 </div>
 @endif
 
+@if($canSeeConfidential && $qualification)
+@php
+    $q = $qualification;
+    $reqCreds = collect(json_decode((string) ($position->required_credentials ?? '[]'), true) ?: [])->implode(', ');
+@endphp
+<div class="hims-card mb-3" id="promotion-qualification">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <h5><i class="bi bi-ladder"></i> Promotion qualification — {{ $candidate->target_title }}</h5>
+        @if($candidate->status === 'promoted')
+            <span class="hims-badge green"><i class="bi bi-check2-circle"></i> Promoted {{ $candidate->promoted_at ? \Carbon\Carbon::parse($candidate->promoted_at)->format('d M Y') : '' }}</span>
+        @elseif($q['qualified'])
+            <span class="hims-badge green"><i class="bi bi-patch-check-fill"></i> Qualified · {{ $q['passed'] }}/{{ $q['total'] }} checks</span>
+        @else
+            <span class="hims-badge yellow"><i class="bi bi-hourglass-split"></i> Not yet qualified · {{ $q['passed'] }}/{{ $q['total'] }} checks</span>
+        @endif
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-lg-7">
+                <ul style="list-style:none;margin:0;padding:0;display:grid;gap:8px">
+                    @foreach($q['checks'] as $check)
+                    <li style="display:flex;gap:10px;align-items:flex-start;font-size:13px">
+                        @if($check['passed'] === true)
+                            <i class="bi bi-check-circle-fill" style="color:#16a34a;font-size:17px"></i>
+                        @elseif($check['passed'] === false)
+                            <i class="bi bi-x-circle-fill" style="color:#dc2626;font-size:17px"></i>
+                        @else
+                            <i class="bi bi-dash-circle" style="color:#9ca3af;font-size:17px"></i>
+                        @endif
+                        <div>
+                            <strong>{{ $check['label'] }}</strong>
+                            <div style="color:#6b7280;font-size:12px">{{ $check['detail'] }}
+                                @if(! empty($check['gaps_url']))<a href="{{ $check['gaps_url'] }}" style="margin-left:4px">View gap analysis</a>@endif
+                            </div>
+                        </div>
+                    </li>
+                    @endforeach
+                </ul>
+                <p style="font-size:12px;color:#6b7280;margin:12px 0 0"><i class="bi bi-info-circle"></i> HR3 checks whether the candidate qualifies. The new position and salary grade are applied in HR1 after promotion.</p>
+            </div>
+            <div class="col-lg-5">
+                @can('manage-succession')
+                    @if($candidate->status !== 'promoted')
+                    <form method="POST" action="{{ route('succession.candidates.promote', $candidate->candidate_id) }}" onsubmit="return confirm('Confirm promotion of {{ addslashes($candidate->employee_name) }} to {{ addslashes($candidate->target_title) }}?')" style="border:1px solid var(--hims-border);border-radius:10px;padding:14px;margin-bottom:12px">
+                        @csrf
+                        <div class="hims-label" style="margin-bottom:6px">Promote into this position</div>
+                        @unless($q['qualified'])
+                            <label class="hims-label" for="override_reason" style="font-weight:500;color:#92400e">Not all checks pass — justification required to promote anyway</label>
+                            <textarea name="override_reason" id="override_reason" class="hims-input" rows="3" minlength="15" maxlength="1000" placeholder="Why is promotion justified despite the open items?" required></textarea>
+                        @endunless
+                        <button type="submit" class="btn-hims btn-hims-primary mt-2" @if(! in_array($candidate->status, ['approved'], true)) disabled title="Approve the nomination first" @endif>
+                            <i class="bi bi-arrow-up-circle"></i> {{ $q['qualified'] ? 'Promote' : 'Promote with override' }}
+                        </button>
+                    </form>
+                    @elseif($candidate->promotion_override_reason)
+                        <div class="hims-alert warning"><i class="bi bi-exclamation-triangle"></i> Promoted with override: {{ $candidate->promotion_override_reason }}</div>
+                    @endif
+
+                    <details style="border:1px solid var(--hims-border);border-radius:10px;padding:10px 14px">
+                        <summary style="cursor:pointer;font-weight:600;font-size:13px">Position requirements</summary>
+                        <form method="POST" action="{{ route('succession.positions.requirements', $position->position_id) }}" style="display:grid;gap:10px;margin-top:10px">
+                            @csrf @method('PUT')
+                            <div><label class="hims-label" for="target_role_id">Target job role (competencies)</label>
+                                <select name="target_role_id" id="target_role_id" class="hims-input">
+                                    <option value="">— not set —</option>
+                                    @foreach($roles as $r)<option value="{{ $r->role_id }}" @selected($position->target_role_id === $r->role_id)>{{ $r->role_name }}</option>@endforeach
+                                </select></div>
+                            <div class="d-flex gap-2">
+                                <div style="flex:1"><label class="hims-label" for="min_performance_score">Min. score</label><input type="number" step="0.05" min="1" max="5" name="min_performance_score" id="min_performance_score" class="hims-input" placeholder="3.50" value="{{ $position->min_performance_score }}"></div>
+                                <div style="flex:1"><label class="hims-label" for="min_years_service">Min. years</label><input type="number" min="0" max="40" name="min_years_service" id="min_years_service" class="hims-input" value="{{ $position->min_years_service }}"></div>
+                            </div>
+                            <div><label class="hims-label" for="required_credentials">Required credentials <span style="font-weight:400;color:#6b7280">(comma-separated)</span></label><input type="text" name="required_credentials" id="required_credentials" class="hims-input" maxlength="500" placeholder="e.g. PRC License, BLS Certification, ACLS Certification" value="{{ $reqCreds }}"></div>
+                            <button class="btn-hims btn-hims-outline btn-sm" type="submit"><i class="bi bi-save"></i> Save requirements</button>
+                        </form>
+                    </details>
+                @endcan
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 <div class="row g-3">
     @if($canSeeConfidential)<div class="col-lg-4">
         <div class="hims-card" style="height:100%">
@@ -94,7 +176,7 @@
                 <div style="display:grid;gap:12px;font-size:13px">
                     <div>
                         <div class="hims-label" style="margin-bottom:2px">Status</div>
-                        <span class="hims-badge {{ $candidate->status === 'approved' ? 'green' : ($candidate->status === 'rejected' ? 'red' : 'yellow') }}">
+                        <span class="hims-badge {{ in_array($candidate->status, ['approved', 'promoted'], true) ? 'green' : (in_array($candidate->status, ['rejected', 'closed'], true) ? 'red' : 'yellow') }}">
                             {{ ucfirst(str_replace('_',' ', (string) $candidate->status)) }}
                         </span>
                     </div>
@@ -126,7 +208,7 @@
                     <div style="border-top:1px solid var(--hims-border);padding-top:12px;margin-top:4px">
                         <div class="hims-label" style="margin-bottom:8px">Succession Approval Workflow</div>
                         <div class="d-flex gap-2" style="flex-wrap:wrap">
-                            @if($candidate->status !== 'approved')
+                            @if(! in_array($candidate->status, ['approved', 'promoted'], true))
                             <form method="POST" action="{{ route('succession.candidates.approve', $candidate->candidate_id) }}" onsubmit="return confirm('Approve nomination for {{ addslashes($candidate->employee_name) }}?')">
                                 @csrf
                                 <button type="submit" class="btn-hims btn-hims-primary btn-sm" style="background:#16a34a;border-color:#16a34a">
@@ -135,7 +217,7 @@
                             </form>
                             @endif
 
-                            @if($candidate->status !== 'rejected')
+                            @if(! in_array($candidate->status, ['rejected', 'promoted'], true))
                             <form method="POST" action="{{ route('succession.candidates.reject', $candidate->candidate_id) }}" onsubmit="return confirm('Reject nomination for {{ addslashes($candidate->employee_name) }}?')">
                                 @csrf
                                 <button type="submit" class="btn-hims btn-sm" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 12px;cursor:pointer">

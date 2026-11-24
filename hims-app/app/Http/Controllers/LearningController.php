@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CpdQualificationService;
 use App\Services\NotificationService;
 use App\Services\RenewalCycleService;
 use App\Support\AuditTrail;
@@ -11,6 +12,8 @@ use Illuminate\Support\Str;
 
 class LearningController extends Controller
 {
+    protected bool $learningScope = true;
+
     public function index(Request $request)
     {
         $stats = [
@@ -412,8 +415,16 @@ class LearningController extends Controller
                     DB::raw("CONCAT(COALESCE(vb.first_name,''),' ',COALESCE(vb.last_name,'')) as verified_by_name"))
         )
             ->when($request->query('focus'), fn ($q, $id) => $q->where('cr.cpd_id', $id))
-            ->when($request->query('filter') === 'pending', fn ($q) => $q->where('cr.verified', false))
+            ->when($request->query('filter') === 'pending', fn ($q) => $q->where('cr.verified', false)->where('cr.source_type', 'external'))
+            ->when($request->query('filter') === 'not_qualified', fn ($q) => $q->where('cr.verified', false)->whereIn('cr.source_type', ['course', 'training']))
+            ->when($request->query('filter') === 'qualified', fn ($q) => $q->where('cr.verified', true))
             ->orderByDesc('cr.date_earned')->paginate(30)->withQueryString();
+
+        // Qualified = there is evidence the person actually did it (completed
+        // the course / attended the session / HR checked the certificate).
+        $cpdQualification = app(CpdQualificationService::class);
+        $cpdQualification->syncVerifiedFlags($records->getCollection());
+        $qualification = $cpdQualification->evaluateMany($records->getCollection());
 
         // Totals reflect the same scope as the list, so a member of staff sees
         // their own hours rather than the hospital's.
@@ -423,15 +434,17 @@ class LearningController extends Controller
         )
             ->selectRaw('COALESCE(SUM(cr.cpd_hours),0) as total_hours')
             ->selectRaw('COALESCE(SUM(CASE WHEN cr.verified = 1 THEN cr.cpd_hours ELSE 0 END),0) as verified_hours')
-            ->selectRaw('COUNT(CASE WHEN cr.verified = 0 THEN 1 END) as pending_count')
+            ->selectRaw("COUNT(CASE WHEN cr.verified = 0 AND cr.source_type = 'external' THEN 1 END) as pending_count")
+            ->selectRaw("COUNT(CASE WHEN cr.verified = 0 AND cr.source_type IN ('course','training') THEN 1 END) as not_qualified_count")
             ->first();
 
         $user = auth()->user();
 
         return view('learning.cpd.index', [
             'records' => $records,
+            'qualification' => $qualification,
             'totals' => $totals,
-            'filter' => $request->query('filter') === 'pending' ? 'pending' : 'all',
+            'filter' => in_array($request->query('filter'), ['pending', 'qualified', 'not_qualified'], true) ? $request->query('filter') : 'all',
             'canVerify' => $user?->can('manage-learning') ?? false,
             // The Record CPD modal is hosted on this page, so its pickers load
             // here — createCpd() and its GET page are gone. Staff log their own
@@ -452,7 +465,7 @@ class LearningController extends Controller
         $request->validate([
             'employee_id' => 'nullable|string|exists:employees,employee_id',
             'source_type' => 'required|in:course,training,external',
-            'source_id' => 'nullable|string',
+            'source_id' => 'nullable|required_if:source_type,course,training|string',
             'activity_name' => 'required|string|max:300',
             'cpd_hours' => 'required|numeric|min:0.5|max:999.9',
             'date_earned' => 'required|date|before_or_equal:today',
@@ -474,28 +487,52 @@ class LearningController extends Controller
 
         $this->authorizeEmployeeAccess($employeeId);
 
-        // Hours that came from a HIMS course or training session are already
-        // evidenced by the completion record, so they post verified. External
-        // activity is a claim until HR checks the certificate.
+        // Course / training hours qualify only when HIMS has the evidence: a
+        // completed enrollment or recorded attendance. Previously these were
+        // marked verified on submission even if the person never attended.
+        // External activity is a claim until HR checks the certificate.
         $isSystemSourced = in_array($request->source_type, ['course', 'training'], true);
+        $cpdId = (string) Str::uuid();
+        $check = null;
+        if ($isSystemSourced) {
+            $check = app(CpdQualificationService::class)->evaluate((object) [
+                'cpd_id' => $cpdId,
+                'employee_id' => $employeeId,
+                'source_type' => $request->source_type,
+                'source_id' => $request->source_id,
+                'cpd_hours' => (float) $request->cpd_hours,
+                'verified' => false,
+            ]);
+
+            $dupe = DB::table('cpd_records')->where('employee_id', $employeeId)
+                ->where('source_type', $request->source_type)->where('source_id', $request->source_id)->exists();
+            if ($dupe) {
+                return back()->withInput()->with('error', 'CPD for this '.($request->source_type === 'course' ? 'course' : 'session').' is already on record.');
+            }
+        }
+        $qualifies = $isSystemSourced && $check['status'] === CpdQualificationService::QUALIFIED;
 
         DB::table('cpd_records')->insert([
-            'cpd_id' => Str::uuid(),
+            'cpd_id' => $cpdId,
             'employee_id' => $employeeId,
             'source_type' => $request->source_type,
             'source_id' => $isSystemSourced ? ($request->source_id ?: null) : null,
             'activity_name' => $request->activity_name,
-            'cpd_hours' => $request->cpd_hours,
+            'cpd_hours' => $qualifies ? $check['eligible_hours'] : $request->cpd_hours,
             'date_earned' => $request->date_earned,
             'renewal_period' => $request->renewal_period ?: now()->year,
-            'verified' => $isSystemSourced,
-            'verified_by' => $isSystemSourced ? $this->currentEmployeeId() : null,
+            'verified' => $qualifies,
+            'verified_by' => $qualifies ? $this->currentEmployeeId() : null,
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        return redirect()->route('learning.cpd.index')->with('success', $isSystemSourced
-            ? 'CPD recorded and auto-verified from its HIMS source.'
-            : 'CPD submitted. External activity stays pending until HR verifies it.');
+        if (! $isSystemSourced) {
+            return redirect()->route('learning.cpd.index')->with('success', 'CPD submitted. External activity stays pending until HR verifies the certificate.');
+        }
+
+        return $qualifies
+            ? redirect()->route('learning.cpd.index')->with('success', 'Qualified: '.$check['reason'].' '.$check['eligible_hours'].' CPD hour(s) counted.')
+            : redirect()->route('learning.cpd.index')->with('error', 'Recorded as NOT qualified: '.$check['reason'].' It will count automatically once attendance or completion is recorded.');
     }
 
     /**
@@ -669,6 +706,15 @@ class LearningController extends Controller
 
         $record = DB::table('cpd_records')->where('cpd_id', $cpdId)->first();
         abort_if(! $record, 404);
+
+        // Course / training entries qualify on HIMS evidence alone; HR cannot
+        // hand-verify one the employee did not complete or attend.
+        if (in_array($record->source_type, ['course', 'training'], true)) {
+            $check = app(CpdQualificationService::class)->evaluate($record);
+            if ($check['status'] !== CpdQualificationService::QUALIFIED) {
+                return back()->with('error', 'Cannot verify: '.$check['reason']);
+            }
+        }
 
         DB::table('cpd_records')->where('cpd_id', $cpdId)->update([
             'verified' => true,

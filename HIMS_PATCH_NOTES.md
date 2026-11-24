@@ -11,6 +11,112 @@ Entries marked 📋 are specified but not implemented.
 
 ---
 
+## v2.25.0 - 2026-11-24
+
+HR3 Performance & Development release for hospital rollout. It adds a public landing page and a 2-minute idle sign-out, account status shown everywhere, competency-gap arithmetic shown step by step, CPD hours that count only with evidence, a Recognition **Awards & Certificates** programme with verifiable digital certificates and badges, a qualification checklist before promoting a succession candidate, and two new account types (**Training Officer**, **Trainee**). It also hardens the audit trail (SHA-256 hash chain plus baseline request logging) and fixes several security and data-integrity issues. HR1/HR2 integration is unchanged apart from one credential-renewal rule (see *Changed*).
+
+### Added
+
+*   **Public landing page (`GET /`, route `landing`).** This is the first screen before sign-in, and where a timed-out or signed-out tab lands. It shows the HR3 modules and a Sign in button, and no staff data. It also shows a notice for `?timeout=1`, `?reason=deactivated` and `?reason=expired`.
+*   **Account types: Training Officer and Trainee (`App\Support\Roles`).** One catalogue drives the Users screen, validation, labels, the AI assistant's scope and the permission matrix shown when creating an account. There are now six roles:
+    - `admin` and `hr_manager` see the whole hospital.
+    - `training_officer` sees the whole hospital for learning and training only.
+    - `supervisor` sees their direct reports.
+    - `staff` and `trainee` see their own records.
+    - **Training Officer** (Training & Development / Nursing Education):
+        - Manages courses, pathways, sessions, venues, attendance, mandatory-training assignments, renewal rules, CPD verification, accreditation reports and department training-needs analysis.
+        - Cannot see performance reviews, succession, awards or employee administration.
+        - Has its own dashboard (`dashboard/partials/training.blade.php`).
+    - **Trainee** (students on placement, interns, OJT, orientees):
+        - Has the Staff learning view without performance reviews.
+        - Has an **access end date** (`users.access_expires_at`, migration `2026_11_24_000004`). On that date sign-in is refused and any open session ends with `?reason=expired`.
+    - Session instructors are not a role. Whoever is named as instructor of a session may take its attendance (new `take-attendance` gate).
+*   **New gates:** `view-performance`, `take-attendance`, `view-training-needs`, `view-reports`. There are now 24 Gates.
+*   **Account status everywhere (`App\Support\AccountStatus`).**
+    - Each account shows as Active, Locked (with minutes remaining), Deactivated, Access ended or No login account, with the same badge and explanation on the Users list, the employee profile and the employee directory.
+    - Setting an employee to `resigned`, `terminated` or `suspended` deactivates their linked login immediately (audited as `user_account_auto_deactivated`).
+    - A deactivated account is refused at sign-in with an explicit message.
+*   **Step-by-step competency gap calculation (`competency/partials/_gap-method.blade.php`).** Every gap row on the employee and organisation gap-analysis pages carries its working:
+    - `Current − Required = gap`.
+    - The severity rule that applied.
+    - The priority sum: `|gap| × 25 + 30 if mandatory/critical + 15 if still below after training`, capped at 100.
+    - A method panel explains readiness (met ÷ total) and the new **proficiency coverage** (`Σ min(current, required) ÷ Σ required × 100`). Coverage gives credit for partial progress.
+*   **CPD qualification (`App\Services\CpdQualificationService`).** Every CPD entry is labelled **Qualified**, **Not qualified** or **Pending**, with the reason:
+    - A course entry qualifies only with a completed enrolment.
+    - A training entry qualifies only with recorded attendance.
+    - An external entry qualifies once HR verifies the certificate.
+    - Qualified hours are capped at what the course or session is worth.
+    - `cpd_records.verified` is kept in step, so renewal cycles and dashboards count qualified hours only.
+    - Checking a learner in banks the session's hours. Withdrawing attendance removes them.
+*   **Awards & Certificates (`/recognition/awards`, `AwardController`, `AwardService`, migration `2026_11_24_000002`).**
+    - The programme is based on common hospital HR practice: length-of-service milestones, DAISY-style compassionate-care recognition, clinical and patient-safety excellence, employee of the quarter, preceptor/mentor, innovation, team and CPD awards.
+    - New tables: `award_types` and `employee_awards`. 15 starter award types are seeded: service at 5/10/15/20/25/30 years, plus nine excellence, conduct, teamwork, leadership and learning awards.
+    - HR/Admin can create and edit award types, including badge icon and colour, certificate title and wording, signatory and points.
+    - HR/Admin can issue an award to one person or a whole team from a searchable checklist, revoke it with a reason, and run automatic awards on demand.
+    - Every award generates a **digital certificate** with a unique code `HR3-AW-YYYY-XXXXXXXX`. It is printable, saves as PDF, and is publicly verifiable at `GET /awards/verify/{code}`. Revoked certificates show as revoked.
+    - Every award also generates a shareable **SVG badge** at `GET /awards/badge/{code}.svg`.
+    - Earned badges and certificates appear on the employee profile and on the recipient's Awards tab.
+    - Recipients get a notification. Issue, revoke and type changes are audited.
+    - `php artisan hims:auto-awards` (scheduled daily at 06:10) issues service milestones from the HR1 hire date and the Lifelong Learner award at 40 qualified CPD hours in a calendar year. Re-running it never issues a duplicate.
+*   **Succession promotion is qualification-based (`App\Services\SuccessionQualificationService`, migration `2026_11_24_000003`).**
+    - Critical positions can set promotion requirements: target job role, minimum performance score, minimum years of service and required credentials.
+    - A candidate shows an eight-point **Promotion qualification** checklist:
+        1. Nomination approved.
+        2. Ready now.
+        3. Latest review at or above the minimum.
+        4. No open PIP.
+        5. No critical gaps against the *target* role.
+        6. Years of service.
+        7. Required credentials valid and no expired credential.
+        8. No overdue mandatory training.
+    - `POST /succession/candidates/{id}/promote` records the promotion only when every check passes. An HR override requires a written reason and is audited.
+    - Salary is deliberately not handled in HR3. Pay changes follow in HR1.
+*   **Audit hash chain.**
+    - `App\Support\AuditTrail` now fills `before_state_hash`, `after_state_hash` and `chain_hash` (SHA-256 over the previous hash plus the row), with a new `chain_seq` column (migration `2026_11_24_000001`).
+    - The chain head is stored in `system_settings.audit_chain_head` and locked while a row is appended.
+    - `php artisan hims:audit-verify` re-computes the chain and reports the first edited, deleted or re-ordered row.
+*   **Baseline request audit (`App\Http\Middleware\AuditRequests`).**
+    - Every successful POST/PUT/PATCH/DELETE by a signed-in user is recorded as `http_<verb>`, with the route name, parameters and submitted fields. Secrets are removed.
+    - Opening a sensitive record (employee file, credentials, reviews, gap analysis, succession, appraisal report, audit log) is recorded as `view`.
+    - Failed requests, and redirects carrying validation errors, are not logged.
+*   **Credential primary-source verification.**
+    - `POST /competency/credentials/{id}/verify` lets HR/Admin mark a licence as checked with the issuing body. The credential list shows who verified it and when.
+    - Self-verification is refused.
+*   **`CRON_SECRET`** for the Vercel cron endpoints, and `BACKUP_SCHEDULE_ENABLED`, are now documented in `.env.example`.
+*   **Tests:** `HospitalHardeningTest`, `Hr3EnhancementsTest` and `AccountTypesTest`. Results:
+    - SQLite: 1211 tests (21 MySQL-only skips).
+    - MySQL scratch database: 1211 tests, 0 skips.
+
+### Changed
+
+*   **Idle timeout is 2 minutes, measured in seconds.**
+    - `SESSION_IDLE_TIMEOUT=120` is read once through `config('session.idle_timeout')`. The middleware, the browser script and `session/ping` all use `EnforceSessionTimeout::idleTimeoutSeconds()`.
+    - An idle tab now returns to the **landing page** (`/?timeout=1`) instead of the sign-in form.
+    - Activity is reported by an input-driven heartbeat (`POST session/activity`, at most once a minute and only after real input). The `session/ping` status probe never extends the session.
+*   **Gap analysis** uses a portable `CASE` in place of MySQL `GREATEST()`. It can also be measured against a different role (used by succession).
+*   **Learning, Compliance, Training and Gap Analysis** scope rows through `$learningScope`, so Training Officers see the whole hospital in those modules only.
+*   **HR1 credential sync:** a renewed or re-issued credential (new number, expiry or issuer) clears its earlier verification and writes an audit entry. A new document has not been primary-source checked.
+*   **Audit retention:** `hims:prune-expired-data` no longer deletes audit rows by default. `--audit-days` must be given explicitly and is floored at 2190 days (6 years).
+*   **Award recipients** use a filterable `.hims-checklist`, not `<select multiple>`.
+*   **Landing page:** the "How HR3 fits in" panel was removed. The hero now spans the full width.
+
+### Fixed
+
+*   **Charts no longer show invented numbers.** Training feedback averages and the appraisal report previously fell back to hard-coded scores (e.g. 4.4/4.6) when nothing had been rated. They now show a "No data yet" empty state, through a Chart.js plugin in `layouts/hims`.
+*   **Open redirect after record unlock.** `RecordAccessController` only ever returns to a path on this site.
+*   **Idle-timeout unit mismatch.** The server read the setting as minutes while the browser read seconds, so 180 meant 3 minutes in the tab and 3 hours on the server. `env()` also returned null under `config:cache`.
+
+### Security
+
+*   `Strict-Transport-Security: max-age=31536000; includeSubDomains` is sent on HTTPS responses.
+*   Deactivated and expired accounts are ended on their next request, not at their next sign-in.
+
+### Docs
+
+*   Updated `README.md`, `HIMS_ACCESS_AND_VISIBILITY.md`, `HIMS_ARCHITECTURE_AND_SECURITY.md`, `HIMS_SYSTEM_DOCUMENTATION.md`, `HIMS_USER_GUIDE.md` and `.claude/rules/authorization.md` for the six account types, the 2-minute timeout and landing page, the audit hash chain, awards and certificates, CPD qualification and promotion qualification.
+
+---
+
 ## v2.24.0 - 2026-10-28
 
 Strict GDPR (EU 2016/679) & PH Data Privacy Act (RA 10173) compliance suite, Employees directory Record Access Password protection, zero-access AI employee data guardrails, hospital clinical learning modules, and full-system end-to-end Playwright verification & bug fixes.

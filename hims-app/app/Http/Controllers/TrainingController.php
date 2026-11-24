@@ -2,19 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CpdQualificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class TrainingController extends Controller
 {
+    protected bool $learningScope = true;
+
     public function index(Request $request)
     {
         $stats = [
             'upcoming_sessions' => DB::table('training_sessions')->where('status', 'scheduled')->where('session_date', '>=', now())->count(),
             'total_registrations' => DB::table('training_registrations')->count(),
             'avg_attendance' => round(DB::table('training_registrations')->where('status', 'attended')->count() / max(DB::table('training_registrations')->count(), 1) * 100),
-            'avg_feedback_score' => number_format(DB::table('training_feedback')->avg('overall_rating') ?? 0, 1),
+            'avg_feedback_score' => ($avgFeedback = DB::table('training_feedback')->avg('overall_rating')) !== null ? number_format((float) $avgFeedback, 1) : null,
         ];
 
         // The Upcoming Sessions card's category dropdown was a hardcoded list of
@@ -91,12 +94,24 @@ class TrainingController extends Controller
         $trainingCatAttended = $categoryAttendance->pluck('total_attended')->toArray();
 
         // Chart Metrics: Feedback Ratings
-        $feedbackMetrics = [
-            'Content Quality' => round((float) (DB::table('training_feedback')->avg('content_rating') ?? 4.4), 1),
-            'Instructor Delivery' => round((float) (DB::table('training_feedback')->avg('instructor_rating') ?? 4.6), 1),
-            'Venue & Facilities' => round((float) (DB::table('training_feedback')->avg('venue_rating') ?? 4.2), 1),
-            'Overall Satisfaction' => round((float) (DB::table('training_feedback')->avg('overall_rating') ?? 4.5), 1),
-        ];
+        // Real averages only. When no one has rated a session yet the chart gets
+        // an empty set and says so — it never shows invented scores.
+        $feedbackMetrics = [];
+        $feedbackAverages = DB::table('training_feedback')
+            ->selectRaw('AVG(content_rating) as content, AVG(instructor_rating) as instructor, AVG(venue_rating) as venue, AVG(overall_rating) as overall, COUNT(*) as total')
+            ->first();
+        if ($feedbackAverages && (int) $feedbackAverages->total > 0) {
+            foreach ([
+                'Content Quality' => $feedbackAverages->content,
+                'Instructor Delivery' => $feedbackAverages->instructor,
+                'Venue & Facilities' => $feedbackAverages->venue,
+                'Overall Satisfaction' => $feedbackAverages->overall,
+            ] as $label => $value) {
+                if ($value !== null) {
+                    $feedbackMetrics[$label] = round((float) $value, 1);
+                }
+            }
+        }
 
         return view('training.index', compact(
             'stats', 'sessions', 'venues', 'activeVenues', 'instructors', 'feedback', 'categories', 'category',
@@ -439,10 +454,12 @@ class TrainingController extends Controller
      */
     public function checkIn(Request $request, string $sessionId)
     {
-        abort_unless(auth()->user()->can('manage-training'), 403);
-
         $session = DB::table('training_sessions')->where('session_id', $sessionId)->first();
         abort_if(! $session, 404);
+
+        // Training managers, or whoever is the instructor of this session —
+        // a staff nurse teaching a BLS class takes its attendance.
+        abort_unless(auth()->user()->can('take-attendance', $session), 403);
 
         $user = auth()->user();
         $isInstructor = $session->instructor_id === $this->currentEmployeeId();
@@ -466,7 +483,7 @@ class TrainingController extends Controller
 
             // Instructors may check in anyone; supervisors may only check in their
             // own department unless admin/hr.
-            if (! $isInstructor && ! $user->seesWholeOrganisation()) {
+            if (! $isInstructor && ! $this->seesAllEmployees()) {
                 if ($registration->department_id !== $user->departmentId()) {
                     continue;
                 }
@@ -477,6 +494,11 @@ class TrainingController extends Controller
                 'check_in_time' => $status === 'attended' ? now() : null,
                 'check_in_method' => $status === 'attended' ? 'manual' : null,
             ]);
+
+            // Attendance is the CPD evidence: bank the session's hours when
+            // attended, stop them qualifying when attendance is withdrawn.
+            app(CpdQualificationService::class)
+                ->syncFromAttendance($sessionId, $registration->employee_id, $this->currentEmployeeId());
         }
 
         return back()->with('success', 'Attendance recorded.');

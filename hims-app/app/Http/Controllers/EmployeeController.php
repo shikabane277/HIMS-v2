@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AwardService;
 use App\Services\ReportingLineService;
+use App\Support\AccountStatus;
 use App\Support\AuditTrail;
 use App\Support\CredentialStatus;
 use Carbon\Carbon;
@@ -10,6 +12,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -22,7 +25,12 @@ class EmployeeController extends Controller
         $employees = DB::table('employees as e')
             ->join('departments as d', 'e.department_id', '=', 'd.department_id')
             ->join('roles as r', 'e.role_id', '=', 'r.role_id')
-            ->select('e.*', 'd.name as department_name', 'r.role_name');
+            ->select('e.*', 'd.name as department_name', 'r.role_name')
+            // Login account state, so the directory shows who can actually sign in.
+            ->selectSub(fn ($q) => $q->from('users')->whereColumn('users.employee_id', 'e.employee_id')->orderByDesc('users.id')->limit(1)->select('users.id'), 'account_user_id')
+            ->selectSub(fn ($q) => $q->from('users')->whereColumn('users.employee_id', 'e.employee_id')->orderByDesc('users.id')->limit(1)->select('users.is_active'), 'account_is_active')
+            ->selectSub(fn ($q) => $q->from('users')->whereColumn('users.employee_id', 'e.employee_id')->orderByDesc('users.id')->limit(1)->select('users.locked_until'), 'account_locked_until')
+            ->selectSub(fn ($q) => $q->from('users')->whereColumn('users.employee_id', 'e.employee_id')->orderByDesc('users.id')->limit(1)->select('users.access_expires_at'), 'account_expires_at');
 
         if ($search = trim((string) $request->query('q'))) {
             $employees->where(function ($q) use ($search) {
@@ -241,7 +249,14 @@ class EmployeeController extends Controller
         $credentials = DB::table('employee_credentials')->where('employee_id', $id)->get();
         $enrollments = DB::table('course_enrollments as ce')->join('courses as c', 'ce.course_id', '=', 'c.course_id')->where('ce.employee_id', $id)->select('ce.*', 'c.title', 'c.cpd_hours')->get();
 
-        return view('employees.show', compact('employee', 'reviews', 'credentials', 'enrollments'));
+        $account = DB::table('users')->where('employee_id', $id)->orderByDesc('id')->first(['id', 'email', 'role', 'is_active', 'locked_until', 'access_expires_at']);
+        $accountStatus = AccountStatus::of($account);
+
+        $awards = Schema::hasTable('employee_awards')
+            ? AwardService::awardsFor($id)
+            : collect();
+
+        return view('employees.show', compact('employee', 'reviews', 'credentials', 'enrollments', 'account', 'accountStatus', 'awards'));
     }
 
     /**
@@ -521,17 +536,8 @@ class EmployeeController extends Controller
                 ]);
 
                 // Automatic user account deactivation when employee is terminated/resigned/suspended
-                if (in_array($request->employment_status, ['terminated', 'resigned', 'suspended'], true)) {
-                    $affected = DB::table('users')->where('employee_id', $id)->where('is_active', true)->update([
-                        'is_active' => false,
-                        'updated_at' => now(),
-                    ]);
-                    if ($affected > 0) {
-                        AuditTrail::record('user_account_auto_deactivated', 'users', $id, afterState: [
-                            'reason' => 'employee_status_'.$request->employment_status,
-                            'employee_id' => $id,
-                        ]);
-                    }
+                if (in_array($request->employment_status, AccountStatus::BLOCKING_EMPLOYMENT, true)) {
+                    AccountStatus::deactivateForEmployee($id, 'employee_status_'.$request->employment_status);
                 } elseif ($request->employment_status === 'active' && $employee->employment_status !== 'active') {
                     DB::table('users')->where('employee_id', $id)->where('is_active', false)->update([
                         'is_active' => true,

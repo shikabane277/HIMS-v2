@@ -128,7 +128,7 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
         $response->assertJson(['status' => 'active']);
     }
 
-    public function test_session_timeout_logs_out_inactive_user_and_redirects_to_login(): void
+    public function test_session_timeout_logs_out_inactive_user_and_redirects_to_landing(): void
     {
         Config::set('session.idle_timeout', 900); // 15 minutes
 
@@ -140,7 +140,7 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
             ->get(route('dashboard'));
 
         $this->assertGuest();
-        $response->assertRedirect(route('login', ['timeout' => 1]));
+        $response->assertRedirect(route('landing', ['timeout' => 1]));
     }
 
     public function test_login_page_renders_timeout_warning_notice(): void
@@ -160,7 +160,7 @@ class SessionSecurityAndOtpExpiryTest extends TestCase
         $response = $this->actingAs($user)->get(route('dashboard'));
 
         $this->assertGuest();
-        $response->assertRedirect(route('login', ['timeout' => 1]));
+        $response->assertRedirect(route('landing', ['reason' => 'deactivated']));
     }
 
     public function test_2fa_email_delivery_failure_does_not_reveal_code_on_screen(): void

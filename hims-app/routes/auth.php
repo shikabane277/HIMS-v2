@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\TwoFactorAuthenticatedSessionController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Middleware\EnforceSessionTimeout;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -92,7 +93,7 @@ Route::middleware('auth')->group(function () {
      */
     Route::post('session/ping', function (Request $request) {
         $lastActivity = (int) $request->session()->get('hims_last_activity', 0);
-        $timeoutSeconds = max(60, (int) (env('SESSION_IDLE_TIMEOUT') ?: config('session.idle_timeout', 300)) * 60);
+        $timeoutSeconds = EnforceSessionTimeout::idleTimeoutSeconds();
         $expired = $lastActivity > 0 && (time() - $lastActivity > $timeoutSeconds);
 
         return response()->json([
@@ -101,6 +102,18 @@ Route::middleware('auth')->group(function () {
             'timestamp' => time(),
         ]);
     })->name('session.ping');
+
+    /*
+     * Input-driven heartbeat. The idle-logout script calls this at most once a
+     * minute, and only after real keyboard/mouse/touch input since the last
+     * call, so typing a long review keeps the session alive while an untouched
+     * tab sends nothing. EnforceSessionTimeout refreshes hims_last_activity on
+     * this request like any other (and rejects it if the session already
+     * expired).
+     */
+    Route::post('session/activity', function () {
+        return response()->json(['status' => 'active', 'timestamp' => time()]);
+    })->middleware('throttle:10,1')->name('session.activity');
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');

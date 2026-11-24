@@ -22,6 +22,8 @@
     </div>
 </div>
 
+@include('competency.partials._gap-method')
+
 <div class="hims-card mb-4" style="overflow:visible !important;position:relative;z-index:30">
     <div class="card-body" style="overflow:visible !important;position:relative;padding:18px 22px">
         <div class="row g-3 align-items-end">
@@ -197,7 +199,13 @@
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:32px">No employees in your scope.</td></tr>
+                <tr><td colspan="4" class="text-center" style="color:#9ca3af;padding:32px">
+                    @can('run-gap-analysis')
+                        No employees in your scope.
+                    @else
+                        Individual analyses include performance-review data, so they are open to supervisors and HR only. Use the department training-needs view above to plan training.
+                    @endcan
+                </td></tr>
                 @endforelse
             </tbody>
         </table>

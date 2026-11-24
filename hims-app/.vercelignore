@@ -8,3 +8,4 @@
 /storage/framework/cache/*
 /storage/framework/sessions/*
 /storage/framework/views/*
+_claude_backup_*

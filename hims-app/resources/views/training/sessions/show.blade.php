@@ -73,7 +73,7 @@
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5><i class="bi bi-people-fill"></i> Registrations ({{ $session->registered_count ?? 0 }})</h5>
-                    @can('manage-training')
+                    @can('take-attendance', $session)
                         @if($session->status === 'scheduled' && count($registrations ?? []) > 0)
                             <button type="button" class="btn-hims btn-hims-outline" style="font-size:13px;padding:6px 14px" onclick="document.getElementById('checkin-form').style.display = document.getElementById('checkin-form').style.display === 'none' ? '' : 'none'">
                                 <i class="bi bi-check2-square"></i> Mark Attendance
@@ -83,7 +83,7 @@
                 </div>
             </div>
             <div class="card-body" style="padding:0">
-                @can('manage-training')
+                @can('take-attendance', $session)
                     <form method="POST" action="{{ route('training.sessions.checkin', $session->session_id) }}" id="checkin-form" style="display:none;padding:20px;background:var(--hims-bg);border-bottom:1px solid var(--hims-border)">
                         @csrf
                         <div style="margin-bottom:12px;font-weight:600;font-size:13px">Mark each registrant as attended or no-show:</div>

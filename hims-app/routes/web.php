@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\AwardController;
 use App\Http\Controllers\CompetencyController;
 use App\Http\Controllers\ComplianceController;
 use App\Http\Controllers\DashboardController;
@@ -25,12 +26,21 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 // ── Public ──────────────────────────────────────────────────
+// Public landing page: the first screen before sign-in, and where an idle
+// session ends up (with ?timeout=1) so the screen no longer shows any records.
 Route::get('/', function () {
-    return redirect()->route('login');
-});
+    return view('landing');
+})->name('landing');
 
 // Public verification for QR codes and certificate links
 Route::get('/certificates/{code}', [LearningController::class, 'showCertificate'])->name('certificates.verify');
+
+// Award certificates and badges: public so a recipient can share the link
+// and anyone can confirm it is genuine (and not revoked).
+Route::get('/awards/verify/{code}', [AwardController::class, 'certificate'])
+    ->where('code', '[A-Za-z0-9-]+')->middleware('throttle:60,1')->name('awards.verify');
+Route::get('/awards/badge/{code}.svg', [AwardController::class, 'badge'])
+    ->where('code', '[A-Za-z0-9-]+')->middleware('throttle:60,1')->name('awards.badge');
 
 /*
 |--------------------------------------------------------------------------
@@ -40,7 +50,8 @@ Route::get('/certificates/{code}', [LearningController::class, 'showCertificate'
 | cross-employee data are further gated with the 'role' middleware
 | (App\Http\Middleware\EnsureUserHasRole), which reads users.role.
 |
-| Roles: admin | hr_manager | supervisor | staff
+| Roles: admin | hr_manager | training_officer | supervisor | staff | trainee
+| (see App\Support\Roles for what each account type is for)
 |
 | The matching Gate definitions live in AppServiceProvider::registerGates()
 | and are what the sidebar's @can checks use, so navigation and enforcement
@@ -53,7 +64,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/search', GlobalSearchController::class)->name('search');
 
     // ── Performance Management ───────────────────────────────
-    Route::prefix('performance')->name('performance.')->group(function () {
+    // Not for trainees or the Training Officer (see the 'view-performance' gate).
+    Route::prefix('performance')->name('performance.')->middleware('can:view-performance')->group(function () {
         Route::get('/', [PerformanceController::class, 'index'])->name('index');
         Route::get('/reviews', [PerformanceController::class, 'reviewsIndex'])->name('reviews.index');
 
@@ -131,6 +143,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::patch('/domains/{id}/toggle-status', [CompetencyController::class, 'toggleDomainStatus'])->name('domains.toggle-status');
             Route::delete('/domains/{id}', [CompetencyController::class, 'destroyDomain'])->name('domains.destroy');
 
+            Route::post('/credentials/{id}/verify', [CompetencyController::class, 'verifyCredential'])->name('credentials.verify');
             Route::get('/role-requirements', [CompetencyController::class, 'roleRequirementsIndex'])->name('role-requirements.index');
             Route::post('/role-requirements', [CompetencyController::class, 'storeRoleRequirement'])->name('role-requirements.store');
             Route::put('/role-requirements/{id}', [CompetencyController::class, 'updateRoleRequirement'])->name('role-requirements.update');
@@ -138,11 +151,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
 
         // ── AI-Driven Competency Gap Analysis (Objective 6) ──
-        Route::middleware('role:admin,hr_manager,supervisor')->prefix('gap-analysis')->name('gap.')->group(function () {
-            Route::get('/', [GapAnalysisController::class, 'index'])->name('index');
-            Route::get('/department', [GapAnalysisController::class, 'department'])->name('department');
-            Route::get('/employee/{employeeId}', [GapAnalysisController::class, 'employee'])->name('employee');
-            Route::get('/employee/{employeeId}/json', [GapAnalysisController::class, 'employeeJson'])->name('employee.json');
+        Route::prefix('gap-analysis')->name('gap.')->group(function () {
+            // Department training-needs view: also the Training Officer.
+            Route::middleware('role:admin,hr_manager,supervisor,training_officer')->group(function () {
+                Route::get('/', [GapAnalysisController::class, 'index'])->name('index');
+                Route::get('/department', [GapAnalysisController::class, 'department'])->name('department');
+            });
+            // Individual analyses quote performance reviews: supervisors and HR.
+            Route::middleware('role:admin,hr_manager,supervisor')->group(function () {
+                Route::get('/employee/{employeeId}', [GapAnalysisController::class, 'employee'])->name('employee');
+                Route::get('/employee/{employeeId}/json', [GapAnalysisController::class, 'employeeJson'])->name('employee.json');
+            });
         });
 
         // Wildcard last on principle: it is the only GET under /domains now
@@ -169,10 +188,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/certificates', fn () => redirect()->route('recognition.certificates.index'))->name('certificates.index');
         Route::get('/certificates/{code}', [LearningController::class, 'showCertificate'])->name('certificates.show');
 
-        // Authoring the catalogue is HR/admin only. Courses and pathways are
-        // created and edited from modals on the Learning index (New Pathway also
-        // from the pathways index), so none of them has a GET page.
-        Route::middleware('role:admin,hr_manager')->group(function () {
+        // Authoring the catalogue is HR/admin and the Training Officer. Courses
+        // and pathways are created and edited from modals on the Learning index
+        // (New Pathway also from the pathways index), so none has a GET page.
+        Route::middleware('role:admin,hr_manager,training_officer')->group(function () {
             Route::post('/courses', [LearningController::class, 'storeCourse'])->name('courses.store');
             Route::put('/courses/{id}', [LearningController::class, 'updateCourse'])->name('courses.update');
             Route::post('/courses/{id}/toggle-status', [LearningController::class, 'toggleCourseStatus'])->name('courses.toggle-status');
@@ -193,7 +212,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // check-in: it is a statement about somebody, so nobody self-certifies.
         // The controller holds supervisors to their own direct reports.
         Route::post('/enrollments/{id}/complete', [LearningController::class, 'completeEnrollment'])
-            ->middleware('role:admin,hr_manager,supervisor')
+            ->middleware('role:admin,hr_manager,training_officer,supervisor')
             ->name('enrollments.complete');
 
         Route::post('/cpd', [LearningController::class, 'storeCpd'])->name('cpd.store');
@@ -208,7 +227,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // rules and the hospital-wide reports. Served by ComplianceController,
         // which keeps its name because it is still the hospital-facing half —
         // only the URLs and the navigation moved.
-        Route::middleware('role:admin,hr_manager,supervisor')->group(function () {
+        Route::middleware('role:admin,hr_manager,training_officer,supervisor')->group(function () {
             Route::get('/required', [ComplianceController::class, 'index'])->name('assignments.index');
             Route::post('/required', [ComplianceController::class, 'storeAssignment'])->name('assignments.store');
             Route::get('/renewals', [ComplianceController::class, 'atRisk'])->name('renewals.index');
@@ -217,7 +236,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Renewal rules set hospital-wide policy, and account coverage exposes
         // login state — both HR/admin only.
-        Route::middleware('role:admin,hr_manager')->group(function () {
+        Route::middleware('role:admin,hr_manager,training_officer')->group(function () {
             Route::get('/renewals/rules', [ComplianceController::class, 'rulesIndex'])->name('renewals.rules');
             Route::post('/renewals/rules', [ComplianceController::class, 'storeRule'])->name('renewals.rules.store');
             Route::post('/renewals/sync', [ComplianceController::class, 'syncCycles'])->name('renewals.sync');
@@ -227,21 +246,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Wildcards last so they cannot swallow a literal sibling above.
         Route::get('/courses/{id}', [LearningController::class, 'showCourse'])->name('courses.show');
         Route::get('/required/{id}', [ComplianceController::class, 'showAssignment'])
-            ->middleware('role:admin,hr_manager,supervisor')->name('assignments.show');
+            ->middleware('role:admin,hr_manager,training_officer,supervisor')->name('assignments.show');
     });
 
     // Backward-compatible names for bookmarks, integrations, and older tests.
     // The Compliance sidebar was merged into Learning, but these aliases keep
     // existing callers on the same controller and authorization rules.
     Route::prefix('compliance')->name('compliance.')->group(function () {
-        Route::middleware('role:admin,hr_manager,supervisor')->group(function () {
+        Route::middleware('role:admin,hr_manager,training_officer,supervisor')->group(function () {
             Route::get('/required', [ComplianceController::class, 'index'])->name('index');
             Route::post('/required', [ComplianceController::class, 'storeAssignment'])->name('assignments.store');
             Route::get('/renewals', [ComplianceController::class, 'atRisk'])->name('at-risk');
             Route::get('/accreditation', [ComplianceController::class, 'accreditationReport'])->name('accreditation');
             Route::get('/required/{id}', [ComplianceController::class, 'showAssignment'])->name('assignments.show');
         });
-        Route::middleware('role:admin,hr_manager')->group(function () {
+        Route::middleware('role:admin,hr_manager,training_officer')->group(function () {
             Route::get('/accounts', [ComplianceController::class, 'accountCoverage'])->name('account-coverage');
             Route::get('/renewals/rules', [ComplianceController::class, 'rulesIndex'])->name('rules.index');
             Route::post('/renewals/rules', [ComplianceController::class, 'storeRule'])->name('rules.store');
@@ -257,15 +276,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [TrainingController::class, 'index'])->name('index');
         Route::get('/venues', [TrainingController::class, 'venuesIndex'])->name('venues.index');
 
-        Route::middleware('role:admin,hr_manager,supervisor')->group(function () {
+        Route::middleware('role:admin,hr_manager,training_officer,supervisor')->group(function () {
             Route::post('/sessions', [TrainingController::class, 'storeSession'])->name('sessions.store');
             Route::put('/sessions/{id}', [TrainingController::class, 'updateSession'])->name('sessions.update');
             Route::post('/sessions/{id}/reschedule', [TrainingController::class, 'rescheduleSession'])->name('sessions.reschedule');
             Route::post('/sessions/{id}/cancel', [TrainingController::class, 'cancelSession'])->name('sessions.cancel');
-            Route::post('/sessions/{id}/checkin', [TrainingController::class, 'checkIn'])->name('sessions.checkin');
         });
 
-        Route::middleware('role:admin,hr_manager')->group(function () {
+        // Attendance: the controller allows training managers and the
+        // session's own instructor (any account type) — see 'take-attendance'.
+        Route::post('/sessions/{id}/checkin', [TrainingController::class, 'checkIn'])->name('sessions.checkin');
+
+        Route::middleware('role:admin,hr_manager,training_officer')->group(function () {
             Route::post('/venues', [TrainingController::class, 'storeVenue'])->name('venues.store');
             Route::put('/venues/{id}', [TrainingController::class, 'updateVenue'])->name('venues.update');
             Route::delete('/venues/{id}', [TrainingController::class, 'destroyVenue'])->name('venues.destroy');
@@ -293,6 +315,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::put('/candidates/{id}', [SuccessionController::class, 'updateCandidate'])->name('candidates.update');
                 Route::post('/candidates/{id}/approve', [SuccessionController::class, 'approveCandidate'])->name('candidates.approve');
                 Route::post('/candidates/{id}/reject', [SuccessionController::class, 'rejectCandidate'])->name('candidates.reject');
+                Route::post('/candidates/{id}/promote', [SuccessionController::class, 'promoteCandidate'])->name('candidates.promote');
+                Route::put('/positions/{id}/requirements', [SuccessionController::class, 'updatePositionRequirements'])->name('positions.requirements');
                 Route::delete('/candidates/{id}', [SuccessionController::class, 'withdrawCandidate'])->name('candidates.withdraw');
             });
 
@@ -320,12 +344,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('recognition')->name('recognition.')->group(function () {
         Route::get('/', [RecognitionController::class, 'index'])->name('index');
         Route::get('/certificates', [LearningController::class, 'certificatesIndex'])->name('certificates.index');
+        Route::get('/awards', [AwardController::class, 'index'])->name('awards.index');
         Route::post('/posts', [RecognitionController::class, 'storePost'])->name('posts.store');
         Route::post('/posts/{postId}/react', [RecognitionController::class, 'react'])->name('react');
         Route::post('/posts/{postId}/comments', [RecognitionController::class, 'storeComment'])->name('comments.store');
 
         Route::middleware('role:admin,hr_manager')->group(function () {
             Route::post('/badges', [RecognitionController::class, 'storeBadge'])->name('badges.store');
+            Route::post('/awards/types', [AwardController::class, 'storeType'])->name('awards.types.store');
+            Route::put('/awards/types/{id}', [AwardController::class, 'updateType'])->name('awards.types.update');
+            Route::post('/awards/types/{id}/toggle', [AwardController::class, 'toggleType'])->name('awards.types.toggle');
+            Route::post('/awards/issue', [AwardController::class, 'issue'])->name('awards.issue');
+            Route::post('/awards/{awardId}/revoke', [AwardController::class, 'revoke'])->name('awards.revoke');
+            Route::post('/awards/run-auto', [AwardController::class, 'runAuto'])->name('awards.run-auto');
             Route::post('/posts/{postId}/admit-points', [RecognitionController::class, 'admitPoints'])->name('posts.admit_points');
             Route::post('/posts/{postId}/reject-points', [RecognitionController::class, 'rejectPoints'])->name('posts.reject_points');
             Route::patch('/posts/{postId}/moderation', [RecognitionController::class, 'moderatePost'])->name('posts.moderate');
@@ -513,8 +544,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings/ai-data-sharing', [UserController::class, 'updateAiSettings'])->name('settings.ai-data-sharing')->middleware('role:admin');
     Route::post('/settings/record-access-password', [UserController::class, 'updateRecordAccessPassword'])->name('settings.record-access-password')->middleware('role:admin');
     Route::get('/record-access/prompt', [RecordAccessController::class, 'show'])->name('record-access.prompt');
-    Route::post('/record-access/verify', [RecordAccessController::class, 'verify'])->name('record-access.verify');
-    Route::post('/record-access/unlock', [RecordAccessController::class, 'unlock'])->name('record-access.unlock');
+    Route::post('/record-access/verify', [RecordAccessController::class, 'verify'])->middleware('throttle:10,1')->name('record-access.verify');
+    Route::post('/record-access/unlock', [RecordAccessController::class, 'unlock'])->middleware('throttle:10,1')->name('record-access.unlock');
     Route::post('/record-access/lock', [RecordAccessController::class, 'lock'])->name('record-access.lock');
     Route::get('/audit/history', [UserController::class, 'auditHistory'])
         ->middleware('role:admin,hr_manager')->name('audit.history');
@@ -541,44 +572,41 @@ Route::get('/terms-of-service', function () {
 require __DIR__.'/auth.php';
 
 // ── Automated Scheduled Tasks (Vercel Cron / External Cron) ─
+//
+// Authorisation: the caller must send `Authorization: Bearer <CRON_SECRET>`
+// (Vercel Cron does this automatically when CRON_SECRET is set in the project)
+// or `X-Cron-Key: <CRON_SECRET>` for other schedulers. The old check accepted
+// the mere presence of an `x-vercel-cron` header, which any client can add, and
+// a `?key=` query string, which ends up in access logs. With no secret
+// configured the endpoint only answers in the local environment.
 Route::get('/api/cron/{action}', function (string $action, Request $request) {
-    $cronKey = config('hims.cron_secret', env('CRON_SECRET', ''));
-    $hasHeader = $request->header('x-vercel-cron') !== null;
-    $hasKey = ! empty($cronKey) && $request->query('key') === $cronKey;
+    $secret = (string) config('hims.cron_secret', '');
+    $provided = (string) ($request->bearerToken() ?: $request->header('X-Cron-Key', ''));
 
-    if (! $hasHeader && ! $hasKey && ! app()->environment('local')) {
+    $authorised = $secret !== ''
+        ? ($provided !== '' && hash_equals($secret, $provided))
+        : app()->environment('local');
+
+    if (! $authorised) {
+        Log::warning('Rejected cron call', ['action' => $action, 'ip' => $request->ip()]);
         abort(403, 'Unauthorized cron execution.');
     }
 
-    if ($action === 'sync') {
-        Artisan::call('hims:sync-hr', ['--system' => 'all']);
+    $commands = [
+        'sync' => ['hims:sync-hr', ['--system' => 'all']],
+        'scan' => ['hims:scan-credential-expiry', []],
+        'prune' => ['hims:prune-expired-data', []],
+        'digest' => ['hims:send-supervisor-digest', []],
+    ];
 
-        return response()->json([
-            'status' => 'success',
-            'action' => 'hims:sync-hr',
-            'output' => trim(Artisan::output()),
-        ]);
-    }
+    abort_unless(isset($commands[$action]), 404);
 
-    if ($action === 'scan') {
-        Artisan::call('hims:scan-credential-expiry');
+    [$command, $arguments] = $commands[$action];
+    $exitCode = Artisan::call($command, $arguments);
 
-        return response()->json([
-            'status' => 'success',
-            'action' => 'hims:scan-credential-expiry',
-            'output' => trim(Artisan::output()),
-        ]);
-    }
-
-    if ($action === 'prune') {
-        Artisan::call('hims:prune-expired-data');
-
-        return response()->json([
-            'status' => 'success',
-            'action' => 'hims:prune-expired-data',
-            'output' => trim(Artisan::output()),
-        ]);
-    }
-
-    abort(404);
-})->name('cron.execute');
+    return response()->json([
+        'status' => $exitCode === 0 ? 'success' : 'failed',
+        'action' => $command,
+        'output' => trim(Artisan::output()),
+    ], $exitCode === 0 ? 200 : 500);
+})->middleware('throttle:30,1')->name('cron.execute');

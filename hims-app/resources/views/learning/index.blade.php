@@ -277,12 +277,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         new Chart(velCanvas, {
             data: {
-                labels: trendLabels.length ? trendLabels : ['May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026'],
+                labels: trendLabels,
                 datasets: [
                     {
                         type: 'line',
                         label: 'CPD Hours Earned',
-                        data: trendLabels.length ? cpdData : [48, 62, 75, 90, 84, 110],
+                        data: cpdData,
                         borderColor: '#059669',
                         backgroundColor: 'rgba(5, 150, 105, 0.12)',
                         borderWidth: 2.5,
@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     {
                         type: 'bar',
                         label: 'Completions',
-                        data: trendLabels.length ? completionsData : [18, 24, 29, 35, 30, 42],
+                        data: completionsData,
                         backgroundColor: 'rgba(2, 132, 199, 0.75)',
                         hoverBackgroundColor: '#0284c7',
                         borderRadius: 6,
@@ -348,9 +348,9 @@ document.addEventListener('DOMContentLoaded', function () {
         new Chart(catCanvas, {
             type: 'doughnut',
             data: {
-                labels: catLabels.length ? catLabels : ['Clinical Care', 'Infection Control', 'Emergency', 'Nursing', 'Safety'],
+                labels: catLabels,
                 datasets: [{
-                    data: hasData ? catCounts : [32, 24, 18, 14, 12],
+                    data: catCounts,
                     backgroundColor: ['#059669', '#0284c7', '#8b5cf6', '#d97706', '#0d9488'],
                     borderWidth: 2,
                     borderColor: '#ffffff'

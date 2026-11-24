@@ -65,6 +65,9 @@
             <div class="stat-value">{{ $s['readiness_pct'] }}%</div>
             <div class="stat-label">Requirement Readiness</div>
             <div class="stat-change up"><i class="bi bi-check2-circle"></i> {{ $s['met'] }} of {{ $s['competencies_required'] }} met</div>
+            @isset($s['proficiency_pct'])
+                <div style="font-size:11.5px;color:#6b7280;margin-top:4px" title="Σ min(current, required) ÷ Σ required">Proficiency coverage {{ $s['proficiency_pct'] }}% ({{ $s['proficiency_points'][0] }} of {{ $s['proficiency_points'][1] }} levels)</div>
+            @endisset
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
@@ -266,6 +269,9 @@
     </div>
 </div>
 
+{{-- ── How gaps are calculated ── --}}
+@include('competency.partials._gap-method')
+
 {{-- ── Measured gaps (deterministic) ── --}}
 <div class="hims-card mb-4">
     <div class="card-header">
@@ -279,7 +285,7 @@
             <div class="card-body" style="padding:0">
                 <table class="hims-table">
             <thead>
-                <tr><th>Competency</th><th>Domain</th><th>Required</th><th>Current</th><th>Gap</th><th>Status</th><th>Notes</th></tr>
+                <tr><th>Competency</th><th>Domain</th><th>Required</th><th>Current</th><th>Gap</th><th>Status</th><th>Priority</th><th>How it's calculated</th><th>Notes</th></tr>
             </thead>
             <tbody>
                 @forelse($gaps as $gap)
@@ -312,10 +318,18 @@
                             {{ $gap['status'] === 'unassessed' ? 'Not assessed' : ($gap['status'] === 'met' ? 'Met' : ucfirst($gap['severity']).' gap') }}
                         </span>
                     </td>
+                    <td data-label="Priority"><strong>{{ $gap['priority'] }}</strong><span style="font-size:11px;color:#9ca3af">/100</span></td>
+                    <td data-label="How it's calculated" style="font-size:11.5px;color:#374151;min-width:220px">
+                        @if(! empty($gap['calculation']))
+                            <div><i class="bi bi-calculator" style="color:var(--hims-primary)"></i> <strong>Gap:</strong> {{ $gap['calculation']['gap'] }}</div>
+                            <div style="margin-top:2px"><strong>Severity:</strong> {{ $gap['calculation']['severity'] }}</div>
+                            <div style="margin-top:2px"><strong>Priority:</strong> {{ $gap['calculation']['priority'] }}</div>
+                        @endif
+                    </td>
                     <td data-label="Notes" style="font-size:11.5px;color:#6b7280;max-width:260px">{{ $gap['note'] }}</td>
                 </tr>
                 @empty
-                <tr><td colspan="7" class="text-center" style="color:#9ca3af;padding:32px">
+                <tr><td colspan="9" class="text-center" style="color:#9ca3af;padding:32px">
                     No competency requirements are defined for this employee's job role, so there is nothing to measure against.
                 </td></tr>
                 @endforelse

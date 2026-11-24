@@ -50,6 +50,7 @@
         @if(request('timeout'))
             <div class="hims-alert warning"><i class="bi bi-clock-history"></i> Your session has expired due to inactivity. Please sign in again.</div>
         @endif
+
         @if(session('status'))
             <div class="hims-alert success" data-auto-dismiss><i class="bi bi-check-circle-fill"></i> {{ session('status') }}</div>
         @endif
@@ -96,6 +97,11 @@
             <p style="font-size:11.5px;margin:0">
                 <a href="{{ route('terms-of-service') }}" style="color:#059669;text-decoration:none;font-weight:500">
                     <i class="bi bi-file-earmark-medical"></i> Terms of Service &amp; Data Protection Notice
+                </a>
+            </p>
+            <p style="font-size:11.5px;margin:8px 0 0 0">
+                <a href="{{ route('landing') }}" style="color:#6b7280;text-decoration:none;font-weight:500">
+                    <i class="bi bi-arrow-left"></i> Back to home
                 </a>
             </p>
         </div>

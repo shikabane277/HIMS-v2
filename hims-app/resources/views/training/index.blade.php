@@ -295,11 +295,11 @@ document.addEventListener('DOMContentLoaded', function () {
         new Chart(attCanvas, {
             type: 'bar',
             data: {
-                labels: catLabels.length ? catLabels : ['Clinical Skills', 'Infection Control', 'Emergency Care', 'BLS / ACLS', 'Patient Safety'],
+                labels: catLabels,
                 datasets: [
                     {
                         label: 'Registered',
-                        data: catLabels.length ? catRegistered : [35, 42, 28, 50, 30],
+                        data: catRegistered,
                         backgroundColor: 'rgba(2, 132, 199, 0.3)',
                         borderColor: '#0284c7',
                         borderWidth: 1.5,
@@ -308,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     },
                     {
                         label: 'Attended',
-                        data: catLabels.length ? catAttended : [32, 38, 25, 47, 28],
+                        data: catAttended,
                         backgroundColor: 'rgba(5, 150, 105, 0.85)',
                         borderColor: '#059669',
                         borderWidth: 1.5,
@@ -349,13 +349,19 @@ document.addEventListener('DOMContentLoaded', function () {
         const metricLabels = Object.keys(metrics);
         const metricScores = Object.values(metrics);
 
-        new Chart(fbCanvas, {
+        if (!metricLabels.length) {
+            const empty = document.createElement('p');
+            empty.className = 'text-muted';
+            empty.style.cssText = 'margin:0;padding:24px 0;text-align:center;font-size:13px';
+            empty.textContent = 'No session feedback has been submitted yet.';
+            fbCanvas.replaceWith(empty);
+        } else new Chart(fbCanvas, {
             type: 'bar',
             data: {
-                labels: metricLabels.length ? metricLabels : ['Content Quality', 'Instructor Delivery', 'Practical Skills', 'Overall Rating'],
+                labels: metricLabels,
                 datasets: [{
                     label: 'Rating (out of 5.00)',
-                    data: metricScores.length ? metricScores : [4.5, 4.7, 4.3, 4.6],
+                    data: metricScores,
                     backgroundColor: ['#059669', '#0284c7', '#8b5cf6', '#d97706'],
                     borderRadius: 6,
                     barPercentage: 0.55

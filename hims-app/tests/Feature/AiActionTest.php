@@ -177,9 +177,10 @@ class AiActionTest extends TestCase
         $this->assertSame('performance.cycle.create', $metadata['action_key']);
         $this->assertSame('Create a 2027 annual review cycle', $metadata['prompt']);
 
-        // Chaining is documented as not implemented; half-building it would be
-        // worse than leaving it out.
-        $this->assertNull($row->chain_hash);
+        // Every audit row is part of the tamper-evident hash chain
+        // (AuditTrail, verified by `php artisan hims:audit-verify`).
+        $this->assertNotNull($row->chain_hash);
+        $this->assertNotNull($row->chain_seq);
     }
 
     /** The exchange is stored like any other, so a reload shows what happened. */
