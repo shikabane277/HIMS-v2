@@ -963,16 +963,17 @@ Available to **Admins** and **HR Managers**.
 - **View** executive workforce, performance, competency, training, and compliance analytics
 - **Generate Custom Reports** and **Export CSV** datasets for hospital leadership and accreditation audits
 
-### Sidebar: 🔐 Users & Access & Audit Trail (Admin only)
+### Sidebar: 🔐 Users & Access (Admin only)
 
 - **Add User** — create a login account and link it to an employee record
-- **Assign roles** (Admin, HR Manager, Supervisor, Staff)
+- **Assign roles** (System Administrator, HR Manager, Training Officer, Supervisor / Department Head, Staff, Trainee). The form shows what each role can and cannot do. A **Trainee** needs an **access end date**
+- **Account status** on every row: Active, Locked, Deactivated, Access ended
 - **Activate / Deactivate accounts** and **Force password change** on next login
 - **Set a new password** for a user from the edit screen
 - **Unlock** a locked account, from the button that appears on its row
 - **Delete** an account
 - **Record Access Password** — set or rotate the master password required to unblur confidential employee, credential, and user-account records across HIMS
-- **Audit Trail (`/audit`)** — inspect and export attributable security and administrative events
+- **Change history** — Admins and HR Managers click **History** on an employee profile or a credential row to see who changed what and when (there is no separate audit page)
 
 ---
 
@@ -1001,7 +1002,7 @@ In the **Delete Account** section on `/profile`, you can enter your current pass
 
 Sensitive tables and records (such as the Employees directory, Credentials register, and Users & Access table) are **blurred by default** to prevent shoulder-surfing at clinical workstations.
 
-- Enter the **Record Access Password** in the overlay card and click **Unlock Records** to unblur sensitive records for **5 minutes**.
+- Enter the **Record Access Password** in the overlay card and click **Unlock Records** to unblur sensitive records. They stay unblurred until you click **Lock** or your session ends (2 minutes idle, or sign-out).
 - While unlocked, a green **Records Unlocked** badge appears in the top bar; click **Lock** at any time to re-blur the screen immediately.
 
 ### How the System Protects Your Account
@@ -1145,7 +1146,7 @@ A: Self-service password reset by email is disabled for security. Contact your S
 A: Wait 15 minutes for the account lock to expire, or ask an Administrator to unlock the account from **Users & Access**.
 
 **Q: Why are employee names and tables blurred on my screen?**
-A: Sensitive workforce, credential, and account tables are protected by the **Record Access Password** gate to prevent shoulder-surfing. Enter the Record Access Password in the unlock overlay to unblur records for 5 minutes.
+A: Sensitive workforce, credential, and account tables are protected by the **Record Access Password** gate to prevent shoulder-surfing. Enter the Record Access Password in the unlock overlay to unblur them until you click **Lock** or your session ends.
 
 **Q: How do I download a copy of all my personal data?**
 A: Open your **Profile** (`/profile`) by clicking your name at the bottom of the sidebar, scroll to **Data Privacy & Portability (GDPR)**, and click **Download My Data (JSON)**.

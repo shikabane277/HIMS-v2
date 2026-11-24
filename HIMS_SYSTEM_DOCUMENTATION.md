@@ -47,7 +47,7 @@ graph TB
     end
 
     subgraph "Security Middleware & Gates"
-        RBAC["20 Gates + 'role' Middleware (RBAC)<br/>+ RecordAccess Gate (In-Place Blur/Unlock)"]
+        RBAC["24 Gates + 'role' Middleware (RBAC)<br/>+ RecordAccess Gate (In-Place Blur/Unlock)"]
     end
 
     SPA --> GW
@@ -67,7 +67,7 @@ graph TB
 | Styling | Hand-authored `public/css/hims.css`; Bootstrap **Icons** font only — no Bootstrap CSS framework, so no reboot layer: element defaults are declared in the stylesheet itself. Served outside the Vite build, so its URL carries the file's own content hash — see §14 |
 | Data access | Raw `DB::table()` Query Builder; `App\Models\User` is the only Eloquent model |
 | Authentication & 2FA | Laravel Breeze session auth + **Mandatory 2FA** (Email OTP 5-min TTL / RFC 6238 TOTP with replay counter), **2-minute silent idle timeout** (`EnforceSessionTimeout`, returns to the public landing page), forced password change (`EnsurePasswordIsChanged`), and `SecurityHeaders` |
-| Authorisation | 20 Gates + `EnsureUserHasRole` middleware over four roles (`admin` \| `hr_manager` \| `supervisor` \| `staff`) + **Record Access Password Gate** (`App\Support\RecordAccess`) blurring sensitive workforce/credential pages until unlocked |
+| Authorisation | 24 Gates + `EnsureUserHasRole` middleware over six roles (`admin` \| `hr_manager` \| `training_officer` \| `supervisor` \| `staff` \| `trainee`) + **Record Access Password Gate** (`App\Support\RecordAccess`) blurring sensitive workforce/credential pages until unlocked |
 | Privacy & GDPR | GDPR / PH RA 10173 consent banner (`POST /profile/gdpr-consent`), self-service JSON data export (`GET /profile/export-data`), cascading account erasure (`DELETE /profile`), separated employee PII anonymization (`POST /employees/{id}/anonymize`), and daily data retention pruning (`hims:prune-expired-data`) |
 | Cache / queue / session | `CACHE_STORE=database`, `SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`; the app makes no cache calls |
 | AI | Provider-agnostic `AiProvider` contract; four selectable providers; **strictly prohibited from accessing employee personal records across all roles** |
@@ -1488,7 +1488,7 @@ graph TD
     E -- Yes --> G["Stage login.2fa.user_id in Session"]
     G --> H{"User Has TOTP Enabled?"}
     H -- Yes --> I["Prompt for 6-Digit Authenticator Code (RFC 6238)"]
-    H -- No --> J["Send 6-Digit Email OTP (SHA-256 hashed, 2-min expiry)"]
+    H -- No --> J["Send 6-Digit Email OTP (SHA-256 hashed, 5-min expiry)"]
     I --> K{"2FA Code Valid & Unconsumed?"}
     J --> K
     K -- No --> L["Increment 2FA Attempts / Throttle"]
@@ -1502,15 +1502,15 @@ Public self-registration and self-service password reset (`/forgot-password`) ar
 ### 7.2 Security Settings
 
 *   **Laravel Breeze & Sessions** ✅ — session cookies are `HttpOnly` with `SameSite=Lax` by framework default. Strict **2-minute** inactivity timeout (`SESSION_IDLE_TIMEOUT=120`, in seconds, read through `config('session.idle_timeout')`) with zero warning modals; an idle tab ends silently and returns to the public landing page (`/?timeout=1`). `session/ping` never extends a session; real input is reported through `POST session/activity` at most once a minute. Deactivated accounts and Trainees past `access_expires_at` are ended on their next request.
-*   **HTTP Security Headers (`SecurityHeaders`)** ✅ — `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, HSTS on HTTPS, and `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` on authenticated responses.
+*   **HTTP Security Headers (`SecurityHeaders`)** ✅ — `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, `X-Permitted-Cross-Domain-Policies: none`, HSTS on HTTPS (no Content-Security-Policy header), and `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` on authenticated responses.
 *   **CSRF Protection** ✅ — `VerifyCsrfToken` in the default `web` group; all state-changing forms emit `@csrf`.
 *   **Brute-force throttling and account lockout** ✅ — `LoginRequest` throttles on an email+IP key at **5 failed attempts** and increments `failed_login_attempts`; the fifth failure sets `locked_until` for 15 minutes. A successful login resets both fields, and Admin can unlock through `UserController::unlockAccount()`. Self-service "Forgot Password" is removed; resets are administered (`must_change_password` enforced by `EnsurePasswordIsChanged`).
 *   **Role-Based Access Control (RBAC)** ✅ — 24 **Gates** + the `EnsureUserHasRole` middleware, keyed on `users.role` (6 roles, `App\Support\Roles`). See §3.1.
-*   **Record Access Password Gate (`App\Support\RecordAccess`)** ✅ — confidential workforce, credential, and account tables render blurred in place (`.hims-record-blurred`) with an inline unlock card until the user enters the admin-configured Record Access Password (`system_settings.record_access_password_hash`, `POST /record-access/unlock`), granting a 5-minute (`300s`) session window that can be manually re-locked (`POST /record-access/lock`).
+*   **Record Access Password Gate (`App\Support\RecordAccess`)** ✅ — confidential workforce, credential, and account tables render blurred in place (`.hims-record-blurred`) with an inline unlock card until the user enters the admin-configured Record Access Password (`system_settings.record_access_password_hash`, `POST /record-access/unlock`). The unlock lasts until **Lock** (`POST /record-access/lock`) or the end of the session; there is no separate timer and no default password.
 *   **GDPR & RA 10173 Data Privacy Controls** ✅ — explicit privacy consent banner (`POST /profile/gdpr-consent`), self-service JSON data export (`GET /profile/export-data`), self-service account erasure (`DELETE /profile`), HR/Admin separated employee PII anonymization (`POST /employees/{id}/anonymize`), and daily automated retention pruning (`php artisan hims:prune-expired-data`).
 *   **Input validation & SQL safety** ✅ — every write path calls `$request->validate([...])`; all queries use Query Builder parameter binding. `DB::raw` fragments (`CONCAT`, `DATE_FORMAT`, `FIELD`) contain no user-supplied interpolation.
 *   **Encryption at rest** ⚠️ — Laravel `Crypt::encryptString()` protects `employees.phone`, `employee_credentials.credential_number`, `system_integrations.api_key`, and `users.totp_secret`, with controller decryption on authorized reads and migrations encrypting existing rows. Other fields, including most performance and succession data, remain database plaintext.
-*   **Two-Factor Authentication (2FA / TOTP)** ✅ — mandatory 2FA via Email OTP (2-min expiry, SHA-256 hashed) and RFC 6238 TOTP MFA. OTP codes are never displayed on screen during SMTP delivery failures. TOTP secrets are encrypted at rest, require password verification on enrollment, and prevent replay attacks via `totp_consumed_counter`. Trusted-device 30-day bypasses have been removed.
+*   **Two-Factor Authentication (2FA / TOTP)** ✅ — mandatory 2FA via Email OTP (5-min expiry, SHA-256 hashed) and RFC 6238 TOTP MFA. OTP codes are never displayed on screen during SMTP delivery failures. TOTP secrets are encrypted at rest, require password verification on enrollment, and prevent replay attacks via `totp_consumed_counter`. Trusted-device 30-day bypasses have been removed.
 *   **Audit trail** ✅ — two layers: rich `AuditTrail::record()` entries with before/after state on sensitive workflows (AI writes, Record Access, GDPR actions, training assignments, renewals, completions, employee/user administration, competency and credential verification, reviews, succession, recognition and awards), plus `AuditRequests` baseline rows for every successful write (`http_<verb>`) and every sensitive record open (`view`). Rows form a SHA-256 hash chain (`chain_seq`, `chain_hash`) checked by `php artisan hims:audit-verify`. Audit rows are retained indefinitely unless pruning is requested explicitly (minimum 6 years).
 
 ### 7.3 Compliance Control Summary
@@ -1522,7 +1522,7 @@ Public self-registration and self-service password reset (`/forgot-password`) ar
 | 2-Minute silent idle timeout & deactivation | Hospital policy · HIPAA | ✅ Implemented (no prompts, auto-terminate, landing page) |
 | Login rate-limiting & 5-attempt lockout | Baseline · Hospital policy | ✅ Implemented (5 attempts, 15-min lock, Admin unlock) |
 | Role-based access enforcement | Baseline | ✅ Implemented (24 Gates + `role` middleware, 6 roles) |
-| Record Access Password Gate | Hospital policy · RA 10173 | ✅ Implemented (in-place blur overlay, 5-min session grant, manual lock, audited) |
+| Record Access Password Gate | Hospital policy · RA 10173 | ✅ Implemented (in-place blur overlay, unlock until Lock or session end, audited) |
 | GDPR / RA 10173 Data Subject Rights | GDPR · RA 10173 | ✅ Implemented (Consent banner, JSON export, account erasure, separated PII anonymization, retention pruning) |
 | AI Employee Data Prohibition | GDPR · RA 10173 | ✅ Implemented (`AiAccessPolicy` blocks `employees` topic for all roles; `AiEntityResolver` employee lookup disabled) |
 | Input validation / SQL-injection defence | Baseline | ✅ Implemented (validation + bound params) |
@@ -2072,7 +2072,7 @@ Notes:
 | MySQL schema & migrations (55 live tables, 1 view, 2 triggers; 44 applied migrations) | ✅ Complete |
 | Laravel Breeze session auth; admin-provisioned accounts, registration & self-service password reset disabled | ✅ Complete |
 | Mandatory 2FA (Email OTP + RFC 6238 TOTP MFA), 2-min silent idle timeout to the public landing page, and 5-attempt lockout | ✅ Complete |
-| Record Access Password Gate (`RecordAccess`) — in-place CSS blur & 5-min session unlock overlay | ✅ Complete |
+| Record Access Password Gate (`RecordAccess`) — in-place CSS blur & unlock overlay (until Lock or session end) | ✅ Complete |
 | GDPR / RA 10173 Compliance — consent banner, JSON portability export, self-service erasure, separated PII anonymization, daily retention pruning | ✅ Complete |
 | RBAC — 24 Gates + `EnsureUserHasRole` middleware over 6 roles (adds Training Officer and time-limited Trainee) | ✅ Complete *(Gates, not Policies)* |
 | Account status (active / locked / deactivated / access ended) shown on users, directory and profile; employee separation deactivates the login | ✅ Complete |
@@ -2103,7 +2103,7 @@ Notes:
 *   **Database**: MySQL 8 — `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`, two `BEFORE INSERT`/`BEFORE UPDATE` triggers for competency gap, and one view (`v_recognition_leaderboard`). That is the whole of the database-enforced logic: there are **no generated columns and no `CHECK` constraints**, and the only true `ENUM` is `ai_chat_messages.role`. Credential status, review status, cycle status and the 9-box label are all computed in PHP, not by the database.
 *   **Clock**: `APP_TIMEZONE=Asia/Manila`. Three statuses — credential expiry, review freeze, cycle close — are decided by comparing today's date against a stored one, so the application timezone is part of the authorisation surface rather than a formatting preference. Under Laravel's stock UTC default an ended cycle stayed writable until 8am Philippine time.
 *   **Caching / Queue / Session**: `CACHE_STORE=database`, `QUEUE_CONNECTION=database`, `SESSION_DRIVER=database`. **Redis is not used** — its config is framework scaffolding only, no `predis` package, and the app makes no `Cache::` calls at all.
-*   **Authentication & Security**: Laravel Breeze v2.4, session-based, bcrypt (12 rounds), Mandatory 2FA (Email OTP + RFC 6238 TOTP MFA), 3-minute silent idle timeout (`EnforceSessionTimeout`), `EnsurePasswordIsChanged`, `SecurityHeaders`, and `RecordAccess` blur/unlock gate. Public registration and self-service password reset disabled; admin-provisioned accounts.
+*   **Authentication & Security**: Laravel Breeze v2.4, session-based, bcrypt (12 rounds), Mandatory 2FA (Email OTP + RFC 6238 TOTP MFA), 2-minute silent idle timeout (`EnforceSessionTimeout`), `EnsurePasswordIsChanged`, `SecurityHeaders`, and `RecordAccess` blur/unlock gate. Public registration and self-service password reset disabled; admin-provisioned accounts.
 *   **Authorisation**: 20 Laravel Gates + `EnsureUserHasRole` middleware over `users.role` (`admin`/`hr_manager`/`supervisor`/`staff`). No Policies.
 *   **AI Integration**: provider-agnostic `App\Contracts\AiProvider` resolved by `AiManager` — Gemini (default), OpenAI, Anthropic, or any OpenAI-compatible host, selected by `AI_PROVIDER`. Raw `Http::` calls via Guzzle; no vendor SDKs. Employee personal data is strictly off-limits (`AiAccessPolicy::TOPICS['employees']['roles'] = []`).
 *   **Build tooling**: Vite 8 + `laravel-vite-plugin` 3.1, Tailwind (v3 core + v4 Vite plugin), Alpine.js 3 — present but largely bypassed by the domain UI. Pint for formatting, PHPUnit 12 and Playwright for testing, Pail for log tailing.

@@ -123,11 +123,11 @@ Private recognition is searchable only by its sender, recipient, or HR/Admin mod
 
 ## Audit Access
 
-Audit history is restricted to administrators (`/audit` and `/audit/export` carry `role:admin`, and `GET /audit/history` carries `role:admin,hr_manager`), so staff and supervisors cannot retrieve the endpoint directly and UI visibility is not the control. The audit trail is attributable and covers logins, 2FA verification, Record Access unlocks/locks, GDPR data exports/erasure/anonymization, review lifecycle changes, succession, recognition moderation, AI-executed writes, and administrative updates, though there is no hash chaining.
+Audit history is restricted to Admins and HR Managers (`view-audit-history`). It is read through the **History** button on an employee profile and on credential rows, which loads `GET /audit/history` (`role:admin,hr_manager`); `GET /audit/export` carries the same middleware. There is no standalone `/audit` page. Staff, supervisors, Training Officers and trainees cannot retrieve audit rows.
 
 ## Record Access Password Gate (Blur & Unlock Overlay)
 
-Confidential employee, credential, and user-account tables render blurred in place (`.hims-record-blurred`) behind an inline password overlay (`partials/record-access-overlay.blade.php`) until the user enters the administrator-configured **Record Access Password** (`POST /record-access/unlock`, verified against `system_settings.record_access_password_hash`). A valid unlock grants a **5-minute (`300s`) session window** (`RecordAccess::TTL_SECONDS`) across sensitive views and can be manually re-locked at any time (`POST /record-access/lock`). Unlock and lock events are recorded in `audit_trails`.
+Confidential employee, credential, and user-account tables render blurred in place (`.hims-record-blurred`) behind an inline password overlay (`partials/record-access-overlay.blade.php`) until the user enters the administrator-configured **Record Access Password** (`POST /record-access/unlock`, verified against `system_settings.record_access_password_hash`). A valid unlock lasts across sensitive views until the user re-locks (`POST /record-access/lock`) or the session ends; there is no separate unlock timer. With no password configured, nobody can unlock. Unlock and lock events are recorded in `audit_trails`.
 
 ## AI Assistant Employee Data Prohibition
 

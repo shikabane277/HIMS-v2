@@ -34,7 +34,7 @@ graph TD
     subgraph "Application Layer (Laravel 13 MVC)"
         C["Web Routing (routes/web.php) & Rate Limiting"] --> SH["SecurityHeaders + EnforceSessionTimeout (5m)<br/>+ EnsurePasswordIsChanged"]
         SH --> D["Laravel Breeze Session Auth + Mandatory 2FA<br/>(Email OTP / RFC 6238 TOTP)"]
-        D --> RB["20 Gates + 'role' Middleware (RBAC)<br/>+ RecordAccess Gate (In-Place Blur/Unlock)"]
+        D --> RB["24 Gates + 'role' Middleware (RBAC)<br/>+ RecordAccess Gate (In-Place Blur/Unlock)"]
         RB --> E["Controllers (Performance, Competency, GapAnalysis,<br/>Learning, Compliance, Training, Succession, Recognition,<br/>Reports, Employees, Users, Profile/GDPR)"]
         E --> F["AiProvider Contract → AiManager<br/>(Gemini / OpenAI / Anthropic / Compatible)<br/>🔒 Zero Employee Data Access"]
     end
@@ -54,8 +54,8 @@ graph TD
 | **Frontend** | HTML5 + hand-authored `public/css/hims.css` + vanilla JS. **Bootstrap Icons** (font glyphs) via CDN only — the Bootstrap CSS *framework* is not used, so no reboot/normalise layer exists and the stylesheet must declare its own element defaults (see the `.hims-table th` note in §1). Tailwind/Vite are installed but the domain UI bypasses the build (`resources/css/app.css` is 3 lines). Domain views extend `layouts/hims` (including `profile/edit`). Record creation happens in **modals** (`.hims-modal-backdrop` / `.hims-modal`, z-index 1200, transparent backdrop acting purely as a dismissal hit area) driven by one shared controller, `partials/modal-js.blade.php`, and rendered through a `@stack('modals')` outside `<main>` so their `position: fixed` resolves against the viewport rather than the animated (transformed) content wrapper; multi-select uses **checkbox lists** (`.hims-checklist`), not `<select multiple>`. Tabular data uses one `.hims-table` style, with regression tests enforcing header/data alignment on the desktop grid and, below 768px, the restacking of every table into labelled record cards — `thead` hidden, each row a bordered card, each cell printing its own heading from `data-label` — so that no screen asks for a horizontal swipe. Sensitive workforce pages render with an in-place CSS blur (`.hims-record-blurred`) and unlock overlay when the **Record Access Password** gate is locked. Because the stylesheet and favicon are served outside the build, their URLs carry the file's own content hash (`substr(md5_file($path), 0, 8)`) from `partials/app-css.blade.php` and `partials/favicon.blade.php`. |
 | **Backend** | **PHP ^8.3**, **Laravel 13.22**. Controllers + `routes/web.php` routing, plus `SecurityHeaders`, `EnforceSessionTimeout`, and `EnsurePasswordIsChanged` middleware in the `web` stack. |
 | **Database** | MySQL 8 (`DB_CONNECTION=mysql`). **55 tables, 1 view, 2 triggers, 44 applied migrations**. `CHAR(36)` UUID PKs generated in PHP via `Str::uuid()`; MySQL triggers auto-compute competency gap; **three statuses are derived rather than stored** — `App\Support\CredentialStatus` (credential expiry), `CycleStatus` (review cycle closed) and `ReviewStatus` (review frozen) all compute from a date on every read, in PHP and as bound SQL. |
-| **Authentication** | Breeze v2.4 session auth on the `users` table + **Mandatory Two-Factor Authentication (2FA)** via Email OTP (5-minute expiry, SHA-256 hashed) or RFC 6238 TOTP Authenticator (`users.totp_secret` encrypted at rest, replay-protected via `totp_consumed_counter`). Login throttling = 5 attempts (`LoginRequest`, 15-minute lockout on 5th failure). Strict **3-minute silent session idle timeout** (`EnforceSessionTimeout`) and immediate session termination when `is_active = false`. Public self-registration and self-service "Forgot Password" are disabled — admins provision accounts and issue temporary passwords via `UserController` (`must_change_password` enforced by `EnsurePasswordIsChanged`). |
-| **Authorisation** | 20 Gates defined in `AppServiceProvider::registerGates()` + the `role` route middleware, both keyed on `users.role`, plus the **Record Access Password Gate (`App\Support\RecordAccess`)** protecting sensitive employee/credential screens. See [§3.2](#32-granular-access-control-rbac). The AI assistant adds subject-matter RBAC in `AiAccessPolicy` with a **strict prohibition on employee personal data across all roles**; see [§3.2.1](#321-subject-matter-rbac-for-the-ai-assistant). |
+| **Authentication** | Breeze v2.4 session auth on the `users` table + **Mandatory Two-Factor Authentication (2FA)** via Email OTP (5-minute expiry, SHA-256 hashed) or RFC 6238 TOTP Authenticator (`users.totp_secret` encrypted at rest, replay-protected via `totp_consumed_counter`). Login throttling = 5 attempts (`LoginRequest`, 15-minute lockout on 5th failure). Strict **2-minute silent session idle timeout** (`EnforceSessionTimeout`, returns to the public landing page) and immediate session termination when `is_active = false` or a trainee's `access_expires_at` has passed. Public self-registration and self-service "Forgot Password" are disabled — admins provision accounts and issue temporary passwords via `UserController` (`must_change_password` enforced by `EnsurePasswordIsChanged`). |
+| **Authorisation** | 24 Gates defined in `AppServiceProvider::registerGates()` + the `role` route middleware, both keyed on `users.role`, plus the **Record Access Password Gate (`App\Support\RecordAccess`)** protecting sensitive employee/credential screens. See [§3.2](#32-granular-access-control-rbac). The AI assistant adds subject-matter RBAC in `AiAccessPolicy` with a **strict prohibition on employee personal data across all roles**; see [§3.2.1](#321-subject-matter-rbac-for-the-ai-assistant). |
 | **Privacy & GDPR** | Strict GDPR & Philippine Data Privacy Act (RA 10173) controls: Art. 7/13 consent banner (`POST /profile/gdpr-consent`), Art. 15/20 JSON data portability export (`GET /profile/export-data`), Art. 17 cascading account erasure (`DELETE /profile`) and separated employee PII anonymization (`POST /employees/{id}/anonymize`), and Art. 5(1)(e) automated data retention pruning (`php artisan hims:prune-expired-data` / `GET /api/cron/prune`). |
 | **Cache / session / queue** | `CACHE_STORE=database`, `SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`. The application makes no `Cache::` calls of its own and dispatches no queued jobs. |
 | **Timezone** | `APP_TIMEZONE=Asia/Manila` (`config/app.php`). **An authorization setting, not a display one** — the three derived statuses above all ask "has this date passed?" against `now()->toDateString()`, so under Laravel's stock UTC default a Philippine cycle stayed editable until 8am the day after it ended. See [§2.2.1](#221-review-and-cycle-status-are-derived-from-the-cycles-end-date). |
@@ -672,7 +672,7 @@ sequenceDiagram
     alt 5th Failed Attempt
         Web-->>User: Set users.locked_until (+15 mins) & Reject
     else Valid Credentials & is_active = true
-        Web->>TwoFA: Issue 2FA Challenge (Email OTP 2m / TOTP)
+        Web->>TwoFA: Issue 2FA Challenge (Email OTP 5m / TOTP)
         TwoFA-->>User: Redirect to /two-factor-challenge
         User->>TwoFA: POST /two-factor-challenge (6-digit code)
         TwoFA->>TwoFA: Verify SHA-256 OTP or RFC 6238 TOTP (check totp_consumed_counter)
@@ -685,7 +685,7 @@ sequenceDiagram
         Rec-->>User: Render Page Blurred (.hims-record-blurred) + Unlock Overlay
         User->>Rec: POST /record-access/unlock (Record Access Password)
         Rec-->>User: Set session('record_access_granted_at') + Audit Trail + Unblur
-    else Record Access Unlocked (within 5m window)
+    else Record Access Unlocked (until Lock or session end)
         Rec-->>User: Render Unblurred Content
     end
 ```
@@ -980,11 +980,11 @@ read screen are MySQL-gated — the listings select `CONCAT()`, which sqlite doe
 
 *   **In-Transit & HTTP Security Headers (`SecurityHeaders`)**: TLS is terminated by the hosting proxy in deployment;
     `bootstrap/app.php` configures `trustProxies` from `APP_TRUSTED_PROXIES`. Every response passes through
-    `App\Http\Middleware\SecurityHeaders`, which enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
-    `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`,
-    a strict `Content-Security-Policy` (`frame-ancestors 'none'; base-uri 'self'; form-action 'self'`), and
-    `Strict-Transport-Security: max-age=31536000; includeSubDomains` over HTTPS. Authenticated responses also receive
-    `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` to prevent browser caching of workforce PII on shared terminals.
+    `App\Http\Middleware\SecurityHeaders`, which sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`,
+    `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()`,
+    `X-Permitted-Cross-Domain-Policies: none`, and `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+    over HTTPS. No `Content-Security-Policy` header is sent. Authenticated responses also receive
+    `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` and `Pragma: no-cache` to prevent browser caching of workforce PII on shared terminals.
 *   **At-Rest Encryption (`Crypt::encryptString`)**: `employees.phone`, `employee_credentials.credential_number`,
     `system_integrations.api_key`, and `users.totp_secret` are encrypted at rest with AES-256-CBC via Laravel
     `Crypt::encryptString()` on write and decrypted only in authorized controllers/services.
@@ -993,8 +993,10 @@ read screen are MySQL-gated — the listings select `CONCAT()`, which sqlite doe
     `/employees/manager-setup`, `/competency/credentials`, `/learning/accounts`, etc.) render blurred
     (`.hims-record-blurred`) behind an in-place glassmorphic unlock overlay (`partials/record-access-overlay.blade.php`)
     until the user enters the admin-configured **Record Access Password** (`POST /record-access/unlock`). Unlocking
-    grants a 5-minute (`300s`) session window (`record_access_granted_at`) and can be manually re-locked at any time
-    via the lock badge (`POST /record-access/lock`). All unlock/failure/lock events are recorded in `audit_trails`
+    sets `record_access_unlocked` in the session, which lasts until the user clicks the lock badge
+    (`POST /record-access/lock`) or the session ends (2-minute idle timeout, sign-out, deactivation). There is no
+    separate unlock timer. If no Record Access Password has been configured, nobody can unlock; there is no default
+    password. All unlock/failure/lock events are recorded in `audit_trails`
     (`record_access_unlocked`, `record_access_failed`, `record_access_locked`).
 *   **GDPR & Philippine Data Privacy Act (RA 10173) Data Subject Rights**:
     *   **Lawfulness & Transparency (Art. 7, 13–14)**: Persistent Data Privacy Notice banner (`partials/gdpr-privacy-banner.blade.php`) with explicit consent recording (`POST /profile/gdpr-consent` → `system_settings` + `audit_trails` action `gdpr_consent_acknowledged`).

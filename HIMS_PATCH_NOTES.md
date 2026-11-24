@@ -108,11 +108,18 @@ HR3 Performance & Development release for hospital rollout. It adds a public lan
 
 ### Security
 
+*   **The Record Access gate no longer has a default password.** `RecordAccess::verify()` used to fall back to `Hash::make('password')` when no password was configured, so anyone could unlock with `password`. Unlocking is now impossible until an Administrator sets a password.
 *   `Strict-Transport-Security: max-age=31536000; includeSubDomains` is sent on HTTPS responses.
 *   Deactivated and expired accounts are ended on their next request, not at their next sign-in.
 
 ### Docs
 
+*   **Corrected older statements that did not match the code:**
+    - The Email OTP lasts 5 minutes, not 2.
+    - A Record Access unlock lasts until **Lock** or the end of the session. There is no 5-minute timer.
+    - `SecurityHeaders` sends `X-Frame-Options: SAMEORIGIN` and no Content-Security-Policy.
+    - Audit history is the **History** modal (`/audit/history`, `/audit/export`, Admin/HR), not an `/audit` page.
+    - The remaining "20 Gates / four roles" and "3-minute" mentions are updated.
 *   Updated `README.md`, `HIMS_ACCESS_AND_VISIBILITY.md`, `HIMS_ARCHITECTURE_AND_SECURITY.md`, `HIMS_SYSTEM_DOCUMENTATION.md`, `HIMS_USER_GUIDE.md` and `.claude/rules/authorization.md` for the six account types, the 2-minute timeout and landing page, the audit hash chain, awards and certificates, CPD qualification and promotion qualification.
 
 ---
